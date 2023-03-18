@@ -7,6 +7,7 @@ from simple_salesforce import Salesforce
 from common import logger
 
 class HarvardSalesforce:
+    # initailize by connecting to salesforce
     def __init__(self, domain, username, password, consumer_key, consumer_secret):
         self.domain = domain
         self.username = username
@@ -40,8 +41,39 @@ class HarvardSalesforce:
                 return False
         return True
     
-    def getContactIds(huids):
-        logger.info(f"getContactIds with the following huids: {huids}")
+    # this function will return a map of the contact ids to huid
+    # NOTE: that there doesn't seem to be a good way to get multiple results without a soql query
+    def getContactIds(self, id_type, ids):
+        logger.info(f"getContactIds with the following huids: {ids}")
+        ids_string = "'" + '\',\''.join(ids) + "'"
+        sf_data = self.sf.query_all(f"SELECT Contact.id, {id_type} FROM Contact WHERE {id_type} IN({ids_string})")
+        logger.info(f"got this data from salesforce: {sf_data}")
+        return sf_data
+    
+    # TODO: use the normal API set call to set the pre-determined deleted flag
+    # NOTE: the integration user I'm using seems to only have GET/POST/HEAD permissions (on standard objects at least)
+    #  update() requires PATCH and I don't know where that permission is in Salesforce yet, it would also need to be set by the admins, so maybe don't?
+    # NOTE: this will set "all" deleted flags at once with the Bulk API
+    def setDeleteds(self, object, id_type, deleted_flag, ids):
+        data = []
+        for id in ids:
+            obj = {}
+            obj[id_type] = id
+            obj[deleted_flag] = True
+            data.append(obj)
+
+        responses = self.sf.bulk.__getattr__(object).upsert(data, external_id_field=id_type)
+        logger.info(responses)
+
+        for response in responses:
+            if(response['success'] != True):
+                logger.error(f"Error in setting deleted: {response['errors']}")
+                return False
+
+        # logger.info(f"id type: {id_type}")
+        # result = self.sf.__getattr__(id_obj).update(f"{id_field}", {'flag_obj': 'Jegede2'})
+        # logger.info(f"Updated deleted flag: {result}")
+        return True
 
 
 
@@ -69,17 +101,7 @@ def sampleCall():
     try: 
         sf = initialize()
 
-        # logger.info("trying to connect...")
-        # sf = Salesforce(
-        #     username=os.getenv('SF_USERNAME'),
-        #     password=os.getenv('SF_PASSWORD'),
-        #     consumer_key=os.getenv('SF_CLIENT_KEY'),
-        #     consumer_secret=os.getenv('SF_CLIENT_SECRET'),
-        #     domain='test'
-        # )
-
         # logger.info("trying a query...")
-        # sf_data = sf.query_all("SELECT Contact.id, HUDA__hud_MULE_UNIQUE_PERSON_KEY__c FROM Contact WHERE HUDA__hud_MULE_UNIQUE_PERSON_KEY__c = '88f5b068222b1f0c'")
         # logger.info(sf_data)
         # sf_data = sf.query_all("SELECT FIELDS(ALL) FROM HUDA__hud_Email__c WHERE HUDA__MULE_UNIQUE_PERSON_KEY__c = '88f5b068222b1f0c' LIMIT 200")
         # logger.info(sf_data)
@@ -109,24 +131,10 @@ def sampleCall():
     
 
 # NOTE: this does not work, not sure I need it though
-def getBulkLogs():
-    job_logs = sf.bulk.get_all_jobs()
-    most_recent_job_log = max(job_logs, key=lambda x: x['createdDate'])
-    logger.info(most_recent_job_log)
-
-
-# This method will work synchronously
-# that will probably be too slow
-# to make best use of this, we will need to async it with something like asyncio
-# def pushBulk(object, data):
+# def getBulkLogs():
 #     sf = initialize()
-#     logger.info(f"pushBulk to {object} with {data}")
-#     response = sf.bulk.__getattr__(object).upsert(data, external_id_field='Id')
-#     logger.info(response)
-#     if len(response['success']) == True:
-#         return True
-#     else:
-#         logger.error(f"Error in bulk data load: {response['errors']}")
-#         return False
+#     job_logs = sf.bulk.get_all_jobs()
+#     most_recent_job_log = max(job_logs, key=lambda x: x['createdDate'])
+#     logger.info(most_recent_job_log)
 
 
