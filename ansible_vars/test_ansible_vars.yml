@@ -1,0 +1,34 @@
+
+# Health
+# health_check_interval: 60
+# target_app_health_check_path: "/ats/ess-public-covid/v1"
+# unhealthy_threshold_count: 5
+
+
+# target_desired_task_count: 2
+target_app_context: "/person-updates"
+create_service: false
+
+# this is the lowest for fargate?
+# target_memory_mb: 1024
+# target_cpu: 256
+target_memory_mb: 1024
+target_cpu: 512
+
+# target_port: 9201
+target_app_name: "person-updates"
+# target_app_hostname: "person-api"
+# target_app_zone: "test.ats.cloud.huit.harvard.edu"
+
+target_container_image: "artifactory.huit.harvard.edu/aais-docker-local/person-updates"
+target_app_version: "latest"
+
+target_container_credentials: "arn:aws:secretsmanager:us-east-1:001980101248:secret:aais-services-artifactory-creds-sEMlXO"
+target_container_host: "artifactory.huit.harvard.edu:443"
+
+target_launchtype: "FARGATE"
+target_alb_name: "def"
+
+target_app_secrets_ref:
+  - aais-oakdev-mule: "arn:aws:secretsmanager:us-east-1:001980101248:secret:aais-services-oakdev-mule-oOJhHY:password::"
+    aais-elastic: "arn:aws:secretsmanager:us-east-1:001980101248:secret:aais-services-elastic-dev-SfyZ3Z:password::"
