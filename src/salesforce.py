@@ -1,4 +1,3 @@
-import requests
 import os
 import json
 from urllib.parse import urlencode
@@ -25,7 +24,8 @@ class HarvardSalesforce:
             raise e
 
     # NOTE: this uses the Salesforce Bulk API
-    # this API is generally async, but the way I'm using it, it will wait (synchronously) for the job to finish 
+    # this API is generally async, but the way I'm using it (through simple-salesforce), it will wait (synchronously) for the job to finish 
+    # this allows us to get the error logs without having to wait/check
     # that will probably be too slow to do fully sync
     # to make best use of this, we will need to async it with something like asyncio
     # NOTE: the Bulk API can take a max of 10000 records at a time
@@ -50,7 +50,6 @@ class HarvardSalesforce:
         logger.info(f"got this data from salesforce: {sf_data}")
         return sf_data
     
-    # TODO: use the normal API set call to set the pre-determined deleted flag
     # NOTE: the integration user I'm using seems to only have GET/POST/HEAD permissions (on standard objects at least)
     #  update() requires PATCH and I don't know where that permission is in Salesforce yet, it would also need to be set by the admins, so maybe don't?
     # NOTE: this will set "all" deleted flags at once with the Bulk API
