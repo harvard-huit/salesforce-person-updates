@@ -32,9 +32,10 @@ logger = logging.getLogger(__name__)
 # get data from DynamoDB
 #============================================================================================
 def getConfig(nameStr):
-    retValue = clientForDynamoDB.get_item(
+    dynamo = boto3.client('dynamodb')
+    retValue = dynamo.get_item(
         Key={
-            'flag_name': {'S': nameStr}
+            'name': {'S': nameStr}
         },
         TableName="salesforce-person-updates-config",
     )    

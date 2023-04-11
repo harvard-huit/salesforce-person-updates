@@ -1,0 +1,15 @@
+{
+    "fields": [
+        "eppn",
+        "netid",
+        "univid",
+        "birthDate",
+        "effectiveStatus",
+        "deceasedFlag",
+        "names.name",
+        "emails.email"        
+    ],
+    "conditions": {
+        "univid": "80719647"
+    }
+}

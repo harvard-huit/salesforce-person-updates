@@ -1,0 +1,32 @@
+{
+    "Contact": {
+        "Id": {
+            "pds": "personKey",
+            "salesforce": "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c"
+        },
+        "Birthdate": "birthDate",
+        "HUDA__hud_BIRTH_DT__c": "birthDate",
+        "HUDA__hud_EFF_STATUS__c": "effectiveStatus.code",
+        "HUDA__hud_DECEASED_FLAG__c": "deceasedFlag",
+        "HUDA__hud_EPPN__c": "eppn",
+        "Name": {
+            "value": "names.name",
+            "when": {
+                "names.personNameType.code": ["LISTING", "OFFICIAL"]
+            }
+        },
+        "Email": {
+            "value": "emails.email",
+            "when": {
+                "emails.officialEmailIndicator": true,
+                "emails.effectiveStatus.code": "A"
+            }
+        },
+        "HUDA__hud_ADID__c": "netid",
+        "HUDA__hud_EFFDT__c": "effectiveDate",
+        "HUDA__hud_INTERNAL_ID__c": "uuid",
+        "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c": "eppn",
+        "HUDA__hud_UUID__c": "uuid"
+    }
+    
+}
