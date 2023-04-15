@@ -19,7 +19,6 @@ class SalesforceTransformer:
                 # current_record is an array because on records that aren't flat, 
                 #   we're going to have to deal with multiples per person
                 current_record = {}
-                current_records = []
 
                 # if it's flat, that means there's only one per person
                 #   (otherwise, it's intention is to get a branch with multiple values per person,
@@ -27,8 +26,7 @@ class SalesforceTransformer:
                 is_flat = self.config[object_name].get('flat') or False    
 
                 good_records = []
-                best_branches = []
-                good_branch = {}
+                best_branches = {}
                 
                 object_config = self.config[object_name]['fields']
                 pds_id_name = self.config[object_name]['Id']['pds']
@@ -151,13 +149,14 @@ class SalesforceTransformer:
                                     best_branch = branch
 
                             if not is_flat:
-                                id_name = self.hashed_ids[object_name]['id_name']
-                                if "." in id_name:
-                                    id_name.split(".")[1:]
-                                if best_branch[id_name] not in [b[id_name] for b in best_branches]:
-                                    best_branches.append(best_branch)
+                                pds_id_name = self.hashed_ids[object_name]['id_name']
+                                if "." in pds_id_name:
+                                    (branch_name, pds_id_name) = pds_id_name.split(".")
+                                pds_branch_id = str(best_branch[pds_id_name])
+                                if pds_branch_id not in best_branches.keys():
+                                    best_branches[pds_branch_id] = {}
+                                best_branches[pds_branch_id] = best_branch
 
-                                best_branches.append(best_branch)
                             
 
                         if best_branch is not None:
@@ -190,21 +189,22 @@ class SalesforceTransformer:
 
 
 
-                for branch in best_branches:
-                    current_record = {}
-                    branch_field_pieces = branch_field.split(".")
-                    if len(branch_field_pieces) == 1:
-                        value = branch[branch_field]
-                    elif len(branch_field_pieces) == 2:
-                        value = branch[branch_field_pieces[0]][branch_field_pieces[1]]
-                    if object_name not in current_record:
-                        current_record[object_name] = {}
-                    for target in self.config[object_name]['fields']:
-                        # source = self.config[object_name]['fields'][target]
-                        # value = branch[source.split(".")[1:]]
-                        # current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
-                        pass
-                    current_record = self.setId(person=person, object_name=object_name, current_record=current_record)
+                for pds_branch_id, branch in best_branches.items():
+        
+                    current_record[object_name] = {}
+                    
+                    # if this id is in the hashed_ids, that means it'll be an update and we need to add the Id
+                    if pds_branch_id in self.hashed_ids[object_name]['Ids']:
+                        sf_id = self.hashed_ids[object_name]['Ids'][pds_branch_id]
+                        current_record[object_name]['Id'] = sf_id
+                    for target, source in self.config[object_name]['fields'].items():
+                        source_pieces = source.split(".")[1:]
+                        if len(source_pieces) == 1:
+                            value = branch[source_pieces[0]]
+                        elif len(source_pieces) == 2:
+                            value = branch[source_pieces[0]][source_pieces[1]]
+                        current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
+
                     good_records.append(current_record[object_name])
                     
 
@@ -230,7 +230,7 @@ class SalesforceTransformer:
         if 'Id' in self.config[object_name]:
             source_object = self.config[object_name]['Id']
             if 'pds' in source_object and 'salesforce' in source_object:
-                logger.debug(f"hashed: {self.hashed_ids[object_name]}")
+                # logger.debug(f"hashed: {self.hashed_ids[object_name]}")
                 # then this is an Id we need to try and match
                 id_name = self.hashed_ids[object_name]['id_name']
                 salesforce_id_name = source_object['salesforce']

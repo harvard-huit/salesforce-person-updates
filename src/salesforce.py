@@ -114,13 +114,20 @@ class HarvardSalesforce:
         if 'updateable' not in self.type_data[object][field]:
             raise Exception(f"Error: field ({field}) does not have an associated `updateable`")
 
+        if value is None:
+            return value
+
+        if not isinstance(value, (str, bool, int)):
+            value_type = type(value)
+            raise Exception(f"Error: value ({value}) for {object}.{field} is not a valid type ({value_type}).")
+
         # if this is false, it means it's not a field we can update
         #   `Id` isn't something we can even try to edit
         if not self.type_data[object][field]['updateable'] and field != "Id":
             raise Exception(f"Error: field ({object}.{field}) is not editable")
 
-        type = self.type_data[object][field]['type']
-        if type in ["textarea", "string"]:
+        field_type = self.type_data[object][field]['type']
+        if field_type in ["textarea", "string"]:
             length = self.type_data[object][field]['length']
             value = str(value)
             if value is None:
@@ -129,11 +136,11 @@ class HarvardSalesforce:
                 if len(value) > length:
                     value = value[:length]
                 return str(value)
-        if type in ["email"]:
+        if field_type in ["email"]:
             return str(value)
-        if type in ["id"]:
+        if field_type in ["id"]:
             return value
-        if type in ["date"]:
+        if field_type in ["date"]:
             # NOTE: Salesforce only liked dates from the year of our lord 1700-2400
             #       Salesforce also wants the date in an iso-8861 string
             #       It does not handle datetime as a date, so the 00:00:00 needs to be stripped off of datetimes
@@ -146,7 +153,7 @@ class HarvardSalesforce:
             except ValueError as e:
                 raise Exception(f"Error: {e}")
             return value
-        if type in ["datetime"]:
+        if field_type in ["datetime"]:
             try:
                 if value:
                     valid_date = datetime.strptime(value, '%Y-%m-%dT%H:%M:%S').date()
@@ -155,13 +162,13 @@ class HarvardSalesforce:
             except ValueError as e:
                 raise Exception(f"Error: {e}")
             return value
-        if type in ["double"]:
+        if field_type in ["double"]:
             try: 
                 return float(value)
             except ValueError as e:
                 raise Exception(f"Error converting {object}.{field} ({value}) to double/float: {e}")
         else:
-            raise Exception(f"Error: unhandled type: {type}")
+            raise Exception(f"Error: unhandled field_type: {field_type}")
 
     # format should look like { "OBJECT": { "id_name": "PDS ID NAME", "Ids": { "HARVARD ID": "SALESFORCE ID", ... } } }
     def getUniqueIds(self, config, people):
@@ -202,7 +209,7 @@ class HarvardSalesforce:
                         if 'Ids' not in self.unique_ids[object]:
                             self.unique_ids[object]['Ids'] = {}
 
-                        self.unique_ids[object]['Ids'][record[salesforce_id_name]] = record['Id']
+                        self.unique_ids[object]['Ids'][str(record[salesforce_id_name])] = record['Id']
 
                 else:
                     raise Exception(f"Error: match_to requires both 'salesforce' and 'pds' keys so we know which ids to match")
