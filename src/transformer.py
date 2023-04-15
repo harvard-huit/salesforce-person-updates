@@ -16,8 +16,6 @@ class SalesforceTransformer:
 
             # go through all the objects
             for object_name in self.config:
-                # current_record is an array because on records that aren't flat, 
-                #   we're going to have to deal with multiples per person
                 current_record = {}
 
                 # if it's flat, that means there's only one per person
@@ -182,7 +180,6 @@ class SalesforceTransformer:
                     if is_flat:
                         if object_name not in current_record:
                             current_record[object_name] = {}
-                        current_record = self.setId(person=person, object_name=object_name, current_record=current_record)
                         current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
                     # else: 
                     #     current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
@@ -213,6 +210,7 @@ class SalesforceTransformer:
 
                 if is_flat:
                     data[object_name] = []
+                    current_record = self.setId(person=person, object_name=object_name, current_record=current_record)
                     data[object_name].append(current_record[object_name])
                 else:
                     data[object_name] = good_records
@@ -254,7 +252,7 @@ class SalesforceTransformer:
 
                     if object_name not in current_record:
                         current_record[object_name] = {}
-                    current_record[object_name][salesforce_id_name] = self.hsf.validate(object=object_name, field=salesforce_id_name, value=value)
+                    current_record[object_name]['Id'] = self.hsf.validate(object=object_name, field=salesforce_id_name, value=value)
             else:
                 raise Exception("Error: config object's Id requires a pds and salesforce value to be able to match")
                 

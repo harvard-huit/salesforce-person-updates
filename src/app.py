@@ -139,7 +139,7 @@ def main():
             # if isinstance(object, list):
             #     for b in object:
                     
-            # hsf.pushBulk(object, object_data)    
+            hsf.pushBulk(object, object_data)    
 
         # NOTE: see notes on this function
         # hsf.setDeleteds(object='Contact', id_type='HUDA__hud_UNIV_ID__c', deleted_flag='lastName', ids=['31598567'])
