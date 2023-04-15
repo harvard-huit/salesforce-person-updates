@@ -5,9 +5,6 @@ from common import logger
 from dotmap import DotMap
 
 
-# class Person(DotMap):
-
-
 class People:
     def __init__(self, query, apikey):
         if apikey == None:
@@ -81,10 +78,54 @@ class People:
         return json.loads(response.text)
             
 
-
-
 # this is to get the value of a dotted element
-def getValue(item):
-    pieces = item.split(".")
-    if len(pieces) < 1:
-        return 
+# (purposely not in the class)
+def getValue(field, person, condition={}):
+
+
+    if field in person:
+        return person[field]
+    else:
+        if "." in field:
+            branch_name = field.split(".")[0]
+            field_name = field.split(".")[1]
+
+            condition_index = None
+            condition_value = None
+            if condition:
+                condition_index = condition.keys()[0]
+                condition_value = condition[condition_index]
+
+            if branch_name not in person:
+                raise Exception(f"Error: {branch_name} not found in person {person}")
+            
+            condition_branch = None
+            if "." in condition_index:
+                pieces = condition_index.split(".")
+                condition_branch = pieces[0]
+                if condition_branch not in person:
+                    raise Exception(f"Error: condition source ({condition_index}) not found in person ({person})")
+                # split off the branch value
+                condition_index = pieces[1:]
+                if "." in condition:
+                    # TODO: finish this
+                    pass                    
+
+
+            data = []
+            for branch in person[branch_name]:
+                if field_name in branch:
+                    if condition:
+                        data.append(branch[field_name])
+                else:
+                    if "." in field_name:
+                        pieces = field_name.split(".")
+                        if pieces[0] in branch:
+                            if pieces[1] in branch[0]:
+                                data.append(branch[pieces[0]][pieces[1]])
+                    else:
+                        raise Exception(f"Error: {field_name} not found in branch {branch}")
+            if len(data) == 1:
+                return data[0]
+            else:
+                return data

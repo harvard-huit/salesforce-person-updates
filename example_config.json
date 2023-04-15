@@ -1,32 +1,64 @@
 {
     "Contact": {
+        "flat": true,
         "Id": {
             "pds": "personKey",
             "salesforce": "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c"
         },
-        "Birthdate": "birthDate",
-        "HUDA__hud_BIRTH_DT__c": "birthDate",
-        "HUDA__hud_EFF_STATUS__c": "effectiveStatus.code",
-        "HUDA__hud_DECEASED_FLAG__c": "deceasedFlag",
-        "HUDA__hud_EPPN__c": "eppn",
-        "Name": {
-            "value": "names.name",
-            "when": {
-                "names.personNameType.code": ["LISTING", "OFFICIAL"]
-            }
+        "fields": {
+            "Birthdate": "birthDate",
+            "HUDA__hud_BIRTH_DT__c": "birthDate",
+            "HUDA__hud_EFF_STATUS__c": "effectiveStatus.code",
+            "HUDA__hud_DECEASED_FLAG__c": "deceasedFlag",
+            "HUDA__hud_EPPN__c": "eppn",
+            "FirstName": {
+                "value": "names.firstName",
+                "when": {
+                    "names.personNameType.code": ["LISTING", "OFFICIAL"]
+                }
+            },
+            "LastName": {
+                "value": "names.lastName",
+                "when": {
+                    "names.personNameType.code": ["LISTING", "OFFICIAL"]
+                }
+            },
+            "Email": {
+                "value": "emails.email",
+                "when": {
+                    "emails.officialEmailIndicator": true,
+                    "emails.effectiveStatus.code": "A"
+                }
+            },
+            "HUDA__hud_ADID__c": "netid",
+            "HUDA__hud_EFFDT__c": "effectiveDate",
+            "HUDA__hud_INTERNAL_ID__c": "uuid",
+            "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c": "personKey",
+            "HUDA__hud_UUID__c": "uuid",
+            "HUDA__hud_GENDER__c": "sex.code"
+        }
+    },
+    "HUDA__hud_Name__c": {
+        "flat": false,
+        "Id": {
+            "pds": "names.personNameKey",
+            "salesforce": "HUDA__PERSON_NAMES_KEY__c"
         },
-        "Email": {
-            "value": "emails.email",
-            "when": {
-                "emails.officialEmailIndicator": true,
-                "emails.effectiveStatus.code": "A"
-            }
-        },
-        "HUDA__hud_ADID__c": "netid",
-        "HUDA__hud_EFFDT__c": "effectiveDate",
-        "HUDA__hud_INTERNAL_ID__c": "uuid",
-        "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c": "eppn",
-        "HUDA__hud_UUID__c": "uuid"
-    }
-    
+        "fields": {
+            "HUDA__EFF_STATUS__c": "names.effectiveStatus.code",
+            "HUDA__EFFDT__c": "names.effectiveDate",
+            "HUDA__NAME_FIRST__c": "names.firstName",
+            "HUDA__UNIV_ID__c": "univid",
+            "HUDA__INTERNAL_ID__c": "uuid",
+            "HUDA__NAME_LAST__c": "names.lastName",
+            "HUDA__NAME_MIDDLE__c": "names.middleName",
+            "HUDA__MULE_UNIQUE_PERSON_KEY__c": "personKey",
+            "HUDA__NAME_TYPE__c": "names.personNameType.code",
+            "HUDA__PERSON_NAMES_KEY__c": "names.personNameKey",
+            "HUDA__NAME_PREFIX__c": "names.prefix",
+            "HUDA__NAME_SUFFIX__c": "names.suffix",
+            "HUDA__UPDATE_SOURCE__c": "",
+            "HUDA__UPDATE_DT__c": "names.updateDate"
+        }
+    }    
 }

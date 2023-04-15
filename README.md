@@ -2,6 +2,41 @@
 
 The salesforce-person-updates project pushes person data from the PDS to the specified Salesforce instance. 
 
+## Workflow
+
+This is an attempt to describe the workflow of this app. 
+
+### 0. This app is triggered. 
+
+### 1. Get confguration and data
+
+#### Configuration
+
+The config will look like the `example_config.json`. It is stored in DynamoDB...
+
+#### Watermark
+
+This controls when we last got updates. 
+
+#### Credentials
+
+Credentials are stored in Secrets Manager. The arn to the entry is in the Dynamo(?)
+
+### 2. Connect to Salesforce and Generate Metadata Maps
+
+### 3. Connect to the PDS and get the data we need
+
+The query for the PDS is stored alongside other configurations in the Dynamo table. This can help limit what data it sorts through and improve speed while reducing space imprint.
+
+### 4. Transform the PDS data into the Config format
+
+
+### 5. 
+
+## TODO: Deployment Notes
+
+
+
 ## Notes on simple-salesforce
 
 simple-salesforce is the most used Python salesforce integration library. We were also using simple-salesforce in the old HUDA API, but an older version. 
@@ -11,6 +46,8 @@ simple-salesforce is the most used Python salesforce integration library. We wer
 Authentication is blissfully abstracted by the simple-salesforce library. It can use either an access token OR a client_key/secret to authenticate a use. 
 
 If we were using the API, we would need to make a call to the token api and get a short lived token an pass that along with each call. The library keeps track of that internally. 
+
+TODO: Credentials are needed in the environment, so they are passed through at the scheduling step. 
 
 ### Bulk API
 

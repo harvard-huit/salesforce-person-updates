@@ -94,35 +94,64 @@ class HarvardSalesforce:
             self.type_data[object] = {}
             description = self.sf.__getattr__(object).describe()
             for field in description.get('fields'):
-                self.type_data[object][field['name']] = field['type']
+                self.type_data[object][field['name']] = {}
+                self.type_data[object][field['name']]['type'] = field['type'] 
+                self.type_data[object][field['name']]['updateable'] = field['updateable']
+                self.type_data[object][field['name']]['length'] = int(field['length'])
 
         return self.type_data
     
     # this will try to make sure the data going to the sf object is the right type
     def validate(self, object, field, value):
-        if not self.type_data:
-            raise Exception("Error: no type data found")
-        type = self.type_data[object][field]
+        if object not in self.type_data:
+            logger.warn("Warning: no type data found, run getTypeMap() first for better performance")
+            self.type_data([object])
+
+        if field not in self.type_data[object]:
+            raise Exception(f"Error: field ({field}) not found in type_data, please ensure this field is on that object")
+        if 'type' not in self.type_data[object][field]:
+            raise Exception(f"Error: field ({field}) does not have an associated `type`")
+        if 'updateable' not in self.type_data[object][field]:
+            raise Exception(f"Error: field ({field}) does not have an associated `updateable`")
+
+        # if this is false, it means it's not a field we can update
+        #   `Id` isn't something we can even try to edit
+        if not self.type_data[object][field]['updateable'] and field != "Id":
+            raise Exception(f"Error: field ({object}.{field}) is not editable")
+
+        type = self.type_data[object][field]['type']
         if type in ["textarea", "string"]:
-            return str(value)
+            length = self.type_data[object][field]['length']
+            value = str(value)
+            if value is None:
+                return ""
+            else:
+                if len(value) > length:
+                    value = value[:length]
+                return str(value)
         if type in ["email"]:
             return str(value)
         if type in ["id"]:
             return value
         if type in ["date"]:
+            # NOTE: Salesforce only liked dates from the year of our lord 1700-2400
+            #       Salesforce also wants the date in an iso-8861 string
+            #       It does not handle datetime as a date, so the 00:00:00 needs to be stripped off of datetimes
             value = value.split("T")[0].split(" ")[0]
             try:
-                valid_date = datetime.strptime(value, '%Y-%m-%d').date()
-                if not (date(1700, 1, 1) <= valid_date <= date(2400, 1, 1)):
-                    raise ValueError(f"Error: date out of range: {value}")
+                if value:
+                    valid_date = datetime.strptime(value, '%Y-%m-%d').date()
+                    if not (date(1700, 1, 1) <= valid_date <= date(2400, 1, 1)):
+                        raise ValueError(f"Error: date out of range: {value}")
             except ValueError as e:
                 raise Exception(f"Error: {e}")
             return value
         if type in ["datetime"]:
             try:
-                valid_date = datetime.strptime(value, '%Y-%m-%dT%H:%M:%S').date()
-                if not (date(1700, 1, 1) <= valid_date <= date(2400, 1, 1)):
-                    raise ValueError(f"Error: date out of range: {value}")
+                if value:
+                    valid_date = datetime.strptime(value, '%Y-%m-%dT%H:%M:%S').date()
+                    if not (date(1700, 1, 1) <= valid_date <= date(2400, 1, 1)):
+                        raise ValueError(f"Error: date out of range: {value}")
             except ValueError as e:
                 raise Exception(f"Error: {e}")
             return value
@@ -140,35 +169,43 @@ class HarvardSalesforce:
         for object in config.keys():
             ids = []
             self.unique_ids[object] = {}
-            if 'Id' in config[object]:
-                if 'salesforce' in config[object]['Id'] and 'pds' in config[object]['Id']:
-                    salesforce_id_name = config[object]['Id']['salesforce']
-                    person_id_name = config[object]['Id']['pds']
-                    person_branch = None
-                    if len(person_id_name.split(".")) > 1:
-                        person_branch = person_id_name.split(".")[0]
-                        person_id_name = person_id_name.split(".")[1]
 
-                    self.unique_ids[object]['id_name'] = person_id_name
+            if 'Id' in config[object]:
+
+                if 'salesforce' in config[object]['Id'] and 'pds' in config[object]['Id']:
+                    # salesforce_id_name is the id name of the external id as it exists in salesforce
+                    salesforce_id_name = config[object]['Id']['salesforce']
+                    # person_id_name is the id name of the same id in pds
+                    full_person_id_name = config[object]['Id']['pds']
+                    person_branch = None
+                    logger.info(f"full_person_id_name: {full_person_id_name}")
+
+                    self.unique_ids[object]['id_name'] = full_person_id_name
+                    if len(full_person_id_name.split(".")) > 1:
+                        person_branch = full_person_id_name.split(".")[0]
+                        person_id_name = full_person_id_name.split(".")[1]
+                    else:
+                        person_id_name = full_person_id_name
 
                     for person in people:
                         if person_branch is not None:
                             for b in person[person_branch]:
-                                ids.append(b[person_id_name])
+                                ids.append(str(b[person_id_name]))
                         else:
-                            ids.append(person[person_id_name])
+                            ids.append(str(person[person_id_name]))
     
                     ids_string = "'" + '\',\''.join(ids) + "'"
-                    logger.info(f"SELECT {object}.id, {salesforce_id_name} FROM Contact WHERE {salesforce_id_name} IN({ids_string})")
-                    sf_data = self.sf.query_all(f"SELECT {object}.id, {salesforce_id_name} FROM Contact WHERE {salesforce_id_name} IN({ids_string})")
-                    logger.info(f"got this data from salesforce: {sf_data}")
+                    logger.debug(f"SELECT {object}.Id, {salesforce_id_name} FROM {object} WHERE {salesforce_id_name} IN({ids_string})")
+                    sf_data = self.sf.query_all(f"SELECT {object}.Id, {salesforce_id_name} FROM {object} WHERE {salesforce_id_name} IN({ids_string})")
+                    logger.debug(f"got this data from salesforce: {sf_data['records']}")
                     for record in sf_data['records']:
-                        logger.info(record)
                         if 'Ids' not in self.unique_ids[object]:
-                            self.unique_ids[object]['Ids'] = {}    
+                            self.unique_ids[object]['Ids'] = {}
+
                         self.unique_ids[object]['Ids'][record[salesforce_id_name]] = record['Id']
 
                 else:
                     raise Exception(f"Error: match_to requires both 'salesforce' and 'pds' keys so we know which ids to match")
 
+        logger.debug(f"unique_ids: {self.unique_ids}")
         return self.unique_ids
