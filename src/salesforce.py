@@ -103,6 +103,7 @@ class HarvardSalesforce:
     
     # this will try to make sure the data going to the sf object is the right type
     def validate(self, object, field, value):
+        logger.debug(f"validating the value ({value}) for the field: {object}.{field}")
         if object not in self.type_data:
             logger.warn("Warning: no type data found, run getTypeMap() first for better performance")
             self.type_data([object])
@@ -138,7 +139,7 @@ class HarvardSalesforce:
                 return str(value)
         if field_type in ["email"]:
             return str(value)
-        if field_type in ["id"]:
+        if field_type in ["id", "reference"]:
             return value
         if field_type in ["date"]:
             # NOTE: Salesforce only liked dates from the year of our lord 1700-2400

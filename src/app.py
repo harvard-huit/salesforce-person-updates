@@ -139,7 +139,7 @@ def main():
             # if isinstance(object, list):
             #     for b in object:
                     
-            hsf.pushBulk(object, object_data)    
+            # hsf.pushBulk(object, object_data)    
 
         # NOTE: see notes on this function
         # hsf.setDeleteds(object='Contact', id_type='HUDA__hud_UNIV_ID__c', deleted_flag='lastName', ids=['31598567'])
@@ -162,7 +162,33 @@ main()
 # )
 
 
+# NOTE: branches are linked to the contact record via the eppn, not the contact relationship
+#       that's weird, right?
+# hsf.pushBulk("HUDA__hud_Name__c", [{
+#   'HUDA__EFFDT__c': '2018-10-23T02:32:49',
+#   'HUDA__EFF_STATUS__c': 'A',
+#   'HUDA__INTERNAL_ID__c': 'JaZahn',
+#   'HUDA__MULE_UNIQUE_PERSON_KEY__c': 'acd3d0471e7ed076',
+#   'HUDA__NAME_FIRST__c': 'JaZahn',
+#   'HUDA__NAME_LAST__c': 'Clevenger',
+#   'HUDA__NAME_MIDDLE__c': None,
+#   'HUDA__NAME_PREFIX__c': None,
+#   'HUDA__NAME_SUFFIX__c': None,
+#   'HUDA__NAME_TYPE__c': 'LISTING',
+#   'HUDA__PERSON_NAMES_KEY__c': '3701467',
+#   'HUDA__UNIV_ID__c': 'JaZahn',
+#   'HUDA__UPDATE_DT__c': '2018-10-23T02:32:49',
+#   'HUDA__UPDATE_SOURCE__c': None,
+#   'Id': 'aDmD40000001DrJKAU',
+#   'HUDA__Name_Contact__c': '00336000010CxNQAA0'
+# }])
+
 # response = hsf.sf.Contact.metadata()
 # response = hsf.getTypeMap(objects=testconfig.keys())
 # logger.info(json.dumps(response))
 # logger.info(pformat(json.dumps(response)))
+
+# contact_results = hsf.getContactIds(id_type='HUDA__hud_UNIV_ID__c', ids=['91156571'])
+# logger.info(pformat(contact_results))
+
+

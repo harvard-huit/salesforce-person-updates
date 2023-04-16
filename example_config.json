@@ -60,5 +60,31 @@
             "HUDA__UPDATE_SOURCE__c": "",
             "HUDA__UPDATE_DT__c": "names.updateDate"
         }
-    }    
+    },
+    "HUDA__hud_Email__c": {
+        "flat": false,
+        "Id": {
+            "pds": "emails.personEmailKey",
+            "salesforce": "HUDA__CONTACT_EMAIL_ADDRESS_KEY__c"
+        },
+        "fields": {
+            "HUDA__CONTACT_EMAIL_ADDRESS_KEY__c": "emails.personEmailKey",
+            "HUDA__EFF_STATUS__c": "emails.effectiveStatus.code",
+            "HUDA__EFFDT__c": "emails.effectiveDate",
+            "HUDA__EMAIL_ADDR_SOURCE__c": "emails.emailAddressSource",
+            "HUDA__EMAIL_ADDR_TYPE__c": "emails.emailAddressType",
+            "HUDA__EMAIL_ADDRESS__c": "emails.emailAddressSource",
+            "HUDA__Email_Contact__c": "sf.contact.id",
+            "HUDA__EMAIL_DOMAIN_NAME__c": "emails.emailDomainName",
+            "HUDA__EMAIL_USER_NAME__c": "emails.emailUserName",
+            "HUDA__INTERNAL_ID__c": "",
+            "HUDA__MULE_UNIQUE_PERSON_KEY__c": "",
+            "HUDA__OFFICIAL_EMAIL_INDICATOR__c": "emails.officialEmailIndicator",
+            "HUDA__PREFERRED_ALUMNI_EMAIL__c": "",
+            "HUDA__PRIVACY_VALUE__c": "emails.privacyValue.code",
+            "HUDA__temp_contactID__c": "",
+            "HUDA__UNIV_ID__c": "",
+            "HUDA__UPDATE_DT__c": ""     
+        }
+    }
 }

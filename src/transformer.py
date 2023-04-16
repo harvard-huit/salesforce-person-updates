@@ -14,6 +14,16 @@ class SalesforceTransformer:
         data = {}
         for person in people:
 
+            salesforce_person = {}
+            if 'Contact' in self.hashed_ds:
+                if self.hashed_ids['Contact']['id_name'] in person:
+                    salesforce_person = {
+                        "contact": {
+                            "id": self.hashed_ids['Contact']['Ids'][person[self.hashed_ids['Contact']['id_name']]]
+                        }
+                    }
+
+
             # go through all the objects
             for object_name in self.config:
                 current_record = {}
@@ -62,6 +72,9 @@ class SalesforceTransformer:
                         value = person[first]
                     elif isinstance(person[first], dict):
                         # if it's a dict, we need to get the piece further in
+                        if pieces[1] not in person[first]:
+                            logger.warn(f"Warning: reference ({pieces[1]}) not found in object ({person[first]})")
+                            continue
                         if isinstance(person[first][pieces[1]], dict):
                             value = person[first][pieces[1]][pieces[2]]
                         else:
@@ -195,12 +208,31 @@ class SalesforceTransformer:
                         sf_id = self.hashed_ids[object_name]['Ids'][pds_branch_id]
                         current_record[object_name]['Id'] = sf_id
                     for target, source in self.config[object_name]['fields'].items():
-                        source_pieces = source.split(".")[1:]
-                        if len(source_pieces) == 1:
-                            value = branch[source_pieces[0]]
-                        elif len(source_pieces) == 2:
-                            value = branch[source_pieces[0]][source_pieces[1]]
-                        current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
+                        
+                        value = None
+                        source_pieces = source.split(".")
+                        if source_pieces[0] in person:
+                            if isinstance(person[source_pieces[0]], list):
+                                source_pieces = source_pieces[1:]
+                            else:
+                                branch = person
+                        if source_pieces[0] in branch:
+                            if len(source_pieces) == 1:
+                                value = branch[source_pieces[0]]
+                            elif len(source_pieces) == 2:
+                                if source_pieces[1] in branch[source_pieces[0]]:
+                                    value = branch[source_pieces[0]][source_pieces[1]]
+                            current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
+                        if source_pieces[0] == 'sf':
+                            source_pieces = source_pieces[1:]
+                            if source_pieces[0] in salesforce_person:
+                                if isinstance(salesforce_person, (str, bool, int)):
+                                    value = salesforce_person[source_pieces[0]]
+                                elif isinstance(salesforce_person, dict) and len(source_pieces) == 2:
+                                    value = salesforce_person[source_pieces[0]][source_pieces[1]]
+                                current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
+
+                        # logger.warn(f"Warning: unable to find valid source: ({source})")
 
                     good_records.append(current_record[object_name])
                     
@@ -257,3 +289,31 @@ class SalesforceTransformer:
                 raise Exception("Error: config object's Id requires a pds and salesforce value to be able to match")
                 
         return current_record
+    
+    def getDotValue(self, object, reference):
+        pieces = reference.split(".")
+
+        if pieces[0] not in object.keys():
+            raise ValueError(f"Error: value ({pieces[0]}) not found in object ({object})")
+        if isinstance(object[pieces[0]], (str, bool, int)):
+            return object[pieces[0]]
+        if isinstance(object[pieces[0]], (dict)) and len(pieces) > 1:
+            if pieces[1] not in object[pieces[0]]:
+                raise ValueError(f"Error: value ({pieces[1]}) not found in object ({object[pieces[0]]})")
+            if isinstance(object[pieces[0]][pieces[1]], (str, bool, int)):
+                return object[pieces[0]][pieces[1]]
+        # if it's a list, it's a branch
+        # the return value needs to be a list unless there's a when?
+        if isinstance(object[pieces[0]], (list)):
+            branch_name = pieces[0]
+            branches = object[pieces[0]]
+            pieces = pieces[1:]
+            if len(pieces) == 0:
+                return branches
+            elif len(pieces) == 1:
+                return [b[pieces[1]] for b in branches]
+            elif len(pieces) == 2:
+                return [b[pieces[1][pieces[2]]] for b in branches]
+                    
+        
+
