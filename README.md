@@ -10,9 +10,13 @@ This is an attempt to describe the workflow of this app.
 
 ### 1. Get confguration and data
 
+#### PDS Query
+
+This will be the query we use to initially limit data and get just the data we need. This will look something like `example_query.json`
+
 #### Configuration
 
-The config will look like the `example_config.json`. It is stored in DynamoDB...
+The config will look like the `example_config.json`.
 
 #### Watermark
 
@@ -20,9 +24,11 @@ This controls when we last got updates.
 
 #### Credentials
 
-Credentials are stored in Secrets Manager. The arn to the entry is in the Dynamo(?)
+Credentials are stored in Secrets Manager. The arn to the entries are in the Dynamo
 
 ### 2. Connect to Salesforce and Generate Metadata Maps
+
+We get the metadata for all of the Salesforce Objects we're pushing to so we can do type validation before sending the data. 
 
 ### 3. Connect to the PDS and get the data we need
 
@@ -30,11 +36,17 @@ The query for the PDS is stored alongside other configurations in the Dynamo tab
 
 ### 4. Transform the PDS data into the Config format
 
+This is the meat of the app, we're descifering what the mapping configuration means and creating a format for the bulk data API. 
 
-### 5. 
+### 5. Push data to Salesforce
+
+We are using the Bulk API for this (through `simple-salesforce`). This API is typically asynchronous, however, we are using it synchronously so that we can "immediately" get feedback on if the call succeeded and log any issues. 
+
+### 6. Everyone is happy. 
+
+This is why we do what we do.
 
 ## TODO: Deployment Notes
-
 
 
 ## Notes on simple-salesforce
@@ -84,3 +96,24 @@ But most functions we're going to need are going to get more than one record at 
 sf_data = self.sf.query_all(f"SELECT Contact.id, HUDA__hud_UNIV_ID__c FROM Contact WHERE HUDA__hud_UNIV_ID__c IN('80719647')")
 ```
 SOQL is a SQL-like syntax, but anytime you want to use something from SQL beyond `select blah from blah where blah`, you'll need to look it up. Also it doesn't join anything, so GL with that. 
+
+## Other stuff
+
+### Relationships
+
+Most of the Objects in Salesforce are going to have a relationship to the Contact record of the person. Relationships are set and updated by simply sending the `Id` of the Contact (or other relationship). 
+
+NOTE: this does NOT determine if someone sees a hud_Name when viewing a Contact record, that is determined by the external id on the Contact record. 
+
+### Types
+
+Types are validated in `salesforce.py` using the `validate` method.
+
+ - `string`
+ - `textarea`
+ - `id`
+ - `reference`
+ - `email`
+ - `date`
+ - `datetime`
+ - `double`
