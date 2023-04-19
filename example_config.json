@@ -45,6 +45,7 @@
             "salesforce": "HUDA__PERSON_NAMES_KEY__c"
         },
         "fields": {
+            "HUDA__Name_Contact__c": "sf.contact.id",
             "HUDA__EFF_STATUS__c": "names.effectiveStatus.code",
             "HUDA__EFFDT__c": "names.effectiveDate",
             "HUDA__NAME_FIRST__c": "names.firstName",
@@ -68,13 +69,13 @@
             "salesforce": "HUDA__CONTACT_EMAIL_ADDRESS_KEY__c"
         },
         "fields": {
+            "HUDA__Email_Contact__c": "sf.contact.id",
             "HUDA__CONTACT_EMAIL_ADDRESS_KEY__c": "emails.personEmailKey",
             "HUDA__EFF_STATUS__c": "emails.effectiveStatus.code",
             "HUDA__EFFDT__c": "emails.effectiveDate",
             "HUDA__EMAIL_ADDR_SOURCE__c": "emails.emailAddressSource",
             "HUDA__EMAIL_ADDR_TYPE__c": "emails.emailAddressType",
             "HUDA__EMAIL_ADDRESS__c": "emails.emailAddressSource",
-            "HUDA__Email_Contact__c": "sf.contact.id",
             "HUDA__EMAIL_DOMAIN_NAME__c": "emails.emailDomainName",
             "HUDA__EMAIL_USER_NAME__c": "emails.emailUserName",
             "HUDA__INTERNAL_ID__c": "",
@@ -86,5 +87,34 @@
             "HUDA__UNIV_ID__c": "",
             "HUDA__UPDATE_DT__c": ""     
         }
+    },
+    "HUDA__hud_Address__c": {
+        "flat": false,
+        "Id": {
+            "pds": "addresses.addressKey",
+            "salesforce": "HUDA__CONTACT_ADDRESS_KEY__c"
+        },
+        "fields": {
+            "HUDA__Address_Contact__c": "sf.contact.id",
+            "HUDA__CONTACT_ADDRESS_KEY__c": "addresses.addressKey",
+            "HUDA__ADDR_MAIL_REALM_CD__c": "addresses.addressMailRealmCode",
+            "HUDA__ADDR_CATEGORY_CD__c": "addresses.addressCategory.code",
+            "HUDA__ADDR_CITY__c": "addresses.addressCity",
+            "HUDA__ADDR_ISO_COUNTRY_CD__c": "addresses.addressCountry.code",
+            "HUDA__EFF_STATUS__c": "addresses.effectiveStatus.code",
+            "HUDA__EFFDT__c": "addresses.effectiveDate",
+            "HUDA__UNIV_ID__c": "univid",
+            "HUDA__INTERNAL_ID__c": "uuid",
+            "HUDA__ADDR_PS_LOCATION_CD__c": "addresses.psLocation.code",
+            "HUDA__MULE_UNIQUE_PERSON_KEY__c": "personKey",
+            "HUDA__ADDR_POSTAL_CD__c": "addresses.addressPostalCode",
+            "HUDA__PRIVACY_VALUE__c": "addresses.privacyValue.code",
+            "HUDA__ADDR_SOURCE__c": "addresses.source",
+            "HUDA__ADDR_STATE__c": "addresses.addressState",
+            "HUDA__ADDR_LINE1__c": "addresses.addressStreet1",
+            "HUDA__ADDR_LINE2__c": "addresses.addressStreet2",
+            "HUDA__ADDR_LINE3__c": "addresses.addressStreet3",
+            "HUDA__ADDR_ID__c": "addresses.addrId",
+            "HUDA__UPDATE_DT__c": "addresses.updateDate"        }
     }
 }

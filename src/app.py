@@ -136,10 +136,8 @@ def main():
         for object, object_data in data.items():
             logger.info(f"object: {object}")
             logger.info(pformat(object_data))
-            # if isinstance(object, list):
-            #     for b in object:
-                    
-            # hsf.pushBulk(object, object_data)    
+            
+            hsf.pushBulk(object, object_data)    
 
         # NOTE: see notes on this function
         # hsf.setDeleteds(object='Contact', id_type='HUDA__hud_UNIV_ID__c', deleted_flag='lastName', ids=['31598567'])
@@ -160,6 +158,23 @@ main()
 #     password = os.getenv('SF_PASSWORD'),
 #     token = os.getenv('SF_SECURITY_TOKEN'),
 # )
+
+# hsf.pushBulk("Contact", [{
+#   'Birthdate': '1980-11-17',
+#   'Email': 'null@harvard.edu',
+#   'FirstName': 'Test',
+#   'HUDA__hud_ADID__c': 'test1234',
+#   'HUDA__hud_BIRTH_DT__c': '1980-11-17',
+#   'HUDA__hud_DECEASED_FLAG__c': 'N',
+#   'HUDA__hud_EFFDT__c': '2007-12-21T02:32:17',
+#   'HUDA__hud_EFF_STATUS__c': 'A',
+#   'HUDA__hud_EPPN__c': '2940935f3b990175',
+#   'HUDA__hud_GENDER__c': 'M',
+#   'HUDA__hud_INTERNAL_ID__c': 'e9f928bc98814859a3595494e368bbcd',
+#   'HUDA__hud_MULE_UNIQUE_PERSON_KEY__c': '2940935f3b990175',
+#   'HUDA__hud_UUID__c': 'e9f928bc98814859a3595494e368bbcd',
+#   'LastName': 'Clevenger'
+# }])
 
 
 # NOTE: branches are linked to the contact record via the eppn, not the contact relationship

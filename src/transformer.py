@@ -15,7 +15,7 @@ class SalesforceTransformer:
         for person in people:
 
             salesforce_person = {}
-            if 'Contact' in self.hashed_ds:
+            if 'Contact' in self.hashed_ids:
                 if self.hashed_ids['Contact']['id_name'] in person:
                     salesforce_person = {
                         "contact": {
