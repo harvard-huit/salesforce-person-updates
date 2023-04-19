@@ -2,6 +2,44 @@
 
 The salesforce-person-updates project pushes person data from the PDS to the specified Salesforce instance. 
 
+
+## Development Notes
+
+In order to work this locally, you'll need: 
+
+### Apikey to the PDS
+
+TODO: link to the PDS request form
+
+### Test Salesforce instance
+
+A sandbox or development or scratch Salesforce instance.
+
+### .env file
+
+A `.env` file that looks like:
+```
+STACK="developer"
+PDS_APIKEY="<PDS Apikey>"
+DEBUG="True"
+
+SF_USERNAME="<your salesforce username>"
+SF_PASSWORD="<your salesforce password>"
+SF_DOMAIN="test"
+# SF_CLIENT_KEY="<your client key>"
+# SF_CLIENT_SECRET="<your client secret>"
+SF_SECURITY_TOKEN="<your token>"
+```
+
+`STACK` being `"developer"` skips ECS checks.
+`DEBUG` will set the logging level to debug. 
+
+You only need `SF_SECURITY_TOKEN` OR `SF_CLIENT_KEY` and `SF_CLIENT_SECRET`
+
+## TODO: Deployment Notes
+
+
+
 ## Workflow
 
 This is an attempt to describe the workflow of this app. 
@@ -46,7 +84,6 @@ We are using the Bulk API for this (through `simple-salesforce`). This API is ty
 
 This is why we do what we do.
 
-## TODO: Deployment Notes
 
 
 ## Notes on simple-salesforce
