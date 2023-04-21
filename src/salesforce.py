@@ -184,33 +184,43 @@ class HarvardSalesforce:
                     # salesforce_id_name is the id name of the external id as it exists in salesforce
                     salesforce_id_name = config[object]['Id']['salesforce']
                     # person_id_name is the id name of the same id in pds
-                    full_person_id_name = config[object]['Id']['pds']
-                    person_branch = None
-                    logger.info(f"full_person_id_name: {full_person_id_name}")
+                    full_person_id_value = config[object]['Id']['pds']
 
-                    self.unique_ids[object]['id_name'] = full_person_id_name
-                    if len(full_person_id_name.split(".")) > 1:
-                        person_branch = full_person_id_name.split(".")[0]
-                        person_id_name = full_person_id_name.split(".")[1]
+                    # if it's a list, we need to do all of them
+                    if isinstance(full_person_id_value, list):
+                        pds_id_names = full_person_id_value
                     else:
-                        person_id_name = full_person_id_name
+                        pds_id_names = [full_person_id_value]
 
-                    for person in people:
-                        if person_branch is not None:
-                            for b in person[person_branch]:
-                                ids.append(str(b[person_id_name]))
+                    for full_person_id_name in pds_id_names:
+
+                        person_branch = None
+                        logger.debug(f"full_person_id_name: {full_person_id_name}")
+
+                        self.unique_ids[object]['id_name'] = full_person_id_name
+
+                        if len(full_person_id_name.split(".")) > 1:
+                            person_branch = full_person_id_name.split(".")[0]
+                            person_id_name = full_person_id_name.split(".")[1]
                         else:
-                            ids.append(str(person[person_id_name]))
-    
-                    ids_string = "'" + '\',\''.join(ids) + "'"
-                    logger.debug(f"SELECT {object}.Id, {salesforce_id_name} FROM {object} WHERE {salesforce_id_name} IN({ids_string})")
-                    sf_data = self.sf.query_all(f"SELECT {object}.Id, {salesforce_id_name} FROM {object} WHERE {salesforce_id_name} IN({ids_string})")
-                    logger.debug(f"got this data from salesforce: {sf_data['records']}")
-                    for record in sf_data['records']:
-                        if 'Ids' not in self.unique_ids[object]:
-                            self.unique_ids[object]['Ids'] = {}
+                            person_id_name = full_person_id_name
 
-                        self.unique_ids[object]['Ids'][str(record[salesforce_id_name])] = record['Id']
+                        for person in people:
+                            if person_branch is not None:
+                                for b in person[person_branch]:
+                                    ids.append(str(b[person_id_name]))
+                            else:
+                                ids.append(str(person[person_id_name]))
+        
+                        ids_string = "'" + '\',\''.join(ids) + "'"
+                        logger.debug(f"SELECT {object}.Id, {salesforce_id_name} FROM {object} WHERE {salesforce_id_name} IN({ids_string})")
+                        sf_data = self.sf.query_all(f"SELECT {object}.Id, {salesforce_id_name} FROM {object} WHERE {salesforce_id_name} IN({ids_string})")
+                        logger.debug(f"got this data from salesforce: {sf_data['records']}")
+                        for record in sf_data['records']:
+                            if 'Ids' not in self.unique_ids[object]:
+                                self.unique_ids[object]['Ids'] = {}
+
+                            self.unique_ids[object]['Ids'][str(record[salesforce_id_name])] = record['Id']
 
                 else:
                     raise Exception(f"Error: match_to requires both 'salesforce' and 'pds' keys so we know which ids to match")

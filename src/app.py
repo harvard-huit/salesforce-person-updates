@@ -104,8 +104,6 @@ def main():
         data = transformer.transform(people)
 
 
-
-
         # transform(config=testconfig, people=people, hashed_ids=hashed_ids)
 
 
@@ -136,7 +134,7 @@ def main():
         for object, object_data in data.items():
             logger.info(f"object: {object}")
             logger.info(pformat(object_data))
-            
+
             hsf.pushBulk(object, object_data)    
 
         # NOTE: see notes on this function

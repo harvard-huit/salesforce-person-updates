@@ -198,39 +198,51 @@ class SalesforceTransformer:
                     #     current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
 
 
-
+                branch = {}
                 for pds_branch_id, branch in best_branches.items():
         
                     current_record[object_name] = {}
                     
-                    # if this id is in the hashed_ids, that means it'll be an update and we need to add the Id
+                    # if this id is in the hashed_ids, that means it'll be an update and we need to add the Object Id
                     if pds_branch_id in self.hashed_ids[object_name]['Ids']:
                         sf_id = self.hashed_ids[object_name]['Ids'][pds_branch_id]
                         current_record[object_name]['Id'] = sf_id
-                    for target, source in self.config[object_name]['fields'].items():
+                    for target, source_value in self.config[object_name]['fields'].items():
                         
-                        value = None
-                        source_pieces = source.split(".")
-                        if source_pieces[0] in person:
-                            if isinstance(person[source_pieces[0]], list):
-                                source_pieces = source_pieces[1:]
-                            else:
-                                branch = person
-                        if source_pieces[0] in branch:
-                            if len(source_pieces) == 1:
-                                value = branch[source_pieces[0]]
-                            elif len(source_pieces) == 2:
-                                if source_pieces[1] in branch[source_pieces[0]]:
-                                    value = branch[source_pieces[0]][source_pieces[1]]
-                            current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
-                        if source_pieces[0] == 'sf':
-                            source_pieces = source_pieces[1:]
-                            if source_pieces[0] in salesforce_person:
-                                if isinstance(salesforce_person, (str, bool, int)):
-                                    value = salesforce_person[source_pieces[0]]
-                                elif isinstance(salesforce_person, dict) and len(source_pieces) == 2:
-                                    value = salesforce_person[source_pieces[0]][source_pieces[1]]
+                        if isinstance(source_value, list):
+                            sources = source_value
+                        else: 
+                            sources = [source_value]
+                        # source = source_value
+
+                        for source in sources:
+                            # for source in sources:
+                            logger.debug(f"source: {source}")
+                            value = None
+                            source_pieces = source.split(".")
+                            branch_temp = branch
+                            if source_pieces[0] in person:
+                                logger.debug(f"  {source_pieces[0]} in person")
+                                if isinstance(person[source_pieces[0]], list):
+                                    source_pieces = source_pieces[1:]
+                                else:
+                                    branch_temp = person
+                            if source_pieces[0] in branch_temp:
+                                logger.debug(f"  {source_pieces[0]} in branch")
+                                if len(source_pieces) == 1:
+                                    value = branch_temp[source_pieces[0]]
+                                elif len(source_pieces) == 2:
+                                    if source_pieces[1] in branch_temp[source_pieces[0]]:
+                                        value = branch_temp[source_pieces[0]][source_pieces[1]]
                                 current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
+                            if source_pieces[0] == 'sf':
+                                source_pieces = source_pieces[1:]
+                                if source_pieces[0] in salesforce_person:
+                                    if isinstance(salesforce_person, (str, bool, int)):
+                                        value = salesforce_person[source_pieces[0]]
+                                    elif isinstance(salesforce_person, dict) and len(source_pieces) == 2:
+                                        value = salesforce_person[source_pieces[0]][source_pieces[1]]
+                                    current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
 
                         # logger.warn(f"Warning: unable to find valid source: ({source})")
 
