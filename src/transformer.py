@@ -6,54 +6,76 @@ class SalesforceTransformer:
         self.hsf = hsf
         self.hashed_ids = {}
 
-    def transform(self, people):
+    # This method helps sort out the config to get a subsection of the config for a specific source
+    def getSourceConfig(self, source):
+        split_config = {}
+        for object_name in self.config:
+            if 'source' in self.config[object_name]:
+                if self.config[object_name]['source'] == source:
+                    split_config[object_name] = self.config[object_name]
+        return split_config
+
+    def transform(self, source_data, source_name):
 
         logger.debug("Starting transfom")
-        self.hashed_ids = self.hsf.getUniqueIds(config=self.config, people=people)
+        source_config = self.getSourceConfig(source_name)
+        self.hashed_ids = self.hsf.getUniqueIds(config=source_config, source_data=source_data)
 
         data = {}
-        for person in people:
+        for source_data_object in source_data:
 
             salesforce_person = {}
             if 'Contact' in self.hashed_ids:
-                if self.hashed_ids['Contact']['id_name'] in person:
+                if self.hashed_ids['Contact']['id_name'] in source_data_object:
                     salesforce_person = {
                         "contact": {
-                            "id": self.hashed_ids['Contact']['Ids'][person[self.hashed_ids['Contact']['id_name']]]
+                            "id": self.hashed_ids['Contact']['Ids'][source_data_object[self.hashed_ids['Contact']['id_name']]]
                         }
                     }
 
 
             # go through all the objects
-            for object_name in self.config:
+            for object_name in source_config:
                 current_record = {}
+                if object_name  != "hed__Affiliation__c":
+                    continue
 
-                # if it's flat, that means there's only one per person
-                #   (otherwise, it's intention is to get a branch with multiple values per person,
+                # if it's flat, that means there's only one per "person"
+                #   (otherwise, it's intention is to get a branch with multiple values per "person",
                 #   like names, emails, etc etc)
-                is_flat = self.config[object_name].get('flat') or False    
+                is_flat = source_config[object_name].get('flat') or False    
 
                 good_records = []
                 best_branches = {}
                 
-                object_config = self.config[object_name]['fields']
-                pds_id_name = self.config[object_name]['Id']['pds']
-                salesforce_id_name = self.config[object_name]['Id']['salesforce']
-                value_reference = ""
+                object_config = source_config[object_name]['fields']
+                source_id_name = source_config[object_name]['Id'][source_name]
+                salesforce_id_name = source_config[object_name]['Id']['salesforce']
+
                 logger.debug(f"object: {object_name}")
 
                 # go through all of the target fields we'll be mapping to
                 # target is the field name of the data item in Salesforce
                 for target in object_config:
+                    value_reference = ""
+
+                    # if the source field is not defined, just skip this field
+                    # we might have an empty field to remind us that we _can_ populate it
                     if not object_config[target]:
                         continue
-                    source_object = object_config[target]
+
                     logger.debug(f"  target: {target}")
+                    source_object = object_config[target]
+
                     # value that we're sending to SF
                     value = ""
 
+                    is_branched = False
+
                     when = None
                     logger.debug(f"  source_object: {source_object}")
+
+
                     if isinstance(source_object, (dict)):
                         if 'value' in source_object:
                             value_reference = source_object['value']
@@ -61,26 +83,43 @@ class SalesforceTransformer:
                             when = source_object['when']
                     elif isinstance(source_object, (str)):
                         value_reference = source_object
-                    logger.debug(f"    value_reference: {value_reference}:{person[value_reference]}") # this will bork on branched values
+                    else: 
+                        value_reference = None
+
+                    logger.debug(f"    value_reference: {value_reference}:{source_data_object.get(value_reference)}")                     
                     logger.debug(f"    when: {when}")
                     
                     pieces = value_reference.split(".")
                     first = pieces[0]
                     
                     # check the value referenced in the config
-                    if isinstance(person[first], (str, bool)):
-                        value = person[first]
-                    elif isinstance(person[first], dict):
+                    if isinstance(source_data_object[first], (str, bool)):
+                        value = source_data_object[first]
+                    elif isinstance(source_data_object[first], dict):
                         # if it's a dict, we need to get the piece further in
-                        if pieces[1] not in person[first]:
-                            logger.warn(f"Warning: reference ({pieces[1]}) not found in object ({person[first]})")
+                        if pieces[1] not in source_data_object[first]:
+                            if first == 'sf':
+                                source_pieces = pieces[1:]
+                                if source_pieces[0] in salesforce_person:
+                                    if isinstance(salesforce_person, (str, bool, int)):
+                                        value = salesforce_person[source_pieces[0]]
+                                    elif isinstance(salesforce_person, dict) and len(source_pieces) == 2:
+                                        value = salesforce_person[source_pieces[0]][source_pieces[1]]
+                                    if object_name not in current_record:
+                                        current_record[object_name] = {}
+                                    current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
+                                else:
+                                    logger.warn(f"Warning: reference ({pieces[1]}) not found in object ({salesforce_person[first]})")
+                            else:
+                                logger.warn(f"Warning: reference ({pieces[1]}) not found in object ({source_data_object[first]})")
                             continue
-                        if isinstance(person[first][pieces[1]], dict):
-                            value = person[first][pieces[1]][pieces[2]]
+                        if isinstance(source_data_object[first][pieces[1]], dict):
+                            value = source_data_object[first][pieces[1]][pieces[2]]
                         else:
-                            value = person[first][pieces[1]]
-                    elif isinstance(person[first], list):
-                        branches = person[first]
+                            value = source_data_object[first][pieces[1]]
+                    elif isinstance(source_data_object[first], list):
+                        is_branched = True
+                        branches = source_data_object[first]
                         # ignore the first piece of the dotted element
                         branch_field = ".".join(pieces[1:])
 
@@ -131,9 +170,7 @@ class SalesforceTransformer:
                                                     break
                                             else: 
                                                 raise Exception(f"Error: Reference not recognized: {ref}")
-
-                                        
-                                                                                        
+            
                                     elif isinstance(val, (str, bool, int)):
 
                                         ref_pieces = ref.split(".")
@@ -160,10 +197,10 @@ class SalesforceTransformer:
                                     best_branch = branch
 
                             if not is_flat:
-                                pds_id_name = self.hashed_ids[object_name]['id_name']
-                                if "." in pds_id_name:
-                                    (branch_name, pds_id_name) = pds_id_name.split(".")
-                                pds_branch_id = str(best_branch[pds_id_name])
+                                source_id_name = self.hashed_ids[object_name]['id_name']
+                                if "." in source_id_name:
+                                    (branch_name, source_id_name) = source_id_name.split(".")
+                                pds_branch_id = str(best_branch[source_id_name])
                                 if pds_branch_id not in best_branches.keys():
                                     best_branches[pds_branch_id] = {}
                                 best_branches[pds_branch_id] = best_branch
@@ -190,10 +227,12 @@ class SalesforceTransformer:
                             value = 'N'
                     logger.debug(f"      value: {value}")
 
-                    if is_flat:
+
+                    if not is_branched:
                         if object_name not in current_record:
                             current_record[object_name] = {}
                         current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
+
                     # else: 
                     #     current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
 
@@ -207,7 +246,7 @@ class SalesforceTransformer:
                     if pds_branch_id in self.hashed_ids[object_name]['Ids']:
                         sf_id = self.hashed_ids[object_name]['Ids'][pds_branch_id]
                         current_record[object_name]['Id'] = sf_id
-                    for target, source_value in self.config[object_name]['fields'].items():
+                    for target, source_value in source_config[object_name]['fields'].items():
                         
                         if isinstance(source_value, list):
                             sources = source_value
@@ -221,12 +260,12 @@ class SalesforceTransformer:
                             value = None
                             source_pieces = source.split(".")
                             branch_temp = branch
-                            if source_pieces[0] in person:
-                                logger.debug(f"  {source_pieces[0]} in person")
-                                if isinstance(person[source_pieces[0]], list):
+                            if source_pieces[0] in source_data_object:
+                                logger.debug(f"  {source_pieces[0]} in source_data_object")
+                                if isinstance(source_data_object[source_pieces[0]], list):
                                     source_pieces = source_pieces[1:]
                                 else:
-                                    branch_temp = person
+                                    branch_temp = source_data_object
                             if source_pieces[0] in branch_temp:
                                 logger.debug(f"  {source_pieces[0]} in branch")
                                 if len(source_pieces) == 1:
@@ -254,7 +293,10 @@ class SalesforceTransformer:
 
                 if is_flat:
                     data[object_name] = []
-                    current_record = self.setId(person=person, object_name=object_name, current_record=current_record)
+                    current_record = self.setId(source_data_object=source_data_object, object_name=object_name, current_record=current_record)
+                    data[object_name].append(current_record[object_name])
+                elif not is_branched:
+                    current_record = self.setId(source_data_object=source_data_object, object_name=object_name, current_record=current_record)
                     data[object_name].append(current_record[object_name])
                 else:
                     data[object_name] = good_records
@@ -264,23 +306,25 @@ class SalesforceTransformer:
         return data
     
 
-    # this method will set the id of the current record given the person record, the object name and the config
+    # this method will set the id of the current record given the source_data_object record, the object name and the config
     # NOTE: a record should be a single salesforce object name with objects that are not necessarily affiliated 
-    #   with the same person
-    def setId(self, person, object_name, current_record={}):
+    #   with the same source_data_object
+    def setId(self, source_data_object, object_name, current_record={}):
         
         if 'Id' in self.config[object_name]:
             source_object = self.config[object_name]['Id']
-            if 'pds' in source_object and 'salesforce' in source_object:
+            source_name = self.config[object_name]['source']
+            if source_name in source_object and 'salesforce' in source_object:
                 # logger.debug(f"hashed: {self.hashed_ids[object_name]}")
                 # then this is an Id we need to try and match
                 id_name = self.hashed_ids[object_name]['id_name']
                 salesforce_id_name = source_object['salesforce']
                 current_id = None
+                value = None
                 if '.' in id_name:
                     (branch_name, id_name) = id_name.split(".")
                     # we need to loop through all of the branches for this
-                    for branch in person[branch_name]:
+                    for branch in source_data_object[branch_name]:
                         current_id = str(branch[id_name])
                         if current_id in self.hashed_ids[object_name]['Ids']:
                             value = self.hashed_ids[object_name]['Ids'][current_id]
@@ -289,43 +333,18 @@ class SalesforceTransformer:
                             current_record[object_name][salesforce_id_name] = self.hsf.validate(object=object_name, field=salesforce_id_name, value=value)
 
                 else:
-                    current_id = person[id_name]
+                    current_id = source_data_object[id_name]
 
                     if current_id in self.hashed_ids[object_name]['Ids']:
                         value = self.hashed_ids[object_name]['Ids'][current_id]
 
                     if object_name not in current_record:
                         current_record[object_name] = {}
-                    current_record[object_name]['Id'] = self.hsf.validate(object=object_name, field=salesforce_id_name, value=value)
+                    if value is not None:
+                        current_record[object_name]['Id'] = self.hsf.validate(object=object_name, field='Id', value=value)
             else:
                 raise Exception("Error: config object's Id requires a pds and salesforce value to be able to match")
-                
         return current_record
-    
-    def getDotValue(self, object, reference):
-        pieces = reference.split(".")
-
-        if pieces[0] not in object.keys():
-            raise ValueError(f"Error: value ({pieces[0]}) not found in object ({object})")
-        if isinstance(object[pieces[0]], (str, bool, int)):
-            return object[pieces[0]]
-        if isinstance(object[pieces[0]], (dict)) and len(pieces) > 1:
-            if pieces[1] not in object[pieces[0]]:
-                raise ValueError(f"Error: value ({pieces[1]}) not found in object ({object[pieces[0]]})")
-            if isinstance(object[pieces[0]][pieces[1]], (str, bool, int)):
-                return object[pieces[0]][pieces[1]]
-        # if it's a list, it's a branch
-        # the return value needs to be a list unless there's a when?
-        if isinstance(object[pieces[0]], (list)):
-            branch_name = pieces[0]
-            branches = object[pieces[0]]
-            pieces = pieces[1:]
-            if len(pieces) == 0:
-                return branches
-            elif len(pieces) == 1:
-                return [b[pieces[1]] for b in branches]
-            elif len(pieces) == 2:
-                return [b[pieces[1][pieces[2]]] for b in branches]
-                    
+                        
         
 

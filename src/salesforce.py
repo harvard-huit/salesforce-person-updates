@@ -1,6 +1,5 @@
-import os
 import json
-from urllib.parse import urlencode
+import jsonschema
 from datetime import datetime, date
 from simple_salesforce import Salesforce 
 
@@ -12,7 +11,7 @@ class HarvardSalesforce:
         self.domain = domain
         self.username = username
         try: 
-            logger.info(f"initializing to {self.domain} as {self.username}")
+            logger.debug(f"Salesforce initializing to {self.domain} as {self.username}")
             if(token is not None):
                 self.sf = Salesforce(
                     username=self.username,
@@ -29,9 +28,9 @@ class HarvardSalesforce:
                     domain=self.domain
                 )
             else:
-                raise Exception("well, that sucks, no valid credentials found")
+                raise Exception(f"Error: Salesforce connection requires a token or a consumer_key + consumer_secret combination")
         except Exception as e:
-            logger.error(f"error connecting to salesforce: {e}")
+            logger.error(f"Error: Salesforce connection failed to {self.username}@{self.domain}: {e}")
             raise e
         
 
@@ -43,14 +42,15 @@ class HarvardSalesforce:
     # NOTE: the Bulk API can take a max of 10000 records at a time
     # a single record will take anywhere from 2-50 seconds
     def pushBulk(self, object, data):
-        logger.info(f"pushBulk to {object} with {data}")
+        logger.debug(f"pushBulk to {object} with {data}")
 
         responses = self.sf.bulk.__getattr__(object).upsert(data, external_id_field='Id')
-        logger.info(responses)
         for response in responses:
             if response['success'] != True:
                 logger.error(f"Error in bulk data load: {response['errors']}")
                 return False
+            else:
+                logger.info(response)
         return True
     
     # this function will return a map of the contact ids to huid
@@ -85,6 +85,62 @@ class HarvardSalesforce:
         # result = self.sf.__getattr__(id_obj).update(f"{id_field}", {'flag_obj': 'Jegede2'})
         # logger.info(f"Updated deleted flag: {result}")
         return True
+    
+    # check the validity of the config
+    # this does a basic json check
+    # then a more extensive jsonschema check
+    # then it makes calls to salesforce to get the models and fields referenced in the config
+    #   so we can know if all the data structures exist
+    def validateConfig(self, config):
+        try: 
+
+            # first check to see if the config is valid as json
+            try: 
+                json.dumps(config)
+            except ValueError:
+                raise ValueError(f"Config is not valid as JSON")
+            
+            # now use the jsonschema definition to validate the format
+            try:
+                f = open('config.schema.json')
+            except: 
+                try: 
+                    f = open('../config.schema.json')
+                except Exception as e:
+                    logger.error(f"Error: unable to find schema")
+                    raise e
+            schema = json.load(f)
+            f.close()
+
+            try: 
+                jsonschema.validate(instance=config, schema=schema)
+            except Exception as e: 
+                logger.error(f"Error: validation of config against schema failed")
+                raise e
+            
+            # now we make sure the objects exist in salesforce
+            try:
+                for object in config:
+                    sf_data = self.sf.query_all(f"SELECT FIELDS(ALL) FROM {object} LIMIT 1")
+
+                    # in here we check that all fields we're trying to push to exist in the target salesforce
+                    fields = sf_data['records'][0].keys()
+                    for config_field in config[object]['fields'].keys():
+                        if config_field not in fields:
+                            raise Exception(f"Error: {config_field} not found in {object}")
+
+
+            except Exception as e:
+                logger.error(f"Error: Salesforce Object {object} not found in target Salesforce")
+                raise e
+
+
+            return True
+        except Exception as e: 
+            logger.error(f"Error: validation exception: {e}")
+            # raise e
+            return False
+
 
     # returns a mapping of the salesforce object field types
     # for example: { "Contact": { "Name": "string", "Email": "email", "Birthdate": "date" } }
@@ -157,7 +213,12 @@ class HarvardSalesforce:
         if field_type in ["datetime"]:
             try:
                 if value:
-                    valid_date = datetime.strptime(value, '%Y-%m-%dT%H:%M:%S').date()
+                    # we want to try both formats for datetime
+                    try:
+                        valid_date = datetime.strptime(value, '%Y-%m-%dT%H:%M:%S').date()
+                    except:
+                        value = value.replace(" ", "T")
+                        valid_date = datetime.strptime(value, '%Y-%m-%dT%H:%M:%S').date()
                     if not (date(1700, 1, 1) <= valid_date <= date(2400, 1, 1)):
                         raise ValueError(f"Error: date out of range: {value}")
             except ValueError as e:
@@ -171,8 +232,10 @@ class HarvardSalesforce:
         else:
             raise Exception(f"Error: unhandled field_type: {field_type}")
 
-    # format should look like { "OBJECT": { "id_name": "PDS ID NAME", "Ids": { "HARVARD ID": "SALESFORCE ID", ... } } }
-    def getUniqueIds(self, config, people):
+    # getUniqueIds 
+    # output format should look like:
+    #   { "SF OBJECT NAME": { "id_name": "PDS ID NAME", "Ids": { "HARVARD ID": "SALESFORCE ID", ... } } }
+    def getUniqueIds(self, config, source_data):
         self.unique_ids = {}
         for object in config.keys():
             ids = []
@@ -180,39 +243,47 @@ class HarvardSalesforce:
 
             if 'Id' in config[object]:
 
-                if 'salesforce' in config[object]['Id'] and 'pds' in config[object]['Id']:
-                    # salesforce_id_name is the id name of the external id as it exists in salesforce
-                    salesforce_id_name = config[object]['Id']['salesforce']
-                    # person_id_name is the id name of the same id in pds
-                    full_person_id_value = config[object]['Id']['pds']
+                # salesforce_id_name is the id name of the external id as it exists in salesforce
+                salesforce_id_name = config[object]['Id']['salesforce']
+                source_name = config[object]['source']
 
-                    # if it's a list, we need to do all of them
-                    if isinstance(full_person_id_value, list):
-                        pds_id_names = full_person_id_value
+                # full_source_id_value is the id name of the SAME external id as it exists in the source data (e.g. pds or departments)
+                if source_name in config[object]['Id']:
+                    full_source_id_value = config[object]['Id'][source_name]
+                else:
+                    raise Exception(f"Error: source {source_name} not found in config. (Did you remember to slice the config?)")
+
+                # if it's a list, we need to do all of them
+                if isinstance(full_source_id_value, list):
+                    id_names = full_source_id_value
+                else:
+                    id_names = [full_source_id_value]
+
+                for full_source_data_id_name in id_names:
+
+                    source_data_object_branch = None
+                    logger.debug(f"full_source_data_id_name: {full_source_data_id_name}")
+
+                    self.unique_ids[object]['id_name'] = full_source_data_id_name
+
+                    if len(full_source_data_id_name.split(".")) > 1:
+                        source_data_object_branch = full_source_data_id_name.split(".")[0]
+                        source_data_id_name = full_source_data_id_name.split(".")[1]
                     else:
-                        pds_id_names = [full_person_id_value]
+                        source_data_id_name = full_source_data_id_name
 
-                    for full_person_id_name in pds_id_names:
-
-                        person_branch = None
-                        logger.debug(f"full_person_id_name: {full_person_id_name}")
-
-                        self.unique_ids[object]['id_name'] = full_person_id_name
-
-                        if len(full_person_id_name.split(".")) > 1:
-                            person_branch = full_person_id_name.split(".")[0]
-                            person_id_name = full_person_id_name.split(".")[1]
+                    for source_data_object in source_data:
+                        if source_data_object_branch is not None:
+                            for b in source_data_object[source_data_object_branch]:
+                                ids.append(str(b[source_data_id_name]))
                         else:
-                            person_id_name = full_person_id_name
+                            ids.append(str(source_data_object[source_data_id_name]))
+    
+                    batch_size = 1000
+                    for i in range(0, len(ids), batch_size):
+                        batch = ids[i:i + batch_size]
 
-                        for person in people:
-                            if person_branch is not None:
-                                for b in person[person_branch]:
-                                    ids.append(str(b[person_id_name]))
-                            else:
-                                ids.append(str(person[person_id_name]))
-        
-                        ids_string = "'" + '\',\''.join(ids) + "'"
+                        ids_string = "'" + '\',\''.join(batch) + "'"
                         logger.debug(f"SELECT {object}.Id, {salesforce_id_name} FROM {object} WHERE {salesforce_id_name} IN({ids_string})")
                         sf_data = self.sf.query_all(f"SELECT {object}.Id, {salesforce_id_name} FROM {object} WHERE {salesforce_id_name} IN({ids_string})")
                         logger.debug(f"got this data from salesforce: {sf_data['records']}")
@@ -221,9 +292,7 @@ class HarvardSalesforce:
                                 self.unique_ids[object]['Ids'] = {}
 
                             self.unique_ids[object]['Ids'][str(record[salesforce_id_name])] = record['Id']
-
-                else:
-                    raise Exception(f"Error: match_to requires both 'salesforce' and 'pds' keys so we know which ids to match")
+                        
 
         logger.debug(f"unique_ids: {self.unique_ids}")
         return self.unique_ids

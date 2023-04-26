@@ -1,6 +1,32 @@
 {
+    "Account": {
+        "source": "departments",
+        "flat": false,
+        "Id": {
+            "departments": "hrDeptId",
+            "salesforce": "HUDA__hud_DEPT_ID__c"
+        },
+        "fields": {
+            "HUDA__hud_DEPT_ID__c": "hrDeptId",
+            "Name": "hrDeptDesc",
+            "HUDA__hud_DEPT_LONG_DESC__c": "hrDeptLongDesc",
+            "HUDA__hud_DEPT_OFFICIAL_DESC__c": "hrDeptOfficialDesc",
+            "HUDA__hud_DEPT_SHORT_DESC__c": "hrDeptShortDesc",
+            "HUDA__hud_EFF_STATUS__c": "effectiveStatus.code",
+            "HUDA__hud_EFFDT__c": "effectiveDate",
+            "HUDA__hud_ESTAB_ID__c": "estabId",
+            "HUDA__hud_FACULTY_CD__c": "facultyCode",
+            "HUDA__hud_MAJ_AFFILIATION_CD__c": "majAffiliation.code",
+            "HUDA__hud_MAJ_AFFILIATION_DESC__c": "majAffiliation.description",
+            "HUDA__hud_SUB_AFFILIATION_CD__c": "subAffiliation.code",
+            "HUDA__hud_SUB_AFFILIATION_DESC__c": "subAffiliation.description",
+            "HUDA__hud_UPDATE_SOURCE__c": "updateSource",
+            "HUDA__hud_UPDATE_DT__c": "updateDate"
+        }
+    },
     "Contact": {
         "flat": true,
+        "source": "pds",
         "Id": {
             "pds": "personKey",
             "salesforce": "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c"
@@ -40,6 +66,7 @@
     },
     "HUDA__hud_Name__c": {
         "flat": false,
+        "source": "pds",
         "Id": {
             "pds": "names.personNameKey",
             "salesforce": "HUDA__PERSON_NAMES_KEY__c"
@@ -64,6 +91,7 @@
     },
     "HUDA__hud_Email__c": {
         "flat": false,
+        "source": "pds",
         "Id": {
             "pds": "emails.personEmailKey",
             "salesforce": "HUDA__CONTACT_EMAIL_ADDRESS_KEY__c"
@@ -90,6 +118,7 @@
     },
     "HUDA__hud_Address__c": {
         "flat": false,
+        "source": "pds",
         "Id": {
             "pds": "addresses.addressKey",
             "salesforce": "HUDA__CONTACT_ADDRESS_KEY__c"
@@ -115,10 +144,12 @@
             "HUDA__ADDR_LINE2__c": "addresses.addressStreet2",
             "HUDA__ADDR_LINE3__c": "addresses.addressStreet3",
             "HUDA__ADDR_ID__c": "addresses.addrId",
-            "HUDA__UPDATE_DT__c": "addresses.updateDate"        }
+            "HUDA__UPDATE_DT__c": "addresses.updateDate"        
+        }
     },
     "HUDA__hud_Phone__c": {
         "flat": false,
+        "source": "pds",
         "Id": {
             "pds": "phones.phoneKey",
             "salesforce": "HUDA__CONTACT_DATA_KEY__c"
@@ -143,6 +174,7 @@
     },
     "HUDA__hud_Location__c": {
         "flat": false,
+        "source": "pds",
         "Id": {
             "pds": "locations.personLocationKey",
             "salesforce": "HUDA__CONTACT_LOCATION_KEY__c"
@@ -166,6 +198,7 @@
     },
     "hed__Affiliation__c": {
         "flat": false,
+        "source": "pds",
         "Id": {
             "pds": ["employeeRoles.personRoleKey", "poiRoles.personRoleKey", "studentRoles.personRoleKey"],
             "salesforce": "HUDA__hud_PERSON_ROLES_KEY__c"

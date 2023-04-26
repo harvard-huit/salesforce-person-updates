@@ -2,6 +2,7 @@ from common import isTaskRunning, logger, stack
 import pds
 from salesforce import HarvardSalesforce
 from transformer import SalesforceTransformer
+from departments import Departments
 
 import os
 import json
@@ -14,7 +15,7 @@ if stack == 'developer':
 from pprint import pprint, pp, pformat
 
 f = open('../example_config.json')
-testconfig = json.load(f)
+config = json.load(f)
 f.close()
 
 f = open('../example_pds_query.json')
@@ -37,7 +38,7 @@ def main():
                 logger.warning("WARNING: application already running")
                 exit()
 
-        # TODO: GET data/watermark from dynamodb based on client (now)
+        # TODO: GET data/watermark from dynamodb based on client
 
         # initializing a salesforce instance
         # hsf = HarvardSalesforce(
@@ -55,87 +56,52 @@ def main():
         )
 
         # check salesforce for required objects for push and get a map of the types
-        hsf.getTypeMap(testconfig.keys())
+        hsf.getTypeMap(config.keys())
+
+        # validate the config
+        hsf.validateConfig(config)
 
 
-        # TODO: GET list of updated people since watermark (now)
-        # pds.search({
-        #     "fields": ["univid"],
-        #     "conditions": {
-        #         "cacheUpdateDate": ">" + watermark
-        #     }
-        # })
-        # id_results = pds.search({
-        #     "fields": ["univid"],
-        #     "conditions": {
-        #         "univid": "80719647"
-        #     }
-        # })
+        # TODO: GET list of updated people since watermark 
 
-        # TODO: removed fields from this temporarily, should come from config
+
+        # TODO: removed fields from this temporarily (should come from config)
         # "fields": ["univid", "names.name"],
-
-
         query = {
             "conditions": {
                 "univid": ["80719647"]
             }
         }
-        # this is a list of DotMaps, which allows us to access the keys with dot notation
+        # this is a list of DotMaps, which was supposed to allow us to access the keys with dot notation
         people = pds.People(query=query, apikey=os.getenv("PDS_APIKEY")).people
-        # for person in people:
-        #     logger.info(person.names)
-        #     logger.info(person.effectiveStatus.code)
-        
 
-        # GET list of people from salesforce that match the ids we got back from the pds call
-        # contact_results = hsf.getContactIds(id_type='HUDA__hud_UNIV_ID__c', ids=ids)
-        # hashed_contacts = {}
-        # for contact in contact_results['records']:
-        #     hashed_contacts[contact['HUDA__hud_UNIV_ID__c']] = contact['Id']
-        
-        # get a map of ids for matching
-        # hashed_ids = hsf.getUniqueIds(config=testconfig, people=people)
+        # here we get the full list of departments
+        departments = Departments(apikey=os.getenv("DEPT_APIKEY"))
+        hashed_departments = departments.departments
+        logger.debug(f"Successfully got {len(departments.results)} departments")
+
+        transformer = SalesforceTransformer(config=config, hsf=hsf)
 
         # data will have the structure of { "OBJECT": [{"FIELD": "VALUE"}, ...]}
+        # data = {}
+        # data = transformer.transform(source_data=departments.results, source_name='departments')
+
+        # logger.info(f"**** Push Departments to SF  ****")
+        # for object, object_data in data.items():
+        #     logger.info(f"object: {object}")
+        #     logger.info(pformat(object_data))
+
+        #     hsf.pushBulk(object, object_data)    
+
         data = {}
+        data = transformer.transform(source_data=people, source_name='pds')
 
-        transformer = SalesforceTransformer(config=testconfig, hsf=hsf)
-        data = transformer.transform(people)
-
-
-        # transform(config=testconfig, people=people, hashed_ids=hashed_ids)
-
-
-        # logger.info(pformat(data))
-
-        # TODO: pushing _dynamic_ data through to salesforce
-        # Working example: push data through to salesforce
-        # object = 'HUDA__hud_Name__c'
-        # data = [
-        #     {
-        #         'Id': 'aDm1R000000PLDgSAO',
-        #         'HUDA__NAME_MIDDLE__c': 'test 4'
-        #     }
-        # ]
-        # hsf.pushBulk(object, data)
-        
-        # object = 'Contact'
-        # data = [
-        #     {
-        #         'Id': '00336000010CjErAAK',
-        #         'Email': 'jazahn@gmail.com'
-        #     }
-        # ]
-        # hsf.pushBulk(object, data)
-
-
-        logger.info(f"**** Push to SF  ****")
+        logger.info(f"**** Push People to SF  ****")
         for object, object_data in data.items():
-            logger.info(f"object: {object}")
-            logger.info(pformat(object_data))
+            logger.debug(f"object: {object}")
+            logger.debug(pformat(object_data))
 
-            hsf.pushBulk(object, object_data)    
+            # hsf.pushBulk(object, object_data)    
 
         # NOTE: see notes on this function
         # hsf.setDeleteds(object='Contact', id_type='HUDA__hud_UNIV_ID__c', deleted_flag='lastName', ids=['31598567'])
@@ -149,6 +115,8 @@ def main():
 
 
 main()
+
+
 
 # hsf = HarvardSalesforce(
 #     domain = os.getenv('SF_DOMAIN'),
@@ -197,11 +165,12 @@ main()
 # }])
 
 # response = hsf.sf.Contact.metadata()
-# response = hsf.getTypeMap(objects=testconfig.keys())
+# response = hsf.getTypeMap(objects=config.keys())
 # logger.info(json.dumps(response))
 # logger.info(pformat(json.dumps(response)))
 
 # contact_results = hsf.getContactIds(id_type='HUDA__hud_UNIV_ID__c', ids=['91156571'])
 # logger.info(pformat(contact_results))
 
-
+# departments = Departments(apikey=os.getenv("DEPT_APIKEY")).departments
+# logger.info(departments)
