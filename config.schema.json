@@ -1,0 +1,75 @@
+{
+    "type": "object",
+    "additionalProperties": {
+        "type" : "object",
+        "properties" : {
+            "Id" : {
+                "anyOf": [
+                    {
+                        "type" : "object",
+                        "properties": {
+                            "pds": {
+                                "anyOf": [
+                                    { "type": "string" },
+                                    { "type": "array" }
+                                ]
+                            },
+                            "salesforce": {
+                                "type": "string"
+                            }
+                        },
+                        "required": ["salesforce", "pds"]
+                    },
+                    {
+                        "type" : "object",
+                        "properties": {
+                            "departments": {
+                                "type": "string"
+                            },
+                            "salesforce": {
+                                "type": "string"
+                            }
+                        },
+                        "required": ["salesforce", "departments"]
+                    }
+                ]
+            },
+            "source" : { "enum" : ["pds", "departments"] },
+            "flat" : { "type" : "boolean" },
+            "fields": {
+                "type": "object",
+                "additionalProperties": {
+                    "anyOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "boolean"
+                        },
+                        {
+                            "type": "array"
+                        },
+                        {
+                            "type": "object",
+                            "properties": {
+                                "value": { "type": "string" },
+                                "when": { 
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "anyOf": [
+                                            { "type": "string" },
+                                            { "type": "boolean" },
+                                            { "type": "array" }
+                                        ]
+                                    }
+                                }
+                            },
+                            "required": ["value"]
+                        }
+                    ]
+                }
+            }
+        },
+        "required": ["Id", "fields"]
+    }
+}
