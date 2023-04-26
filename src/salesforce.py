@@ -1,9 +1,11 @@
 import json
 import jsonschema
+import logging
 from datetime import datetime, date
 from simple_salesforce import Salesforce 
 
 from common import logger
+logging.getLogger("simple_salesforce").setLevel(logging.WARNING)
 
 class HarvardSalesforce:
     # initailize by connecting to salesforce
@@ -238,7 +240,6 @@ class HarvardSalesforce:
     def getUniqueIds(self, config, source_data):
         self.unique_ids = {}
         for object in config.keys():
-            ids = []
             self.unique_ids[object] = {}
 
             if 'Id' in config[object]:
@@ -259,12 +260,13 @@ class HarvardSalesforce:
                 else:
                     id_names = [full_source_id_value]
 
+                self.unique_ids[object]['id_name'] = full_source_id_value
+
                 for full_source_data_id_name in id_names:
 
                     source_data_object_branch = None
                     logger.debug(f"full_source_data_id_name: {full_source_data_id_name}")
 
-                    self.unique_ids[object]['id_name'] = full_source_data_id_name
 
                     if len(full_source_data_id_name.split(".")) > 1:
                         source_data_object_branch = full_source_data_id_name.split(".")[0]
@@ -273,6 +275,7 @@ class HarvardSalesforce:
                         source_data_id_name = full_source_data_id_name
 
                     for source_data_object in source_data:
+                        ids = []
                         if source_data_object_branch is not None:
                             for b in source_data_object[source_data_object_branch]:
                                 ids.append(str(b[source_data_id_name]))

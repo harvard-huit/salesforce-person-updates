@@ -86,22 +86,22 @@ def main():
         # data = {}
         # data = transformer.transform(source_data=departments.results, source_name='departments')
 
-        # logger.info(f"**** Push Departments to SF  ****")
-        # for object, object_data in data.items():
-        #     logger.info(f"object: {object}")
-        #     logger.info(pformat(object_data))
+        logger.info(f"**** Push Departments to SF  ****")
+        for object, object_data in data.items():
+            logger.info(f"object: {object}")
+            logger.info(pformat(object_data))
 
-        #     hsf.pushBulk(object, object_data)    
+            hsf.pushBulk(object, object_data)    
 
         data = {}
         data = transformer.transform(source_data=people, source_name='pds')
 
         logger.info(f"**** Push People to SF  ****")
         for object, object_data in data.items():
-            logger.debug(f"object: {object}")
-            logger.debug(pformat(object_data))
+            logger.info(f"object: {object}")
+            logger.info(pformat(object_data))
 
-            # hsf.pushBulk(object, object_data)    
+            hsf.pushBulk(object, object_data)    
 
         # NOTE: see notes on this function
         # hsf.setDeleteds(object='Contact', id_type='HUDA__hud_UNIV_ID__c', deleted_flag='lastName', ids=['31598567'])

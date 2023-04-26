@@ -1,4 +1,7 @@
 from common import logger
+import re
+from pprint import pprint, pp, pformat
+
 
 class SalesforceTransformer:
     def __init__(self, config, hsf):
@@ -37,6 +40,8 @@ class SalesforceTransformer:
             # go through all the objects
             for object_name in source_config:
                 current_record = {}
+
+                # DEBUGGING 
                 if object_name  != "hed__Affiliation__c":
                     continue
 
@@ -75,172 +80,194 @@ class SalesforceTransformer:
                     when = None
                     logger.debug(f"  source_object: {source_object}")
 
-
-                    if isinstance(source_object, (dict)):
-                        if 'value' in source_object:
-                            value_reference = source_object['value']
-                        if 'when' in source_object:
-                            when = source_object['when']
-                    elif isinstance(source_object, (str)):
-                        value_reference = source_object
+                    
+                    if isinstance(source_object, list): 
+                        value_references = source_object
                     else: 
-                        value_reference = None
+                        if isinstance(source_object, (dict)):
+                            if 'value' in source_object:
+                                value_references = [source_object['value']]
+                            if 'when' in source_object:
+                                when = source_object['when']
+                        elif isinstance(source_object, (str)):
+                            value_references = [source_object]
 
-                    logger.debug(f"    value_reference: {value_reference}:{source_data_object.get(value_reference)}")                     
-                    logger.debug(f"    when: {when}")
-                    
-                    pieces = value_reference.split(".")
-                    first = pieces[0]
-                    
-                    # check the value referenced in the config
-                    if isinstance(source_data_object[first], (str, bool)):
-                        value = source_data_object[first]
-                    elif isinstance(source_data_object[first], dict):
-                        # if it's a dict, we need to get the piece further in
-                        if pieces[1] not in source_data_object[first]:
-                            if first == 'sf':
-                                source_pieces = pieces[1:]
-                                if source_pieces[0] in salesforce_person:
-                                    if isinstance(salesforce_person, (str, bool, int)):
-                                        value = salesforce_person[source_pieces[0]]
-                                    elif isinstance(salesforce_person, dict) and len(source_pieces) == 2:
-                                        value = salesforce_person[source_pieces[0]][source_pieces[1]]
-                                    if object_name not in current_record:
-                                        current_record[object_name] = {}
-                                    current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
+                    for value_reference in value_references:
+
+
+                        pieces = value_reference.split(".")
+                        first = pieces[0]
+
+                        logger.debug(f"    value_reference: {value_reference}:{source_data_object.get(value_reference)}")                     
+                        logger.debug(f"    when: {when}")
+                        
+                        
+                        # check the value referenced in the config
+                        if isinstance(source_data_object[first], (str, bool)):
+                            value = source_data_object[first]
+                        elif isinstance(source_data_object[first], dict):
+                            # if it's a dict, we need to get the piece further in
+                            if pieces[1] not in source_data_object[first]:
+                                if first == 'sf':
+                                    source_pieces = pieces[1:]
+                                    if source_pieces[0] in salesforce_person:
+                                        if isinstance(salesforce_person, (str, bool, int)):
+                                            value = salesforce_person[source_pieces[0]]
+                                        elif isinstance(salesforce_person, dict) and len(source_pieces) == 2:
+                                            value = salesforce_person[source_pieces[0]][source_pieces[1]]
+                                        if object_name not in current_record:
+                                            current_record[object_name] = {}
+                                        current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
+                                    else:
+                                        logger.warn(f"Warning: reference ({pieces[1]}) not found in object ({salesforce_person[first]})")
                                 else:
-                                    logger.warn(f"Warning: reference ({pieces[1]}) not found in object ({salesforce_person[first]})")
+                                    logger.warn(f"Warning: reference ({pieces[1]}) not found in object ({source_data_object[first]})")
+                                continue
+                            if isinstance(source_data_object[first][pieces[1]], dict):
+                                value = source_data_object[first][pieces[1]][pieces[2]]
                             else:
-                                logger.warn(f"Warning: reference ({pieces[1]}) not found in object ({source_data_object[first]})")
-                            continue
-                        if isinstance(source_data_object[first][pieces[1]], dict):
-                            value = source_data_object[first][pieces[1]][pieces[2]]
-                        else:
-                            value = source_data_object[first][pieces[1]]
-                    elif isinstance(source_data_object[first], list):
-                        is_branched = True
-                        branches = source_data_object[first]
-                        # ignore the first piece of the dotted element
-                        branch_field = ".".join(pieces[1:])
+                                value = source_data_object[first][pieces[1]]
+                        elif isinstance(source_data_object[first], list):
+                            is_branched = True
+                            branches = source_data_object[first]
+                            # ignore the first piece of the dotted element
+                            branch_field = ".".join(pieces[1:])
 
-                        # initialize the best branch as None
-                        best_branch = None
+                            # initialize the best branch as None
+                            best_branch = None
 
-                        # now that we know we're on a branch, we need to loop through the possible values
-                        for branch in branches:
+                            # now that we know we're on a branch, we need to loop through the possible values
+                            for branch in branches:
 
-                            is_best = True
-                            # if there is a when clause, figure out if this branch matches
-                            if isinstance(when, dict):
-                                for ref, val in when.items():
+                                is_best = True
+                                # if there is a when clause, figure out if this branch matches
+                                if isinstance(when, dict):
+                                    for ref, val in when.items():
 
-                                    if ref.split(".")[0] not in branch:
-                                        ref = ".".join(ref.split(".")[1:])
-                                    # if this pds reference is not in the branch, try it without the first element,
-                                    #   this allows for `names.name` and `name` to work
-                                    # if it's still not there, that's a problem, maybe I should just ignore this?
-                                    if ref.split(".")[0] not in branch:
-                                        raise Exception(f"Error: invalid reference in when: trying to find {ref} in {branch}")
+                                        if ref.split(".")[0] not in branch:
+                                            ref = ".".join(ref.split(".")[1:])
+                                        # if this pds reference is not in the branch, try it without the first element,
+                                        #   this allows for `names.name` and `name` to work
+                                        # if it's still not there, that's a problem, maybe I should just ignore this?
+                                        if ref.split(".")[0] not in branch:
+                                            raise Exception(f"Error: invalid reference in when: trying to find {ref} in {branch}")
 
-                                    # if the when value is a list, we want to get the "best", this is annoying
-                                    if isinstance(val, list):
-                                        is_best = False
-                                        for v in val:
-                                            # if the best branch already has this value, don't bother with the loop
-                                            #   this means the current branch isn't better
+                                        # if the when value is a list, we want to get the "best", this is annoying
+                                        if isinstance(val, list):
+                                            is_best = False
+                                            for v in val:
+                                                # if the best branch already has this value, don't bother with the loop
+                                                #   this means the current branch isn't better
+                                                ref_pieces = ref.split(".")
+
+                                                if len(ref_pieces) == 1:
+                                                    if best_branch is not None:
+                                                        if best_branch[ref] == v and branch[ref] != v:
+                                                            break
+
+                                                    if branch[ref] == v:
+                                                        is_best = True
+                                                        kill_best = True
+                                                        break
+                                                elif len(ref_pieces) == 2:
+                                                    if best_branch is not None:
+                                                        if best_branch[ref_pieces[0]][ref_pieces[1]] == v and branch[ref_pieces[0]][ref_pieces[1]] != v:
+                                                            break
+
+                                                    if branch[ref_pieces[0]][ref_pieces[1]] == v:
+                                                        is_best = True
+                                                        kill_best = True
+                                                        break
+                                                else: 
+                                                    raise Exception(f"Error: Reference not recognized: {ref}")
+                
+                                        elif isinstance(val, (str, bool, int)):
+
                                             ref_pieces = ref.split(".")
 
                                             if len(ref_pieces) == 1:
-                                                if best_branch is not None:
-                                                    if best_branch[ref] == v and branch[ref] != v:
-                                                        break
-
-                                                if branch[ref] == v:
-                                                    is_best = True
-                                                    kill_best = True
+                                                if branch[ref] != val:
+                                                    is_best = False
                                                     break
                                             elif len(ref_pieces) == 2:
-                                                if best_branch is not None:
-                                                    if best_branch[ref_pieces[0]][ref_pieces[1]] == v and branch[ref_pieces[0]][ref_pieces[1]] != v:
-                                                        break
-
-                                                if branch[ref_pieces[0]][ref_pieces[1]] == v:
-                                                    is_best = True
-                                                    kill_best = True
+                                                if branch[ref_pieces[0]][ref_pieces[1]] != val:
+                                                    is_best = False
                                                     break
                                             else: 
                                                 raise Exception(f"Error: Reference not recognized: {ref}")
-            
-                                    elif isinstance(val, (str, bool, int)):
 
-                                        ref_pieces = ref.split(".")
+                                # if this branch passed the when tests
+                                if is_best:
 
-                                        if len(ref_pieces) == 1:
-                                            if branch[ref] != val:
-                                                is_best = False
-                                                break
-                                        elif len(ref_pieces) == 2:
-                                            if branch[ref_pieces[0]][ref_pieces[1]] != val:
-                                                is_best = False
-                                                break
-                                        else: 
-                                            raise Exception(f"Error: Reference not recognized: {ref}")
-
-                            # if this branch passed the when (the tests)
-                            if is_best:
-
-                                # if we already have a qualifying branch, check the updateDate and change it if the updateDate is better
-                                if best_branch is not None and is_flat and not when:
-                                    if branch.updateDate > best_branch.updateDate:
+                                    # if we already have a qualifying branch, check the updateDate and change it if the updateDate is better
+                                    if best_branch is not None and is_flat:
+                                        if branch.updateDate > best_branch.updateDate:
+                                            best_branch = branch
+                                    else: 
                                         best_branch = branch
-                                else: 
-                                    best_branch = branch
 
-                            if not is_flat:
-                                source_id_name = self.hashed_ids[object_name]['id_name']
-                                if "." in source_id_name:
-                                    (branch_name, source_id_name) = source_id_name.split(".")
-                                pds_branch_id = str(best_branch[source_id_name])
-                                if pds_branch_id not in best_branches.keys():
-                                    best_branches[pds_branch_id] = {}
-                                best_branches[pds_branch_id] = best_branch
+                                if not is_flat:
+                                    source_id_name = self.hashed_ids[object_name]['id_name']
+                                    if isinstance(source_id_name, list):
+                                        for current_id_name in self.hashed_ids[object_name]['id_name']:
+                                            # NOTE: I really don't like this, 
+                                            #       but I can't think of a cleaner way to do it right now
+                                            if re.search(rf"^{first}", current_id_name, re.IGNORECASE):
+                                                source_id_name = current_id_name
+                                                break
+                                        # if it's still a list, that means we didn't get a match :(
+                                        if isinstance(source_id_name, list):
+                                            raise Exception(f"Error: branch {branch_name} not found in source id {source_id_name}")
 
-                            
+                                    if "." in source_id_name:
+                                        (branch_name, source_id_name) = source_id_name.split(".")
+                                    pds_branch_id = str(best_branch[source_id_name])
+                                    if pds_branch_id not in best_branches.keys():
+                                        best_branches[pds_branch_id] = {}
 
-                        if best_branch is not None:
-                            if is_flat:
-                                branch_field_pieces = branch_field.split(".")
-                                if len(branch_field_pieces) == 1:
-                                    value = best_branch[branch_field]
-                                elif len(branch_field_pieces) == 2:
-                                    value = best_branch[branch_field_pieces[0]][branch_field_pieces[1]]
+                                    # need this for identifying the branch type later
+                                    best_branch['branch_name'] = first
+
+                                    best_branches[pds_branch_id] = best_branch
 
                                 
-                        else:
-                            value = None
-                    
 
-                    if isinstance(value, bool):
-                        if value:
-                            value = 'Y'
-                        else:
-                            value = 'N'
-                    logger.debug(f"      value: {value}")
+                            if best_branch is not None:
+                                if is_flat:
+                                    branch_field_pieces = branch_field.split(".")
+                                    if len(branch_field_pieces) == 1:
+                                        value = best_branch[branch_field]
+                                    elif len(branch_field_pieces) == 2:
+                                        value = best_branch[branch_field_pieces[0]][branch_field_pieces[1]]
+
+                                    
+                            else:
+                                value = None
+                        
+
+                        if isinstance(value, bool):
+                            if value:
+                                value = 'Y'
+                            else:
+                                value = 'N'
+                        logger.debug(f"      value: {value}")
 
 
-                    if not is_branched:
-                        if object_name not in current_record:
-                            current_record[object_name] = {}
-                        current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
+                        if not is_branched:
+                            if object_name not in current_record:
+                                current_record[object_name] = {}
+                            current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
 
-                    # else: 
-                    #     current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
+                        # else: 
+                        #     current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
 
+                    # END TARGET ***********************************************
 
                 branch = {}
                 for pds_branch_id, branch in best_branches.items():
-        
+                    
                     current_record[object_name] = {}
+                    branch_name = branch['branch_name']
                     
                     # if this id is in the hashed_ids, that means it'll be an update and we need to add the Object Id
                     if pds_branch_id in self.hashed_ids[object_name]['Ids']:
@@ -259,6 +286,8 @@ class SalesforceTransformer:
                             logger.debug(f"source: {source}")
                             value = None
                             source_pieces = source.split(".")
+                            if source_pieces[0] not in [branch_name, 'sf']:
+                                continue
                             branch_temp = branch
                             if source_pieces[0] in source_data_object:
                                 logger.debug(f"  {source_pieces[0]} in source_data_object")
