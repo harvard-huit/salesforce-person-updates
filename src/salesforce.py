@@ -274,8 +274,8 @@ class HarvardSalesforce:
                     else:
                         source_data_id_name = full_source_data_id_name
 
+                    ids = []
                     for source_data_object in source_data:
-                        ids = []
                         if source_data_object_branch is not None:
                             for b in source_data_object[source_data_object_branch]:
                                 ids.append(str(b[source_data_id_name]))

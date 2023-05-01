@@ -17,10 +17,14 @@ A sandbox or development or scratch Salesforce instance.
 
 ### .env file
 
-A `.env` file that looks like:
+A `.env` file is the best way to work on this locally. In a deployed version, these would be defined in the ansible_vars files. 
+
+The file would look like:
 ```
 STACK="developer"
 PDS_APIKEY="<PDS Apikey>"
+DEPT_APIKEY="<Departments API Apikey>"
+
 DEBUG="True"
 
 SF_USERNAME="<your salesforce username>"
@@ -62,7 +66,7 @@ This controls when we last got updates.
 
 #### Credentials
 
-Credentials are stored in Secrets Manager. The arn to the entries are in the Dynamo
+Credentials are stored in Secrets Manager. The arn to the entries are in the Dynamo. 
 
 ### 2. Connect to Salesforce and Generate Metadata Maps
 

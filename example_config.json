@@ -106,14 +106,12 @@
             "HUDA__EMAIL_ADDRESS__c": "emails.emailAddressSource",
             "HUDA__EMAIL_DOMAIN_NAME__c": "emails.emailDomainName",
             "HUDA__EMAIL_USER_NAME__c": "emails.emailUserName",
-            "HUDA__INTERNAL_ID__c": "",
-            "HUDA__MULE_UNIQUE_PERSON_KEY__c": "",
+            "HUDA__INTERNAL_ID__c": "uuid",
+            "HUDA__MULE_UNIQUE_PERSON_KEY__c": "personKey",
             "HUDA__OFFICIAL_EMAIL_INDICATOR__c": "emails.officialEmailIndicator",
-            "HUDA__PREFERRED_ALUMNI_EMAIL__c": "",
             "HUDA__PRIVACY_VALUE__c": "emails.privacyValue.code",
-            "HUDA__temp_contactID__c": "",
-            "HUDA__UNIV_ID__c": "",
-            "HUDA__UPDATE_DT__c": ""     
+            "HUDA__UNIV_ID__c": "univid",
+            "HUDA__UPDATE_DT__c": "emails.updateDate"     
         }
     },
     "HUDA__hud_Address__c": {
@@ -194,7 +192,8 @@
             "HUDA__LOC_TYPE_CD__c": "locations.locationType.code",
             "HUDA__MULE_UNIQUE_PERSON_KEY__c": "personKey",
             "HUDA__PRIVACY_VALUE__c": "locations.privacyValue.code",
-            "HUDA__UPDATE_DT__c": "locations.updateDate"        }
+            "HUDA__UPDATE_DT__c": "locations.updateDate" 
+        }
     },
     "hed__Affiliation__c": {
         "flat": false,

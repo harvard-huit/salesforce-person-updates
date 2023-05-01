@@ -19,7 +19,7 @@ config = json.load(f)
 f.close()
 
 f = open('../example_pds_query.json')
-testquery = json.load(f)
+pds_query = json.load(f)
 f.close()
 ####################################
 
@@ -61,19 +61,18 @@ def main():
         # validate the config
         hsf.validateConfig(config)
 
+        # TODO: implement updates_only
+        updates_only = os.getenv('UPDATES_ONLY') or False
 
         # TODO: GET list of updated people since watermark 
 
-
-        # TODO: removed fields from this temporarily (should come from config)
-        # "fields": ["univid", "names.name"],
-        query = {
-            "conditions": {
-                "univid": ["80719647"]
-            }
-        }
+        # query = {
+        #     "conditions": {
+        #         "univid": ["80719647"]
+        #     }
+        # }
         # this is a list of DotMaps, which was supposed to allow us to access the keys with dot notation
-        people = pds.People(query=query, apikey=os.getenv("PDS_APIKEY")).people
+        people = pds.People(query=pds_query, apikey=os.getenv("PDS_APIKEY")).people
 
         # here we get the full list of departments
         departments = Departments(apikey=os.getenv("DEPT_APIKEY"))
@@ -86,20 +85,20 @@ def main():
         # data = {}
         # data = transformer.transform(source_data=departments.results, source_name='departments')
 
-        logger.info(f"**** Push Departments to SF  ****")
-        for object, object_data in data.items():
-            logger.info(f"object: {object}")
-            logger.info(pformat(object_data))
+        # logger.info(f"**** Push Departments to SF  ****")
+        # for object, object_data in data.items():
+        #     logger.debug(f"object: {object}")
+        #     logger.debug(pformat(object_data))
 
-            hsf.pushBulk(object, object_data)    
+            # hsf.pushBulk(object, object_data)    
 
         data = {}
         data = transformer.transform(source_data=people, source_name='pds')
 
         logger.info(f"**** Push People to SF  ****")
         for object, object_data in data.items():
-            logger.info(f"object: {object}")
-            logger.info(pformat(object_data))
+            logger.debug(f"object: {object}")
+            logger.debug(pformat(object_data))
 
             hsf.pushBulk(object, object_data)    
 

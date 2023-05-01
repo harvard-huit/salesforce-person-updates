@@ -41,10 +41,6 @@ class SalesforceTransformer:
             for object_name in source_config:
                 current_record = {}
 
-                # DEBUGGING 
-                if object_name  != "hed__Affiliation__c":
-                    continue
-
                 # if it's flat, that means there's only one per "person"
                 #   (otherwise, it's intention is to get a branch with multiple values per "person",
                 #   like names, emails, etc etc)
@@ -103,7 +99,7 @@ class SalesforceTransformer:
                         
                         
                         # check the value referenced in the config
-                        if isinstance(source_data_object[first], (str, bool)):
+                        if isinstance(source_data_object[first], (str, bool, int)):
                             value = source_data_object[first]
                         elif isinstance(source_data_object[first], dict):
                             # if it's a dict, we need to get the piece further in

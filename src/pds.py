@@ -53,7 +53,7 @@ class People:
         if self == None and apikey == None:
             raise Exception("Error: apikey required")
 
-        pdsUrl = "https://go.dev.apis.huit.harvard.edu/ats/person/v3/search"
+        pdsUrl = "https://go.apis.huit.harvard.edu/ats/person/v3/search"
 
         headers = {
             "Content-Type": "application/json",
@@ -70,7 +70,7 @@ class People:
         # logger.info(json.loads(response.text))
         # logger.info(response.status_code)
         if(response.status_code != 200):
-            raise Exception("Error: failure with response from PDS")
+            raise Exception(f"Error: failure with response from PDS: {response.status_code}:{response.text}")
         
         if(response.json()['count'] < 1):
             logger.warn(f"WARNING: PDS returned no results for: {query}")
