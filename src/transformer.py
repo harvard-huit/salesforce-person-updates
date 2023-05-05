@@ -10,7 +10,7 @@ class SalesforceTransformer:
         self.hashed_ids = {}
 
     # This method helps sort out the config to get a subsection of the config for a specific source
-    def getSourceConfig(self, source):
+    def getSourceConfig(self, source: str) -> dict: 
         split_config = {}
         for object_name in self.config:
             if 'source' in self.config[object_name]:
@@ -18,10 +18,23 @@ class SalesforceTransformer:
                     split_config[object_name] = self.config[object_name]
         return split_config
 
-    def transform(self, source_data, source_name):
+    def getTargetConfig(self, target_object: str) -> dict:
+        split_config = {}
+        for object_name in self.config:
+            if object_name == target_object:
+                split_config[object_name] = self.config[object_name]
+
+        return split_config
+
+    def transform(self, source_data, source_name, target_object):
 
         logger.debug("Starting transfom")
-        source_config = self.getSourceConfig(source_name)
+        if source_name is not None:
+            source_config = self.getSourceConfig(source_name)
+        elif target_object is not None:
+            source_config = self.getTargetConfig(target_object)
+        else:
+            source_config = self.config
         self.hashed_ids = self.hsf.getUniqueIds(config=source_config, source_data=source_data)
 
         data = {}
@@ -30,11 +43,12 @@ class SalesforceTransformer:
             salesforce_person = {}
             if 'Contact' in self.hashed_ids:
                 if self.hashed_ids['Contact']['id_name'] in source_data_object:
-                    salesforce_person = {
-                        "contact": {
-                            "id": self.hashed_ids['Contact']['Ids'][source_data_object[self.hashed_ids['Contact']['id_name']]]
+                    if source_data_object[self.hashed_ids['Contact']['id_name']] in self.hashed_ids['Contact']['Ids']:
+                        salesforce_person = {
+                            "contact": {
+                                "id": self.hashed_ids['Contact']['Ids'][source_data_object[self.hashed_ids['Contact']['id_name']]]
+                            }
                         }
-                    }
 
 
             # go through all the objects
@@ -115,9 +129,12 @@ class SalesforceTransformer:
                                             current_record[object_name] = {}
                                         current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
                                     else:
-                                        logger.warn(f"Warning: reference ({pieces[1]}) not found in object ({salesforce_person[first]})")
+                                        # then this person is not currently in salesforce
+                                        logger.warn(f"Warning: reference not found in Salesforce object ({first})")
                                 else:
-                                    logger.warn(f"Warning: reference ({pieces[1]}) not found in object ({source_data_object[first]})")
+                                    pass
+                                    # logger.warn(f"Warning: reference ({pieces[1]}) not found in object ({source_data_object[first]})")
+                                # if it's not in this person, just skip it
                                 continue
                             if isinstance(source_data_object[first][pieces[1]], dict):
                                 value = source_data_object[first][pieces[1]][pieces[2]]
@@ -138,6 +155,7 @@ class SalesforceTransformer:
                                 is_best = True
                                 # if there is a when clause, figure out if this branch matches
                                 if isinstance(when, dict):
+
                                     for ref, val in when.items():
 
                                         if ref.split(".")[0] not in branch:
@@ -157,7 +175,7 @@ class SalesforceTransformer:
                                                 ref_pieces = ref.split(".")
 
                                                 if len(ref_pieces) == 1:
-                                                    if best_branch is not None:
+                                                    if best_branch:
                                                         if best_branch[ref] == v and branch[ref] != v:
                                                             break
 
@@ -166,13 +184,12 @@ class SalesforceTransformer:
                                                         kill_best = True
                                                         break
                                                 elif len(ref_pieces) == 2:
-                                                    if best_branch is not None:
+                                                    if best_branch:
                                                         if best_branch[ref_pieces[0]][ref_pieces[1]] == v and branch[ref_pieces[0]][ref_pieces[1]] != v:
                                                             break
 
                                                     if branch[ref_pieces[0]][ref_pieces[1]] == v:
                                                         is_best = True
-                                                        kill_best = True
                                                         break
                                                 else: 
                                                     raise Exception(f"Error: Reference not recognized: {ref}")
@@ -196,7 +213,7 @@ class SalesforceTransformer:
                                 if is_best:
 
                                     # if we already have a qualifying branch, check the updateDate and change it if the updateDate is better
-                                    if best_branch is not None and is_flat:
+                                    if best_branch and is_flat:
                                         if branch.updateDate > best_branch.updateDate:
                                             best_branch = branch
                                     else: 
@@ -228,7 +245,7 @@ class SalesforceTransformer:
 
                                 
 
-                            if best_branch is not None:
+                            if best_branch:
                                 if is_flat:
                                     branch_field_pieces = branch_field.split(".")
                                     if len(branch_field_pieces) == 1:
@@ -253,9 +270,8 @@ class SalesforceTransformer:
                             if object_name not in current_record:
                                 current_record[object_name] = {}
                             current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
-
-                        # else: 
-                        #     current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
+                        elif best_branch and is_flat: 
+                            current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
 
                     # END TARGET ***********************************************
 
@@ -342,31 +358,36 @@ class SalesforceTransformer:
             if source_name in source_object and 'salesforce' in source_object:
                 # logger.debug(f"hashed: {self.hashed_ids[object_name]}")
                 # then this is an Id we need to try and match
-                id_name = self.hashed_ids[object_name]['id_name']
+                id_names = self.hashed_ids[object_name]['id_name']
                 salesforce_id_name = source_object['salesforce']
                 current_id = None
                 value = None
-                if '.' in id_name:
-                    (branch_name, id_name) = id_name.split(".")
-                    # we need to loop through all of the branches for this
-                    for branch in source_data_object[branch_name]:
-                        current_id = str(branch[id_name])
+                if not isinstance(id_names, list):
+                    id_names = [id_names]
+                for id_name in id_names:
+                    if '.' in id_name:
+                        (branch_name, id_name) = id_name.split(".")
+                        # we need to loop through all of the branches for this
+                        for branch in source_data_object[branch_name]:
+                            if id_name not in branch:
+                                continue
+                            current_id = str(branch[id_name])
+                            if current_id in self.hashed_ids[object_name]['Ids']:
+                                value = self.hashed_ids[object_name]['Ids'][current_id]
+                                if object_name not in current_record:
+                                    current_record[object_name] = {}
+                                current_record[object_name][salesforce_id_name] = self.hsf.validate(object=object_name, field=salesforce_id_name, value=value)
+
+                    else:
+                        current_id = source_data_object[id_name]
+
                         if current_id in self.hashed_ids[object_name]['Ids']:
                             value = self.hashed_ids[object_name]['Ids'][current_id]
-                            if object_name not in current_record:
-                                current_record[object_name] = {}
-                            current_record[object_name][salesforce_id_name] = self.hsf.validate(object=object_name, field=salesforce_id_name, value=value)
 
-                else:
-                    current_id = source_data_object[id_name]
-
-                    if current_id in self.hashed_ids[object_name]['Ids']:
-                        value = self.hashed_ids[object_name]['Ids'][current_id]
-
-                    if object_name not in current_record:
-                        current_record[object_name] = {}
-                    if value is not None:
-                        current_record[object_name]['Id'] = self.hsf.validate(object=object_name, field='Id', value=value)
+                        if object_name not in current_record:
+                            current_record[object_name] = {}
+                        if value is not None:
+                            current_record[object_name]['Id'] = self.hsf.validate(object=object_name, field='Id', value=value)
             else:
                 raise Exception("Error: config object's Id requires a pds and salesforce value to be able to match")
         return current_record

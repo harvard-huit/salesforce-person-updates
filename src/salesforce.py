@@ -49,8 +49,7 @@ class HarvardSalesforce:
         responses = self.sf.bulk.__getattr__(object).upsert(data, external_id_field='Id')
         for response in responses:
             if response['success'] != True:
-                logger.error(f"Error in bulk data load: {response['errors']}")
-                return False
+                raise Exception(f"Error in bulk data load: {response['errors']}")
             else:
                 logger.info(response)
         return True
@@ -173,8 +172,9 @@ class HarvardSalesforce:
         if 'updateable' not in self.type_data[object][field]:
             raise Exception(f"Error: field ({field}) does not have an associated `updateable`")
 
+        # NOTE: Salesforce cannot take a null value directly, it needs to take the value: '#N/A'
         if value is None:
-            return value
+            return None
 
         if not isinstance(value, (str, bool, int)):
             value_type = type(value)
@@ -190,16 +190,16 @@ class HarvardSalesforce:
             length = self.type_data[object][field]['length']
             value = str(value)
             if value is None:
-                return ""
+                return None
             else:
                 if len(value) > length:
                     value = value[:length]
                 return str(value)
-        if field_type in ["email"]:
+        elif field_type in ["email"]:
             return str(value)
-        if field_type in ["id", "reference"]:
+        elif field_type in ["id", "reference"]:
             return value
-        if field_type in ["date"]:
+        elif field_type in ["date"]:
             # NOTE: Salesforce only liked dates from the year of our lord 1700-2400
             #       Salesforce also wants the date in an iso-8861 string
             #       It does not handle datetime as a date, so the 00:00:00 needs to be stripped off of datetimes
@@ -212,7 +212,7 @@ class HarvardSalesforce:
             except ValueError as e:
                 raise Exception(f"Error: {e}")
             return value
-        if field_type in ["datetime"]:
+        elif field_type in ["datetime"]:
             try:
                 if value:
                     # we want to try both formats for datetime
@@ -226,7 +226,7 @@ class HarvardSalesforce:
             except ValueError as e:
                 raise Exception(f"Error: {e}")
             return value
-        if field_type in ["double"]:
+        elif field_type in ["double"]:
             try: 
                 return float(value)
             except ValueError as e:
@@ -237,9 +237,13 @@ class HarvardSalesforce:
     # getUniqueIds 
     # output format should look like:
     #   { "SF OBJECT NAME": { "id_name": "PDS ID NAME", "Ids": { "HARVARD ID": "SALESFORCE ID", ... } } }
-    def getUniqueIds(self, config, source_data):
-        self.unique_ids = {}
+    def getUniqueIds(self, config, source_data, target_object):
+        if target_object is None:
+            self.unique_ids = {}
         for object in config.keys():
+            if target_object is not None and target_object != object:
+                continue
+            
             self.unique_ids[object] = {}
 
             if 'Id' in config[object]:

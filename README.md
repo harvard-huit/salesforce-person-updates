@@ -112,6 +112,8 @@ The way the Bulk functions work in simple-salesforce (by default) is they abstra
 
 This makes some of the logic easier, but it could lead to issues with performance unless we wrap the bulk calls in asyncio so we can be waiting on multiple jobs. 
 
+NOTE: setting a value to `null` requires setting it to `#N/A`. (This is not easy to find in SF documentation.)
+
 #### Examples
 
 ```py

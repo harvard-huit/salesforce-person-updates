@@ -97,8 +97,8 @@ def main():
 
         logger.info(f"**** Push People to SF  ****")
         for object, object_data in data.items():
-            logger.debug(f"object: {object}")
-            logger.debug(pformat(object_data))
+            logger.info(f"object: {object}")
+            logger.info(pformat(object_data))
 
             hsf.pushBulk(object, object_data)    
 
@@ -123,6 +123,8 @@ main()
 #     password = os.getenv('SF_PASSWORD'),
 #     token = os.getenv('SF_SECURITY_TOKEN'),
 # )
+
+
 
 # hsf.pushBulk("Contact", [{
 #   'Birthdate': '1980-11-17',
@@ -162,6 +164,68 @@ main()
 #   'Id': 'aDmD40000001DrJKAU',
 #   'HUDA__Name_Contact__c': '00336000010CxNQAA0'
 # }])
+
+# #N/A doesn't seem to work for date/datetimes
+# data = [{'HUDA__hud_ACADEMIC_PRIME_ROLE_INDICATOR__c': 'F',
+#   'HUDA__hud_DEPT_ID__c': '104130',
+#   'HUDA__hud_EFFDT__c': '2022-11-05T02:33:11',
+#   'HUDA__hud_EFF_STATUS__c': 'A',
+#   'HUDA__hud_POI_COMMENTS__c': None,
+#   'HUDA__hud_EMP_ADDR_PS_LOCATION_CD__c': 'H86079',
+#   'HUDA__hud_EMP_APPOINT_END_DT__c': '2023-09-30T00:00:00',
+#   'HUDA__hud_EMP_DEPT_ENTRY_DT__c': '2022-11-01T00:00:00',
+#   'HUDA__hud_EMP_EMPLOYMENT_STATUS__c': 'A',
+#   'HUDA__hud_EMP_EMPL_CLASS__c': 'Y',
+#   'HUDA__hud_EMP_FACULTY_CD__c': 'FAS',
+#   'HUDA__hud_EMP_FULLTIME_FLAG__c': 'T',
+#   'HUDA__hud_EMP_HIRE_DT__c': '2022-11-01T00:00:00',
+#   'HUDA__hud_EMP_JOBCODE__c': '069591',
+#   'HUDA__hud_EMP_MAJ_AFFILIATION_CD__c': 'FAS^MA',
+#   'HUDA__hud_EMP_MAJ_AFFILIATION_DESC__c': 'Fac Arts & Scis Major Affil',
+#   'HUDA__hud_EMP_PAID_FLAG__c': 'T',
+#   'HUDA__hud_EMP_PAYGROUP__c': 'MIP',
+#   'HUDA__hud_EMP_REHIRE_DT__c': '2022-11-01T00:00:00',
+#   'HUDA__hud_EMP_SUB_AFFILIATION_CD__c': 'FAS_SCI^SA',
+#   'HUDA__hud_EMP_SUB_AFFILIATION_DESC__c': 'FAS^Sciences',
+#   'HUDA__hud_EMP_TERMINATION_DT__c': None,
+#   'HUDA__hud_EMP_UNION_CD__c': '00',
+#   'HUDA__hud_PERSON_ROLES_KEY__c': '6002319',
+#   'HUDA__hud_PRIME_ROLE_INDICATOR__c': 'T',
+#   'HUDA__hud_PRIVACY_VALUE__c': '5',
+#   'HUDA__hud_ROLE_END_DT__c': None,
+#   'HUDA__hud_ROLE_ID__c': '0',
+#   'HUDA__hud_ROLE_SOURCE__c': 'PS',
+#   'HUDA__hud_ROLE_START_DT__c': '2022-11-01T00:00:00',
+#   'HUDA__hud_ROLE_TITLE__c': 'Post-Doctoral Fellow in FAS Informatics',
+#   'HUDA__hud_ROLE_TYPE_CD__c': 'EMPLOYEE',
+#   'HUDA__hud_SUPERVISOR_ID__c': '60751145',
+#   'HUDA__hud_UPDATE_DT__c': '2022-11-05T02:33:11',
+#   'Id': 'a0B1R000014NwyXUAS',
+#   'hed__Contact__c': '0031R00002rj19OQAQ'}]
+# otherdata = [
+#  {'HUDA__hud_EFFDT__c': '2022-10-28T16:43:58',
+#   'HUDA__hud_EFF_STATUS__c': 'A',
+#   'HUDA__hud_PERSON_ROLES_KEY__c': '5998552',
+#   'HUDA__hud_POI_COMMENTS__c': '#N/A',
+#   'HUDA__hud_POI_COMPANY__c': '#N/A',
+#   'HUDA__hud_POI_FACULTY_CD__c': 'FAS',
+#   'HUDA__hud_POI_SHORT_DESC_LINE1__c': '#N/A',
+#   'HUDA__hud_POI_SHORT_DESC_LINE2__c': '#N/A',
+#   'HUDA__hud_PRIME_ROLE_INDICATOR__c': 'F',
+#   'HUDA__hud_PRIVACY_VALUE__c': '1',
+#   'HUDA__hud_ROLE_END_DT__c': '2022-11-08',
+#   'HUDA__hud_ROLE_ID__c': '1',
+#   'HUDA__hud_ROLE_SOURCE__c': 'PORTAL',
+#   'HUDA__hud_ROLE_START_DT__c': '2022-11-01T00:00:00',
+#   'HUDA__hud_ROLE_TITLE__c': 'Postdoctoral Fellow',
+#   'HUDA__hud_ROLE_TYPE_CD__c': 'INCEMPL',
+#   'HUDA__hud_UPDATE_DT__c': '2022-10-28T16:43:58',
+#   'Id': 'a0B1R000014NwYLUA0',
+#   'hed__Contact__c': '0031R00002rj19OQAQ'}]
+
+
+# hsf.pushBulk("hed__Affiliation__c", data)
+
 
 # response = hsf.sf.Contact.metadata()
 # response = hsf.getTypeMap(objects=config.keys())
