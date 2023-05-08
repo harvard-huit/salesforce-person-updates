@@ -74,13 +74,16 @@ def main():
         # this is a list of DotMaps, which was supposed to allow us to access the keys with dot notation
         people = pds.People(query=pds_query, apikey=os.getenv("PDS_APIKEY")).people
 
+        # REMOVED FOR DEBUGGING
         # here we get the full list of departments
-        departments = Departments(apikey=os.getenv("DEPT_APIKEY"))
-        hashed_departments = departments.departments
-        logger.debug(f"Successfully got {len(departments.results)} departments")
+        # departments = Departments(apikey=os.getenv("DEPT_APIKEY"))
+        # hashed_departments = departments.departments
+        # logger.debug(f"Successfully got {len(departments.results)} departments")
 
         transformer = SalesforceTransformer(config=config, hsf=hsf)
 
+
+        # REMOVED FOR DEBUGGING
         # data will have the structure of { "OBJECT": [{"FIELD": "VALUE"}, ...]}
         # data = {}
         # data = transformer.transform(source_data=departments.results, source_name='departments')
@@ -93,9 +96,21 @@ def main():
             # hsf.pushBulk(object, object_data)    
 
         data = {}
-        data = transformer.transform(source_data=people, source_name='pds')
+        data = transformer.transform(source_data=people, target_object='Contact')
 
-        logger.info(f"**** Push People to SF  ****")
+        logger.info(f"**** Push Contact data to SF  ****")
+        for object, object_data in data.items():
+            logger.info(f"object: {object}")
+            logger.info(pformat(object_data))
+
+            hsf.pushBulk(object, object_data)    
+
+
+
+        data = {}
+        data = transformer.transform(source_data=people, source_name='pds', exclude_target_objects=['Contact'])
+
+        logger.info(f"**** Push Remaining People data to SF  ****")
         for object, object_data in data.items():
             logger.info(f"object: {object}")
             logger.info(pformat(object_data))

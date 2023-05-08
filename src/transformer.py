@@ -26,13 +26,14 @@ class SalesforceTransformer:
 
         return split_config
 
-    def transform(self, source_data, source_name, target_object):
+    def transform(self, source_data, source_name=None, target_object=None, exclude_target_objects=[]):
 
         logger.debug("Starting transfom")
-        if source_name is not None:
-            source_config = self.getSourceConfig(source_name)
-        elif target_object is not None:
+        if target_object is not None:
             source_config = self.getTargetConfig(target_object)
+            source_name = source_config[target_object]['source']
+        elif source_name is not None:
+            source_config = self.getSourceConfig(source_name)
         else:
             source_config = self.config
         self.hashed_ids = self.hsf.getUniqueIds(config=source_config, source_data=source_data)
@@ -53,7 +54,11 @@ class SalesforceTransformer:
 
             # go through all the objects
             for object_name in source_config:
+                if object_name in exclude_target_objects:
+                    continue
                 current_record = {}
+                if source_name is None:
+                    source_name = source_config[object_name]['source']
 
                 # if it's flat, that means there's only one per "person"
                 #   (otherwise, it's intention is to get a branch with multiple values per "person",
@@ -140,6 +145,12 @@ class SalesforceTransformer:
                                 value = source_data_object[first][pieces[1]][pieces[2]]
                             else:
                                 value = source_data_object[first][pieces[1]]
+
+                            # we are making an assumption here that if it's a sf value, it's required, 
+                            #   (otherwise it'll end up orphaned)
+                            if first == 'sf' and value in [None, '#N/A']:
+                                raise Exception(f"Error: this value should not be null")
+                            
                         elif isinstance(source_data_object[first], list):
                             is_branched = True
                             branches = source_data_object[first]
@@ -333,7 +344,6 @@ class SalesforceTransformer:
                     data[object_name] = []
 
                 if is_flat:
-                    data[object_name] = []
                     current_record = self.setId(source_data_object=source_data_object, object_name=object_name, current_record=current_record)
                     data[object_name].append(current_record[object_name])
                 elif not is_branched:
