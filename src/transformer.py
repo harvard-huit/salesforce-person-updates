@@ -39,6 +39,7 @@ class SalesforceTransformer:
         self.hashed_ids = self.hsf.getUniqueIds(config=source_config, source_data=source_data)
 
         data = {}
+        best_branches = {}
         for source_data_object in source_data:
 
             salesforce_person = {}
@@ -66,7 +67,6 @@ class SalesforceTransformer:
                 is_flat = source_config[object_name].get('flat') or False    
 
                 good_records = []
-                best_branches = {}
                 
                 object_config = source_config[object_name]['fields']
                 source_id_name = source_config[object_name]['Id'][source_name]
