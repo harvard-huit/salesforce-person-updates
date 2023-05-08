@@ -261,7 +261,7 @@ class HarvardSalesforceTest(unittest.TestCase):
     def test_get_unique_ids(self):
         self.sf.sf.query_all.return_value = self.fakeQueryAllIds
 
-        hashed_ids = self.sf.getUniqueIds(config=self.fakeConfig, sourceData=self.fakePersonData)
+        hashed_ids = self.sf.getUniqueIds(config=self.fakeConfig, source_data=self.fakePersonData)
         self.assertIn('Contact', hashed_ids)
         self.assertIn('Ids', hashed_ids['Contact'])
         self.assertIn('2940935f3b990174', hashed_ids['Contact']['Ids'])
@@ -270,7 +270,7 @@ class HarvardSalesforceTest(unittest.TestCase):
     def test_fail_get_unique_ids(self):
         self.sf.sf.query_all.return_value = self.fakeQueryAllIds
 
-        hashed_ids = self.sf.getUniqueIds(config=self.fakeConfig, sourceData=self.fakePersonData)
+        hashed_ids = self.sf.getUniqueIds(config=self.fakeConfig, source_data=self.fakePersonData)
         self.assertIn('Contact', hashed_ids)
         self.assertIn('Ids', hashed_ids['Contact'])
         self.assertIn('2940935f3b990174', hashed_ids['Contact']['Ids'])

@@ -237,13 +237,13 @@ class HarvardSalesforce:
     # getUniqueIds 
     # output format should look like:
     #   { "SF OBJECT NAME": { "id_name": "PDS ID NAME", "Ids": { "HARVARD ID": "SALESFORCE ID", ... } } }
-    def getUniqueIds(self, config, source_data, target_object):
+    def getUniqueIds(self, config, source_data, target_object=None):
         if target_object is None:
             self.unique_ids = {}
         for object in config.keys():
             if target_object is not None and target_object != object:
                 continue
-            
+
             self.unique_ids[object] = {}
 
             if 'Id' in config[object]:
