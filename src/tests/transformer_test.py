@@ -44,6 +44,18 @@ class SalesforceTransformerTest(unittest.TestCase):
                         }
                     }
                 }
+            },
+            "somethingelse": {
+                "flat": False,
+                "source": "other",
+                "Id": {
+                    "other": "otherKey",
+                    "salesforce": "salesforceId"
+                },
+                "fields": {
+                    "otherBirthdate": "otherbirthDate",
+                    "otherValue": "names.firstName"
+                }
             }
         }
 
@@ -80,6 +92,26 @@ class SalesforceTransformerTest(unittest.TestCase):
         self.assertTrue(self.sf.validateConfig(self.fakeConfig))
         self.sf.sf.query_all.return_value = self.exampleSFData
         self.assertTrue(self.sf.validateConfig(self.exampleConfig))
+
+    def test_validate_source_config_split(self):
+        self.sf.sf.query_all.return_value = self.fakeSFData
+        self.transformer.config = self.fakeConfig
+        source_config = self.transformer.getSourceConfig('pds')
+        self.assertTrue(self.sf.validateConfig(source_config))
+        self.assertEqual(1, len(source_config))
+        for object_name in source_config:
+            self.assertEqual('pds', source_config[object_name]['source'])
+
+    def test_validate_target_config_split(self):
+        self.sf.sf.query_all.return_value = self.fakeSFData
+        self.transformer.config = self.fakeConfig
+        target_config = self.transformer.getTargetConfig('Contact')
+        self.assertTrue(self.sf.validateConfig(target_config))
+        self.assertEqual(1, len(target_config))
+        self.assertIn('Contact', target_config)
+
+    def test_handle_when(self):
+        pass
 
 if __name__ == '__main__':
     unittest.main()

@@ -166,59 +166,7 @@ class SalesforceTransformer:
                                 is_best = True
                                 # if there is a when clause, figure out if this branch matches
                                 if isinstance(when, dict):
-
-                                    for ref, val in when.items():
-
-                                        if ref.split(".")[0] not in branch:
-                                            ref = ".".join(ref.split(".")[1:])
-                                        # if this pds reference is not in the branch, try it without the first element,
-                                        #   this allows for `names.name` and `name` to work
-                                        # if it's still not there, that's a problem, maybe I should just ignore this?
-                                        if ref.split(".")[0] not in branch:
-                                            raise Exception(f"Error: invalid reference in when: trying to find {ref} in {branch}")
-
-                                        # if the when value is a list, we want to get the "best", this is annoying
-                                        if isinstance(val, list):
-                                            is_best = False
-                                            for v in val:
-                                                # if the best branch already has this value, don't bother with the loop
-                                                #   this means the current branch isn't better
-                                                ref_pieces = ref.split(".")
-
-                                                if len(ref_pieces) == 1:
-                                                    if best_branch:
-                                                        if best_branch[ref] == v and branch[ref] != v:
-                                                            break
-
-                                                    if branch[ref] == v:
-                                                        is_best = True
-                                                        kill_best = True
-                                                        break
-                                                elif len(ref_pieces) == 2:
-                                                    if best_branch:
-                                                        if best_branch[ref_pieces[0]][ref_pieces[1]] == v and branch[ref_pieces[0]][ref_pieces[1]] != v:
-                                                            break
-
-                                                    if branch[ref_pieces[0]][ref_pieces[1]] == v:
-                                                        is_best = True
-                                                        break
-                                                else: 
-                                                    raise Exception(f"Error: Reference not recognized: {ref}")
-                
-                                        elif isinstance(val, (str, bool, int)):
-
-                                            ref_pieces = ref.split(".")
-
-                                            if len(ref_pieces) == 1:
-                                                if branch[ref] != val:
-                                                    is_best = False
-                                                    break
-                                            elif len(ref_pieces) == 2:
-                                                if branch[ref_pieces[0]][ref_pieces[1]] != val:
-                                                    is_best = False
-                                                    break
-                                            else: 
-                                                raise Exception(f"Error: Reference not recognized: {ref}")
+                                    is_best = self.handle_when(when, branch, best_branch)
 
                                 # if this branch passed the when tests
                                 if is_best:
@@ -403,4 +351,60 @@ class SalesforceTransformer:
         return current_record
                         
         
+    def handle_when(self, when, branch, best_branch):
+        is_best = True
+        for ref, val in when.items():
+
+            if ref.split(".")[0] not in branch:
+                ref = ".".join(ref.split(".")[1:])
+            # if this pds reference is not in the branch, try it without the first element,
+            #   this allows for `names.name` and `name` to work
+            # if it's still not there, that's a problem, maybe I should just ignore this?
+            if ref.split(".")[0] not in branch:
+                raise Exception(f"Error: invalid reference in when: trying to find {ref} in {branch}")
+
+            # if the when value is a list, we want to get the "best", this is annoying
+            if isinstance(val, list):
+                is_best = False
+                for v in val:
+                    # if the best branch already has this value, don't bother with the loop
+                    #   this means the current branch isn't better
+                    ref_pieces = ref.split(".")
+
+                    if len(ref_pieces) == 1:
+                        if best_branch:
+                            if best_branch[ref] == v and branch[ref] != v:
+                                break
+
+                        if branch[ref] == v:
+                            is_best = True
+                            break
+                    elif len(ref_pieces) == 2:
+                        if best_branch:
+                            if best_branch[ref_pieces[0]][ref_pieces[1]] == v and branch[ref_pieces[0]][ref_pieces[1]] != v:
+                                break
+
+                        if branch[ref_pieces[0]][ref_pieces[1]] == v:
+                            is_best = True
+                            break
+                    else: 
+                        raise Exception(f"Error: Reference not recognized: {ref}")
+
+            elif isinstance(val, (str, bool, int)):
+
+                ref_pieces = ref.split(".")
+
+                if len(ref_pieces) == 1:
+                    if branch[ref] != val:
+                        is_best = False
+                        break
+                elif len(ref_pieces) == 2:
+                    if branch[ref_pieces[0]][ref_pieces[1]] != val:
+                        is_best = False
+                        break
+                else: 
+                    raise Exception(f"Error: Reference not recognized: {ref}")
+                
+        return is_best
+
 
