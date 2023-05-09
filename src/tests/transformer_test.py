@@ -47,14 +47,14 @@ class SalesforceTransformerTest(unittest.TestCase):
             },
             "somethingelse": {
                 "flat": False,
-                "source": "other",
+                "source": "departments",
                 "Id": {
-                    "other": "otherKey",
+                    "departments": "personKey",
                     "salesforce": "salesforceId"
                 },
                 "fields": {
-                    "otherBirthdate": "otherbirthDate",
-                    "otherValue": "names.firstName"
+                    "personKey": "personKey",
+                    "Birthdate": "birthdate"
                 }
             }
         }
@@ -76,6 +76,43 @@ class SalesforceTransformerTest(unittest.TestCase):
                 }
             ]
         }
+
+        self.sample_when = {
+            "names.personNameType.code": ["LISTING", "OFFICIAL"]
+        }
+        self.sample_branch_1 = {
+            "personNameKey": 3837957,
+            "personNameType": {
+                "code": "LISTING"
+            },
+            "firstName": "Rachel",
+            "lastName": "Lewoollen",
+            "middleName": None,
+            "name": "Rachel Lewoollen",
+            "prefix": None,
+            "suffix": None,
+            "effectiveStatus": {
+                "code": "A"
+            },
+            "updateDate": "2020-11-20T02:32:59"
+        }
+        self.sample_branch_2 = {
+            "personNameKey": 3833354,
+            "personNameType": {
+                "code": "OFFICIAL"
+            },
+            "firstName": "Racheel",
+            "lastName": "Lewoollen",
+            "middleName": None,
+            "name": "Racheel Lewoollen",
+            "prefix": None,
+            "suffix": None,
+            "effectiveStatus": {
+                "code": "A"
+            },
+            "updateDate": "2020-11-20T02:32:59"
+        }
+
 
         # this constructs a single record with all of the fields that are contained in the exampleConfig
         self.exampleSFData = { 'records': [] }
@@ -110,8 +147,18 @@ class SalesforceTransformerTest(unittest.TestCase):
         self.assertEqual(1, len(target_config))
         self.assertIn('Contact', target_config)
 
+    # when a branch is the only branch, it should be the best
     def test_handle_when(self):
-        pass
+        self.assertTrue(self.transformer.handle_when(when=self.sample_when, branch=self.sample_branch_1, best_branch={}))
+
+    # when a branch is a better fit, it should be the best, in this case, LISTING is better than OFFICIAL
+    def test_handle_when_with_best(self):
+        self.assertTrue(self.transformer.handle_when(when=self.sample_when, branch=self.sample_branch_1, best_branch=self.sample_branch_2))
+    
+    # when the best_branch is already the better fit, this should return False
+    def test_handle_when_with_better_best(self):
+        self.assertFalse(self.transformer.handle_when(when=self.sample_when, branch=self.sample_branch_2, best_branch=self.sample_branch_1))
+
 
 if __name__ == '__main__':
     unittest.main()
