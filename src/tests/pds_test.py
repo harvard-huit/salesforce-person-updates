@@ -1,9 +1,12 @@
 import unittest
 from unittest import mock
-from pds import People
+import pds
 
 
 class PeoplesTest(unittest.TestCase):
+
+    def setUp(self):
+        self.pds = pds.People(apikey='fake_key')
 
     def mocked_get_people(*args, **kwargs):
         fake_people = {
@@ -24,13 +27,13 @@ class PeoplesTest(unittest.TestCase):
     
     @mock.patch('pds.People.search', side_effect=mocked_get_people)
     def test_mock(self, mock_get):
-        results = People(apikey='fakekey', query={}).results
+        results = self.pds.get_people(query={})
         self.assertEqual(len(results), 2)
 
 
     @mock.patch('pds.People.search', side_effect=mocked_get_people)
     def test_hash(self, mock_get):
-        people = People(apikey='fakekey', query={}).people
+        people = self.pds.get_people(query={})
         self.assertEqual(people[0]['personKey'], 1)
         self.assertEqual(people[1]['personKey'], 2)
 
