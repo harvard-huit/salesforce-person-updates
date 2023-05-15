@@ -6,65 +6,69 @@ from dotmap import DotMap
 
 
 class People:
-    def __init__(self, query, apikey):
+    def __init__(self, apikey, batch_size=10):
         if apikey == None:
             raise Exception("Error: apikey required")
-        if query == None:
-            raise Exception("Error: query required")
 
-        self.query = query
         self.apikey = apikey
+        self.last_query = None
         self.response = {}
         self.results = []
         self.count = 0
         self.total_count = 0
-        try: 
-            self.response = self.search(query=query, apikey=apikey)
-            self.__setattr__('response', self.response)
-            self.results = self.response['results']
-            self.__setattr__('results', self.results)
-            self.count = self.response['count']
-            self.__setattr__('count', self.count)
-            self.total_count = self.response['total_count']
-            self.__setattr__('total_count', self.total_count)
-        except Exception as e:
-            logger.error(f"Error getting valid data from PDS: {e}")
-            raise e
+        self.batch_size = batch_size
+        self.pds_url = "https://go.apis.huit.harvard.edu/ats/person/v3/search"
 
-        self.people = self.getPeople()
-        self.__setattr__('ppl', self.people)
+        self.paginate = False
+        self.session_id = None
 
     def __str__(self):
         return str(self.response)
     def __repr__(self):
         return str(self.response)
 
-    def getPeople(self):
+    def get_people(self, query=''):
+        response = self.search(query=query)
+        results = response['results']
         people = []
-        if self.count > 0:
-            for result in self.results:
+        if response['count'] > 0:
+            for result in results:
                 # dotmap allows us to access the items as names.name
                 person = DotMap(result)
                 people.append(person)
         return people
 
+    def make_people(self, results):
+        people = []
+        for result in results:
+            # dotmap allows us to access the items as names.name
+            person = DotMap(result)
+            people.append(person)
+        return people
 
-    def search(self, query='', apikey=None):
-        if self == None and apikey == None:
+
+    def search(self, query='', paginate=False) -> dict:
+        if self.apikey == None:
             raise Exception("Error: apikey required")
-
-        pdsUrl = "https://go.apis.huit.harvard.edu/ats/person/v3/search"
-
+        
         headers = {
             "Content-Type": "application/json",
-            "x-api-key": apikey
+            "x-api-key": self.apikey
         }
+
+        params = {
+            "size": self.batch_size
+        }
+        if paginate:
+            self.paginate = True
+            params['paginate'] = True
 
         payload = query
 
         #calling PDS api            
-        response = requests.post(pdsUrl, 
+        response = requests.post(self.pds_url, 
             headers = headers,
+            params = params,
             data =  json.dumps(payload))
 
         # logger.info(json.loads(response.text))
@@ -75,57 +79,47 @@ class People:
         if(response.json()['count'] < 1):
             logger.warn(f"WARNING: PDS returned no results for: {query}")
 
-        return json.loads(response.text)
-            
+        if 'session_id' in response.json():
+            self.session_id = response.json()['session_id']
+        
+        self.count = response.json()['count']
+        self.total_count = response.json()['total_count']
 
-# this is to get the value of a dotted element
-# (purposely not in the class)
-def getValue(field, person, condition={}):
+        self.last_query = query
+        self.response = response.json()
+        return self.response
 
+    def next(self) -> dict:
+        if self.session_id is None:
+            logger.warn(f"WARNING: trying to paginate with no session_id available.")
+            return []
 
-    if field in person:
-        return person[field]
-    else:
-        if "." in field:
-            branch_name = field.split(".")[0]
-            field_name = field.split(".")[1]
+        if self.apikey == None:
+            raise Exception("Error: apikey required")
 
-            condition_index = None
-            condition_value = None
-            if condition:
-                condition_index = condition.keys()[0]
-                condition_value = condition[condition_index]
+        headers = {
+            "Content-Type": "application/json",
+            "x-api-key": self.apikey
+        }
 
-            if branch_name not in person:
-                raise Exception(f"Error: {branch_name} not found in person {person}")
-            
-            condition_branch = None
-            if "." in condition_index:
-                pieces = condition_index.split(".")
-                condition_branch = pieces[0]
-                if condition_branch not in person:
-                    raise Exception(f"Error: condition source ({condition_index}) not found in person ({person})")
-                # split off the branch value
-                condition_index = pieces[1:]
-                if "." in condition:
-                    # TODO: finish this
-                    pass                    
+        #calling PDS api            
+        response = requests.post(self.pds_url + "/" + self.session_id, 
+            headers = headers)
 
+        # logger.info(json.loads(response.text))
+        # logger.info(response.status_code)
+        if(response.status_code != 200):
+            raise Exception(f"Error: failure with response from PDS: {response.status_code}:{response.text}")
+        
 
-            data = []
-            for branch in person[branch_name]:
-                if field_name in branch:
-                    if condition:
-                        data.append(branch[field_name])
-                else:
-                    if "." in field_name:
-                        pieces = field_name.split(".")
-                        if pieces[0] in branch:
-                            if pieces[1] in branch[0]:
-                                data.append(branch[pieces[0]][pieces[1]])
-                    else:
-                        raise Exception(f"Error: {field_name} not found in branch {branch}")
-            if len(data) == 1:
-                return data[0]
-            else:
-                return data
+        if(response.json()['count'] < 1):
+            # logger.warn(f"WARNING: PDS returned no results for: session_id: {self.session_id} with query: {self.last_query}")
+            return {}
+
+        if 'session_id' in response.json():
+            self.session_id = response.json()['session_id']
+
+        self.response = json.loads(response.text)
+        self.count = response.json()['count']
+        self.total_count = response.json()['total_count']
+        return self.response

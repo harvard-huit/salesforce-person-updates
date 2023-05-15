@@ -156,9 +156,9 @@
         "poiRoles.faculty.code",
         "poiRoles.shortDescriptionLine1",
         "poiRoles.shortDescriptionLine2"
-                
+        
     ],
     "conditions": {
-        "cacheUpdateDate": ">2023-05-02T13:50:00"
+        "cacheUpdateDate": ">2023-05-15T11:50:00"
     }
 }

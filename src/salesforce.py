@@ -279,10 +279,14 @@ class HarvardSalesforce:
                         source_data_id_name = full_source_data_id_name
 
                     ids = []
+
+                    # example: person in people
                     for source_data_object in source_data:
+                        # if it's a branch
                         if source_data_object_branch is not None:
                             for b in source_data_object[source_data_object_branch]:
                                 ids.append(str(b[source_data_id_name]))
+                        # if it's not a branch
                         else:
                             ids.append(str(source_data_object[source_data_id_name]))
     

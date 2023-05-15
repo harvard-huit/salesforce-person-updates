@@ -44,7 +44,7 @@ class SalesforceTransformer:
 
             salesforce_person = {}
             if 'Contact' in self.hashed_ids:
-                if self.hashed_ids['Contact']['id_name'] in source_data_object:
+                if self.hashed_ids['Contact']['id_name'] in source_data_object and 'Ids' in self.hashed_ids['Contact']:
                     if source_data_object[self.hashed_ids['Contact']['id_name']] in self.hashed_ids['Contact']['Ids']:
                         salesforce_person = {
                             "contact": {
@@ -116,6 +116,7 @@ class SalesforceTransformer:
                         logger.debug(f"    value_reference: {value_reference}:{source_data_object.get(value_reference)}")                     
                         logger.debug(f"    when: {when}")
                         
+                        # skip this ref if it's sf and there's no sf ref
                         
                         # check the value referenced in the config
                         if isinstance(source_data_object[first], (str, bool, int)):
@@ -173,7 +174,7 @@ class SalesforceTransformer:
 
                                     # if we already have a qualifying branch, check the updateDate and change it if the updateDate is better
                                     if best_branch and is_flat:
-                                        if branch.updateDate > best_branch.updateDate:
+                                        if branch['updateDate'] > best_branch['updateDate']:
                                             best_branch = branch
                                     else: 
                                         best_branch = branch
@@ -241,9 +242,10 @@ class SalesforceTransformer:
                     branch_name = branch['branch_name']
                     
                     # if this id is in the hashed_ids, that means it'll be an update and we need to add the Object Id
-                    if pds_branch_id in self.hashed_ids[object_name]['Ids']:
-                        sf_id = self.hashed_ids[object_name]['Ids'][pds_branch_id]
-                        current_record[object_name]['Id'] = sf_id
+                    if 'Ids' in self.hashed_ids[object_name]:
+                        if pds_branch_id in self.hashed_ids[object_name]['Ids']:
+                            sf_id = self.hashed_ids[object_name]['Ids'][pds_branch_id]
+                            current_record[object_name]['Id'] = sf_id
                     for target, source_value in source_config[object_name]['fields'].items():
                         
                         if isinstance(source_value, list):
@@ -330,11 +332,12 @@ class SalesforceTransformer:
                             if id_name not in branch:
                                 continue
                             current_id = str(branch[id_name])
-                            if current_id in self.hashed_ids[object_name]['Ids']:
-                                value = self.hashed_ids[object_name]['Ids'][current_id]
-                                if object_name not in current_record:
-                                    current_record[object_name] = {}
-                                current_record[object_name][salesforce_id_name] = self.hsf.validate(object=object_name, field=salesforce_id_name, value=value)
+                            if 'Ids' in self.hashed_ids[object_name]:
+                                if current_id in self.hashed_ids[object_name]['Ids']:
+                                    value = self.hashed_ids[object_name]['Ids'][current_id]
+                                    if object_name not in current_record:
+                                        current_record[object_name] = {}
+                                    current_record[object_name][salesforce_id_name] = self.hsf.validate(object=object_name, field=salesforce_id_name, value=value)
 
                     else:
                         current_id = source_data_object[id_name]

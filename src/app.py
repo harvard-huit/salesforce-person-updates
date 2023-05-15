@@ -23,113 +23,143 @@ pds_query = json.load(f)
 f.close()
 ####################################
 
+class SalesforcePersonUpdates:
+    def __init__(self):
+        try:
+            if(stack != "developer"):
+                logger.info("Checking if task is already running")
+                if isTaskRunning() and stack != 'developer':
+                    logger.warning("WARNING: application already running")
+                    exit()
 
-####################################################################################################
-# Main
-####################################################################################################
-def main():
+            # TODO: GET data/watermark from dynamodb based on client
 
-    logger.info("Starting aais-ecs-salesforce-person-updates-feed")
+            # initializing a salesforce instance
+            # hsf = HarvardSalesforce(
+            #     domain = 'test',
+            #     username = os.getenv('SF_USERNAME'),
+            #     password = os.getenv('SF_PASSWORD'),
+            #     consumer_key = os.getenv('SF_CLIENT_KEY'),
+            #     consumer_secret = os.getenv('SF_CLIENT_SECRET')
+            # )
+            self.hsf = HarvardSalesforce(
+                domain = os.getenv('SF_DOMAIN'),
+                username = os.getenv('SF_USERNAME'),
+                password = os.getenv('SF_PASSWORD'),
+                token = os.getenv('SF_SECURITY_TOKEN'),
+            )
 
-    try:
-        if(stack != "developer"):
-            logger.info("Checking if task is already running")
-            if isTaskRunning() and stack != 'developer':
-                logger.warning("WARNING: application already running")
-                exit()
+            # check salesforce for required objects for push and get a map of the types
+            self.hsf.getTypeMap(config.keys())
 
-        # TODO: GET data/watermark from dynamodb based on client
+            # validate the config
+            self.hsf.validateConfig(config)
 
-        # initializing a salesforce instance
-        # hsf = HarvardSalesforce(
-        #     domain = 'test',
-        #     username = os.getenv('SF_USERNAME'),
-        #     password = os.getenv('SF_PASSWORD'),
-        #     consumer_key = os.getenv('SF_CLIENT_KEY'),
-        #     consumer_secret = os.getenv('SF_CLIENT_SECRET')
-        # )
-        hsf = HarvardSalesforce(
-            domain = os.getenv('SF_DOMAIN'),
-            username = os.getenv('SF_USERNAME'),
-            password = os.getenv('SF_PASSWORD'),
-            token = os.getenv('SF_SECURITY_TOKEN'),
-        )
+            # TODO: implement updates_only
+            self.updates_only = os.getenv('UPDATES_ONLY') or False
 
-        # check salesforce for required objects for push and get a map of the types
-        hsf.getTypeMap(config.keys())
+            self.pds_apikey = os.getenv("PDS_APIKEY")
+            # initialize pds
+            self.pds = pds.People(apikey=self.pds_apikey)
 
-        # validate the config
-        hsf.validateConfig(config)
-
-        # TODO: implement updates_only
-        updates_only = os.getenv('UPDATES_ONLY') or False
-
-        # TODO: GET list of updated people since watermark 
-
-        # query = {
-        #     "conditions": {
-        #         "univid": ["80719647"]
-        #     }
-        # }
-        # this is a list of DotMaps, which was supposed to allow us to access the keys with dot notation
-        people = pds.People(query=pds_query, apikey=os.getenv("PDS_APIKEY")).people
-
-        # REMOVED FOR DEBUGGING
-        # here we get the full list of departments
-        # departments = Departments(apikey=os.getenv("DEPT_APIKEY"))
-        # hashed_departments = departments.departments
-        # logger.debug(f"Successfully got {len(departments.results)} departments")
-
-        transformer = SalesforceTransformer(config=config, hsf=hsf)
+            # TODO: GET list of updated people since watermark 
 
 
-        # REMOVED FOR DEBUGGING
+
+            self.transformer = SalesforceTransformer(config=config, hsf=self.hsf)
+
+            # self.process_people_batch(people)
+
+
+
+        except Exception as e:
+            logger.error(f"Run failed with error: {e}")
+            raise e
+
+
+
+    def full_departments_data_load(self):
+        self.departments = Departments(apikey=os.getenv("DEPT_APIKEY"))
+        hashed_departments = self.departments.departments
+        logger.debug(f"Successfully got {len(self.departments.results)} departments")
+
         # data will have the structure of { "OBJECT": [{"FIELD": "VALUE"}, ...]}
-        # data = {}
-        # data = transformer.transform(source_data=departments.results, source_name='departments')
+        data = {}
+        data = self.transformer.transform(source_data=self.departments.results, source_name='departments')
 
-        # logger.info(f"**** Push Departments to SF  ****")
-        # for object, object_data in data.items():
-        #     logger.debug(f"object: {object}")
-        #     logger.debug(pformat(object_data))
+        logger.info(f"**** Push Departments to SF  ****")
+        for object, object_data in data.items():
+            logger.debug(f"object: {object}")
+            logger.debug(pformat(object_data))
 
-            # hsf.pushBulk(object, object_data)    
+            self.hsf.pushBulk(object, object_data)    
+
+    def process_people_batch(self, people=[]):
 
         data = {}
-        data = transformer.transform(source_data=people, target_object='Contact')
+        data = self.transformer.transform(source_data=people, target_object='Contact')
 
         logger.info(f"**** Push Contact data to SF  ****")
         for object, object_data in data.items():
             logger.info(f"object: {object}")
             logger.info(pformat(object_data))
 
-            hsf.pushBulk(object, object_data)    
-
-
+            self.hsf.pushBulk(object, object_data)    
 
         data = {}
-        data = transformer.transform(source_data=people, source_name='pds', exclude_target_objects=['Contact'])
+        data = self.transformer.transform(source_data=people, source_name='pds', exclude_target_objects=['Contact'])
 
         logger.info(f"**** Push Remaining People data to SF  ****")
         for object, object_data in data.items():
             logger.info(f"object: {object}")
             logger.info(pformat(object_data))
 
-            hsf.pushBulk(object, object_data)    
+            self.hsf.pushBulk(object, object_data)    
 
         # NOTE: see notes on this function
         # hsf.setDeleteds(object='Contact', id_type='HUDA__hud_UNIV_ID__c', deleted_flag='lastName', ids=['31598567'])
 
-            
-    except Exception as e:
-        logger.error(f"Run failed with error: {e}")
-        raise e
+    def update_single_person(self, huid):
+        pds_query['conditions'] = {}
+        pds_query['conditions']['univid'] = huid
+        people = self.pds.get_people(pds_query)
+        self.process_people_batch(people=people)
     
+    def full_people_data_load(self, dry_run=False):
+        response = self.pds.search(pds_query, paginate=True)
+        current_count = response['count']
+        size = self.pds.batch_size
+        total_count = response['total_count']
+        tally_count = current_count
+        results = response['results']
+        people = self.pds.make_people(results)
+        logger.info(current_count)
+
+        if not dry_run:
+            self.process_people_batch(people)
+        
+        while(True):
+            response = self.pds.next()
+            if not response:
+                break
+            results = response['results']
+            people = self.pds.make_people(results)
+            if not dry_run:
+                self.process_people_batch(people)
+            current_count = response['count']
+            tally_count += current_count
+
+            logger.info(current_count)
+        
+        if current_count != total_count:
+            raise Exception(f"Error: PDS failed to retrieve all records")
+        else:
+            logger.info(f"successfully finished full data load in {duration}")
 
 
-
-main()
-
+sfpu = SalesforcePersonUpdates()
+# sfpu.update_single_person("80719647")
+sfpu.full_people_data_load()
 
 
 # hsf = HarvardSalesforce(
