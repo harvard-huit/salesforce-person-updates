@@ -1,4 +1,4 @@
-name: Postman Testing
+name: Unit Tests
 on:
   workflow_dispatch:
   push:

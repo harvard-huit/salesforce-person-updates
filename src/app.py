@@ -33,6 +33,7 @@ class SalesforcePersonUpdates:
                     exit()
 
             # TODO: GET data/watermark from dynamodb based on client
+            app_config = AppConfig("huit-full-sandbox", "aais-services-salesforce-person-updates-dev")
 
             # initializing a salesforce instance
             # hsf = HarvardSalesforce(
@@ -42,31 +43,39 @@ class SalesforcePersonUpdates:
             #     consumer_key = os.getenv('SF_CLIENT_KEY'),
             #     consumer_secret = os.getenv('SF_CLIENT_SECRET')
             # )
+            # self.hsf = HarvardSalesforce(
+            #     domain = os.getenv('SF_DOMAIN'),
+            #     username = os.getenv('SF_USERNAME'),
+            #     password = os.getenv('SF_PASSWORD'),
+            #     token = os.getenv('SF_SECURITY_TOKEN'),
+            # )
             self.hsf = HarvardSalesforce(
-                domain = os.getenv('SF_DOMAIN'),
-                username = os.getenv('SF_USERNAME'),
-                password = os.getenv('SF_PASSWORD'),
-                token = os.getenv('SF_SECURITY_TOKEN'),
-            )
+                domain = app_config.salesforce_domain,
+                username = app_config.salesforce_username,
+                password = app_config.salesforce_password,
+                token = app_config.salesforce_token,
+                consumer_key = app_config.salesforce_token,
+                consumer_secret = app_config.salesforce_token
+            )            
 
             # check salesforce for required objects for push and get a map of the types
-            self.hsf.getTypeMap(config.keys())
+            self.hsf.getTypeMap(app_config.config.keys())
 
             # validate the config
-            self.hsf.validateConfig(config)
+            self.hsf.validateConfig(app_config.config)
 
             # TODO: implement updates_only
             self.updates_only = os.getenv('UPDATES_ONLY') or False
 
-            self.pds_apikey = os.getenv("PDS_APIKEY")
+            # self.pds_apikey = os.getenv("PDS_APIKEY")
             # initialize pds
-            self.pds = pds.People(apikey=self.pds_apikey)
+            self.pds = pds.People(apikey=app_config.pds_apikey)
 
             # TODO: GET list of updated people since watermark 
 
 
 
-            self.transformer = SalesforceTransformer(config=config, hsf=self.hsf)
+            self.transformer = SalesforceTransformer(config=app_config.config, hsf=self.hsf)
 
             # self.process_people_batch(people)
 
@@ -158,11 +167,6 @@ class SalesforcePersonUpdates:
 
 
 sfpu = SalesforcePersonUpdates()
-# sfpu.update_single_person("80719647")
+sfpu.update_single_person("80719647")
 # sfpu.full_people_data_load()
 
-
-app_config = AppConfig("huit-full-sandbox", "aais-services-salesforce-person-updates-dev")
-
-logger.info(f"id: {app_config.id}")
-logger.info(f"pds_apikey: {app_config.pds_apikey}")

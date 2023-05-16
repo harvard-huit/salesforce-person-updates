@@ -41,6 +41,7 @@ class AppConfig():
         self.name = id
         self.table_name = table_name
         self.salesforce_username = None
+        self.salesforce_domain = None
         self.pds_query = None
         self.config = None
 
@@ -70,6 +71,7 @@ class AppConfig():
             )
             if 'Item' in response:
                 self.salesforce_username = response.get('Item').get('salesforce_username').get('S')
+                self.salesforce_domain = response.get('Item').get('salesforce_domain').get('S')
                 self.pds_query = json.loads(response.get('Item').get('pds_query').get('S'))
                 self.config = json.loads(response.get('Item').get('transformation_config').get('S'))
 
@@ -82,7 +84,7 @@ class AppConfig():
                 salesforce_client_key_arn = None
                 if 'salesforce_client_key_arn' in response.get('Item'):
                     salesforce_client_key_arn = response.get('Item').get('salesforce_client_key_arn').get('S')
-                    
+
                 salesforce_client_secret_arn = None
                 if 'salesforce_client_secret_arn' in response.get('Item'):
                     salesforce_client_secret_arn = response.get('Item').get('salesforce_client_secret_arn').get('S')
