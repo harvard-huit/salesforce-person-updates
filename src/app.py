@@ -165,4 +165,4 @@ sfpu = SalesforcePersonUpdates()
 app_config = AppConfig("huit-full-sandbox", "aais-services-salesforce-person-updates-dev")
 
 logger.info(f"id: {app_config.id}")
-logger.info(f"config: {app_config.config}")
+logger.info(f"pds_apikey: {app_config.pds_apikey}")

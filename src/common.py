@@ -73,13 +73,22 @@ class AppConfig():
                 self.pds_query = json.loads(response.get('Item').get('pds_query').get('S'))
                 self.config = json.loads(response.get('Item').get('transformation_config').get('S'))
 
-                salesforce_password_arn = response.get('Item').get('salesforce_username').get('S')
-                salesforce_token_arn = response.get('Item').get('salesforce_username').get('S')
-                salesforce_client_key_arn = response.get('Item').get('salesforce_username').get('S')
-                salesforce_client_secret_arn = response.get('Item').get('salesforce_username').get('S')
+                salesforce_password_arn = response.get('Item').get('salesforce_password_arn').get('S')
 
-                pds_apikey_arn = None
-                dept_apikey_arn = None
+                salesforce_token_arn = None
+                if 'salesforce_token_arn' in response.get('Item'):
+                    salesforce_token_arn = response.get('Item').get('salesforce_token_arn').get('S')
+
+                salesforce_client_key_arn = None
+                if 'salesforce_client_key_arn' in response.get('Item'):
+                    salesforce_client_key_arn = response.get('Item').get('salesforce_client_key_arn').get('S')
+                    
+                salesforce_client_secret_arn = None
+                if 'salesforce_client_secret_arn' in response.get('Item'):
+                    salesforce_client_secret_arn = response.get('Item').get('salesforce_client_secret_arn').get('S')
+
+                pds_apikey_arn = response.get('Item').get('pds_apikey_arn').get('S')
+                dept_apikey_arn = response.get('Item').get('dept_apikey_arn').get('S')
 
             
             else:
@@ -90,21 +99,41 @@ class AppConfig():
         
         try:
         
-            self.salesforce_password = None
-            self.salesforce_token = None
-            self.salesforce_client_key = None
-            self.salesforce_client_secret = None
+            self.salesforce_password = self.get_secret(salesforce_password_arn)
+            if salesforce_token_arn:
+                self.salesforce_token = self.get_secret(salesforce_token_arn)
+            if salesforce_client_key_arn:
+                self.salesforce_client_key = self.get_secret(salesforce_client_key_arn)
+            if salesforce_client_secret_arn:
+                self.salesforce_client_secret = self.get_secret(salesforce_client_secret_arn)
 
-            self.pds_apikey = None
-            self.dept_apikey = None
+            self.pds_apikey = self.get_secret(pds_apikey_arn)
+            self.dept_apikey = self.get_secret(dept_apikey_arn)
 
         except Exception as e:
             logger.error(f"Error: failure to get secrets manager values")    
             raise e
         
     def get_secret(self, arn):
-        pass
-
+        secretsmanager = boto3.client('secretsmanager')
+        if ':' in arn:
+            pieces = arn.split(':')
+            arn = ':'.join(pieces[:7])
+            val = pieces[-3]
+            
+        response = secretsmanager.get_secret_value(
+            SecretId=arn
+        )
+        logger.info(f"secretsmanager response: {response}")
+        if 'SecretString' in response:
+            secret_string = response['SecretString']
+            if val:
+                return json.loads(secret_string).get(val)
+            else: 
+                return secret_string
+        else:
+            raise Exception(f"Error: failure to get secret value for {arn}")
+        
 #============================================================================================
 # Other
 #============================================================================================
