@@ -6,6 +6,7 @@ import configparser
 import urllib
 import json
 import boto3
+from datetime import datetime
 
 from dotenv import load_dotenv
 load_dotenv() 
@@ -44,6 +45,10 @@ class AppConfig():
         self.salesforce_domain = None
         self.pds_query = None
         self.config = None
+        self.watermarks = {
+            "person": None,
+            "department": None
+        }
 
         self.salesforce_password = None
         self.salesforce_token = None
@@ -53,9 +58,10 @@ class AppConfig():
         self.pds_apikey = None
         self.dept_apikey = None
 
+        # for updates, this is what we'll use for updating the watermark
+        self.starting_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         self.get_config_values()
-
 
     def get_config_values(self):
         # table_name = "aais-services-salesforce-person-updates-dev"
@@ -73,6 +79,21 @@ class AppConfig():
                 self.salesforce_username = response.get('Item').get('salesforce_username').get('S')
                 self.salesforce_domain = response.get('Item').get('salesforce_domain').get('S')
                 self.pds_query = json.loads(response.get('Item').get('pds_query').get('S'))
+                self.config = json.loads(response.get('Item').get('transformation_config').get('S'))
+
+                self.watermarks = json.loads(response.get('Item').get('watermarks').get('S'))
+                if os.getenv("FORCE_PERSON_WATERMARK"):
+                    self.watermarks["person"] = os.getenv("FORCE_PERSON_WATERMARK")
+                if os.getenv("FORCE_DEPARTMENT_WATERMARK"):
+                    self.watermarks["department"] = os.getenv("FORCE_DEPARTMENT_WATERMARK")
+
+                # we want the watermarks to be datetime objects so we can do comparisons easily on them
+                #   this will also throw an error if the format is wrong on the watermark
+                datetime_watermarks = {}
+                for index, watermark in self.watermarks.items():
+                    datetime_watermarks[index] = datetime.strptime(watermark, '%Y-%m-%d %H:%M:%S').date()
+                self.watermarks = datetime_watermarks
+
                 self.config = json.loads(response.get('Item').get('transformation_config').get('S'))
 
                 salesforce_password_arn = response.get('Item').get('salesforce_password_arn').get('S')
@@ -126,7 +147,7 @@ class AppConfig():
         response = secretsmanager.get_secret_value(
             SecretId=arn
         )
-        logger.info(f"secretsmanager response: {response}")
+
         if 'SecretString' in response:
             secret_string = response['SecretString']
             if val:
@@ -135,7 +156,33 @@ class AppConfig():
                 return secret_string
         else:
             raise Exception(f"Error: failure to get secret value for {arn}")
-        
+    
+    def update_watermark(self, watermark_name):
+        # change the watermarks back to strings
+        string_watermarks = {}
+        for index, watermark in self.watermarks.items():
+            if index == watermark_name:
+                string_watermarks[index] = self.starting_timestamp
+            else:
+                string_watermarks[index] = watermark.strftime('%Y-%m-%d %H:%M:%S')
+
+        try: 
+            dynamodb = boto3.resource('dynamodb')
+            table = dynamodb.Table(self.table_name)
+
+            table.update_item(
+                Key={
+                    'id': self.id,
+                    'name': self.name
+                },
+                UpdateExpression='SET watermarks = :val',
+                ExpressionAttributeValues={
+                    ':val': string_watermarks
+                }
+            )
+        except Exception as e:
+            logger.error(f"Error: failiure to update dynamo table {self.table_name} with watermarks {string_watermarks}")
+            raise e
 #============================================================================================
 # Other
 #============================================================================================
