@@ -1,0 +1,98 @@
+name: Deploy
+on:
+  # push:
+  #   branches: [ dev ]
+  workflow_dispatch:
+    inputs:
+      from_tag:
+        type: choice
+        default: 'latest'
+        options:
+          - 'latest'
+          - 'dev'
+          - 'test'
+          - 'stage'
+          - 'prod'
+        required: true
+      environment: 
+        type: choice
+        default: 'dev'
+        options:
+          - 'dev'
+          - 'test'
+          - 'stage'
+          - 'prod'
+        required: true
+
+env:
+  AWS_REGION: us-east-1
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  deploy:
+    name: Deploy ${{ github.event.inputs.environment }}
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Login to AWS with a service account / iam user
+        # uses: aws-actions/configure-aws-credentials@13d241b293754004c80624b5567555c4a39ffbe3
+        uses: HUIT/configure-aws-credentials@13d241b293754004c80624b5567555c4a39ffbe3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_NONPROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_NONPROD }}
+          aws-region: ${{ env.AWS_REGION }}
+          # Note: the aais-ecs-deploy-action will be assuming a role for the deploy
+          #       just leaving this commented code here for future me
+          # role-to-assume: 'arn:aws:iam::${{ env.account }}:role/AutomationDeployRole'
+          # role-duration-seconds: 1200
+          # role-session-name: PersonUpdatesDeploySession
+          # role-skip-session-tagging: true
+          # role-external-id: ${{ secrets.EXTERNAL_ID }}
+
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          path: ./salesforce-person-updates
+
+      # Checking out the cluster config to provide it for the Deploy Action
+      - name: Checkout cluster config
+        uses: actions/checkout@v3
+        with:
+          repository: HUIT/aais-services-config
+          path: ./aais-services-config
+
+      - name: Check if ${{ github.event.inputs.from_tag }} exists
+        run: |
+          echo "Pull old image and store it in case of rollback"
+          docker pull artifactory.huit.harvard.edu/aais-docker-local/salesforce-person-updates:${{ github.event.inputs.environment }}
+          docker tag artifactory.huit.harvard.edu/aais-docker-local/salesforce-person-updates:${{ github.event.inputs.environment }} artifactory.huit.harvard.edu/person-updates:temp
+        continue-on-error: true
+
+      - name: Move tags from ${{ github.event.inputs.from_tag }} to ${{ github.event.inputs.environment }}
+        run: |
+          echo "Pull new image and rename it"
+          docker pull artifactory.huit.harvard.edu/aais-docker-local/salesforce-person-updates:${{ github.event.inputs.from_tag }}
+          docker tag artifactory.huit.harvard.edu/aais-docker-local/salesforce-person-updates:${{ github.event.inputs.from_tag }} artifactory.huit.harvard.edu/aais-docker-local/person-updates:${{ github.event.inputs.environment }}
+          docker push artifactory.huit.harvard.edu/aais-docker-local/salesforce-person-updates:${{ github.event.inputs.environment }}
+
+      - name: Run AAIS Deploy Container Action
+        uses: HUIT/aais-ecs-deploy-action@HEAD
+        with:
+          # Required
+          common_config: aais-services-config/aais_services_${{ github.event.inputs.environment }}.yml
+          # Required -- this token is linked to the user associated with the run
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Optional
+          #   this needs to match the directory the main repository was checked out into
+          #   if the checkout was done without a path, this is not needed
+          app_root: salesforce-person-updates
+ 
+      - name: Rollback image on Error
+        if: ${{ failure() }}
+        run: | 
+          docker tag artifactory.huit.harvard.edu/aais-docker-local/person-updates:temp artifactory.huit.harvard.edu/person-updates:${{ github.event.inputs.environment }}
+          docker push artifactory.huit.harvard.edu/aais-docker-local/person-updates:${{ github.event.inputs.environment }}
