@@ -143,7 +143,7 @@ class SalesforceTransformer:
                                             value = salesforce_person[source_pieces[0]][source_pieces[1]]
                                         if object_name not in current_record:
                                             current_record[object_name] = {}
-                                        current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
+                                        current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value, identifier=source_data_object)
                                     else:
                                         # then this person is not currently in salesforce
                                         logger.warn(f"Warning: reference not found in Salesforce object ({first})")
@@ -240,9 +240,9 @@ class SalesforceTransformer:
                         if not is_branched:
                             if object_name not in current_record:
                                 current_record[object_name] = {}
-                            current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
+                            current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value, identifier=source_data_object)
                         elif best_branch and is_flat: 
-                            current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
+                            current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value, identifier=source_data_object)
 
                     # END TARGET ***********************************************
 
@@ -291,7 +291,7 @@ class SalesforceTransformer:
                                 elif len(source_pieces) == 2:
                                     if source_pieces[1] in branch_temp[source_pieces[0]]:
                                         value = branch_temp[source_pieces[0]][source_pieces[1]]
-                                current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
+                                current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value, identifier=source_data_object)
                             if source_pieces[0] == 'sf':
                                 source_pieces = source_pieces[1:]
                                 if source_pieces[0] in salesforce_person:
@@ -299,7 +299,7 @@ class SalesforceTransformer:
                                         value = salesforce_person[source_pieces[0]]
                                     elif isinstance(salesforce_person, dict) and len(source_pieces) == 2:
                                         value = salesforce_person[source_pieces[0]][source_pieces[1]]
-                                    current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
+                                    current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value, identifier=source_data_object)
 
                         # logger.warn(f"Warning: unable to find valid source: ({source})")
                     good_records.append(current_record[object_name])
@@ -357,7 +357,7 @@ class SalesforceTransformer:
                                     value = self.hashed_ids[object_name]['Ids'][current_id]
                                     if object_name not in current_record:
                                         current_record[object_name] = {}
-                                    current_record[object_name][salesforce_id_name] = self.hsf.validate(object=object_name, field=salesforce_id_name, value=value)
+                                    current_record[object_name][salesforce_id_name] = self.hsf.validate(object=object_name, field=salesforce_id_name, value=value, identifier=source_data_object)
 
                     else:
                         current_id = source_data_object[id_name]
@@ -368,7 +368,7 @@ class SalesforceTransformer:
                         if object_name not in current_record:
                             current_record[object_name] = {}
                         if value is not None:
-                            current_record[object_name]['Id'] = self.hsf.validate(object=object_name, field='Id', value=value)
+                            current_record[object_name]['Id'] = self.hsf.validate(object=object_name, field='Id', value=value, identifier=source_data_object)
             else:
                 raise Exception("Error: config object's Id requires a pds and salesforce value to be able to match")
         

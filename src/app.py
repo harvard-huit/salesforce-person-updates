@@ -63,7 +63,7 @@ class SalesforcePersonUpdates:
 
             # self.pds_apikey = os.getenv("PDS_APIKEY")
             # initialize pds
-            self.pds = pds.People(apikey=self.app_config.pds_apikey, batch_size=200)
+            self.pds = pds.People(apikey=self.app_config.pds_apikey, batch_size=500)
 
             # TODO: GET list of updated people since watermark 
 
@@ -257,14 +257,14 @@ class SalesforcePersonUpdates:
             if not dry_run:
                 self.process_people_batch(people)
             current_count = response['count']
-            tally_count += current_count
 
             current_time = datetime.now().strftime('%H:%M:%S')
             logger.info(f"Finished batch {count}: {current_time}")
 
-            logger.info(f"{current_count} of {total_count} finished")
+            logger.info(f"{tally_count} of {total_count} finished")
+            tally_count += current_count
         
-        if current_count != total_count:
+        if tally_count != total_count:
             raise Exception(f"Error: PDS failed to retrieve all records")
         else:
             logger.info(f"successfully finished full data load in ")

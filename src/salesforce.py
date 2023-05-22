@@ -3,7 +3,7 @@ import jsonschema
 import logging
 from datetime import datetime, date
 from dotmap import DotMap
-from simple_salesforce import Salesforce 
+from simple_salesforce import Salesforce, exceptions
 
 from common import logger
 logging.getLogger("simple_salesforce").setLevel(logging.WARNING)
@@ -66,9 +66,9 @@ class HarvardSalesforce:
                 else:
                     updated_count += 1
                 logger.debug(response)
-        logger.info(f"Updated Records: {updated_count}")
-        logger.info(f"Created Records: {created_count}")
-        logger.info(f"Errored Records: {error_count}")
+        logger.info(f"Updated {object} Records: {updated_count}")
+        logger.info(f"Created {object} Records: {created_count}")
+        logger.info(f"Errored {object} Records: {error_count}")
         return True
     
     # this function will return a map of the contact ids to huid
@@ -176,8 +176,8 @@ class HarvardSalesforce:
         return self.type_data
     
     # this will try to make sure the data going to the sf object is the right type
-    def validate(self, object, field, value):
-        logger.debug(f"validating the value ({value}) for the field: {object}.{field}")
+    def validate(self, object, field, value, identifier):
+        logger.debug(f"validating the value ({value}) for the field: {object}.{field} from {identifier}")
         if object not in self.type_data:
             logger.warn("Warning: no type data found, run getTypeMap() first for better performance")
             self.type_data([object])
@@ -195,7 +195,8 @@ class HarvardSalesforce:
 
         if not isinstance(value, (str, bool, int)):
             value_type = type(value)
-            raise Exception(f"Error: value ({value}) for {object}.{field} is not a valid type ({value_type}).")
+            logger.error(f"Error: value ({value}) for {object}.{field} is not a valid type ({value_type}). Identifier: {identifier}")
+            return None
 
         # if this is false, it means it's not a field we can update
         #   `Id` isn't something we can even try to edit
@@ -225,9 +226,12 @@ class HarvardSalesforce:
                 if value:
                     valid_date = datetime.strptime(value, '%Y-%m-%d').date()
                     if not (date(1700, 1, 1) <= valid_date <= date(2400, 1, 1)):
-                        raise ValueError(f"Error: date out of range: {value}")
+                        # raise ValueError(f"Error: date out of range: {value}")
+                        logger.error(f"Error: date out of range: {value}. Indentifier: {identifier}")
+                        return None
             except ValueError as e:
-                raise Exception(f"Error: {e}")
+                logger.error(f"Error: {e}. Indentifier: {identifier}")
+                return None
             return value
         elif field_type in ["datetime"]:
             try:
@@ -239,17 +243,21 @@ class HarvardSalesforce:
                         value = value.replace(" ", "T")
                         valid_date = datetime.strptime(value, '%Y-%m-%dT%H:%M:%S').date()
                     if not (date(1700, 1, 1) <= valid_date <= date(2400, 1, 1)):
-                        raise ValueError(f"Error: date out of range: {value}")
+                        logger.error(f"Error: date out of range: {value}. Indentifier: {identifier}")
+                        return None
             except ValueError as e:
-                raise Exception(f"Error: {e}")
+                logger.error(f"Error: {e}. Indentifier: {identifier}")
+                return None
             return value
         elif field_type in ["double"]:
             try: 
                 return float(value)
             except ValueError as e:
-                raise Exception(f"Error converting {object}.{field} ({value}) to double/float: {e}")
+                logger.error(f"Error converting {object}.{field} ({value}) to double/float: {e}. Identifier: {identifier}")
+                return None
         else:
-            raise Exception(f"Error: unhandled field_type: {field_type}")
+            logger.error(f"Error: unhandled field_type: {field_type}. Please check config and target Salesforce instance")
+            return None
 
     # getUniqueIds 
     # output format should look like:
@@ -307,20 +315,26 @@ class HarvardSalesforce:
                         else:
                             ids.append(str(source_data_object[source_data_id_name]))
     
-                    batch_size = 1000
+                    batch_size = 500
                     for i in range(0, len(ids), batch_size):
-                        batch = ids[i:i + batch_size]
+                        try:
+                            batch = ids[i:i + batch_size]
 
-                        ids_string = "'" + '\',\''.join(batch) + "'"
-                        logger.debug(f"SELECT {object}.Id, {salesforce_id_name} FROM {object} WHERE {salesforce_id_name} IN({ids_string})")
-                        sf_data = self.sf.query_all(f"SELECT {object}.Id, {salesforce_id_name} FROM {object} WHERE {salesforce_id_name} IN({ids_string})")
-                        logger.debug(f"got this data from salesforce: {sf_data['records']}")
-                        for record in sf_data['records']:
-                            if 'Ids' not in self.unique_ids[object]:
-                                self.unique_ids[object]['Ids'] = {}
+                            ids_string = "'" + '\',\''.join(batch) + "'"
+                            select_string = f"SELECT {object}.Id, {salesforce_id_name} FROM {object} WHERE {salesforce_id_name} IN({ids_string})"
+                            logger.debug(select_string)
+                            sf_data = self.sf.query_all(select_string)
+                            logger.debug(f"got this data from salesforce: {sf_data['records']}")
+                            for record in sf_data['records']:
+                                if 'Ids' not in self.unique_ids[object]:
+                                    self.unique_ids[object]['Ids'] = {}
 
-                            self.unique_ids[object]['Ids'][str(record[salesforce_id_name])] = record['Id']
-                        
+                                self.unique_ids[object]['Ids'][str(record[salesforce_id_name])] = record['Id']
+                        except exceptions.SalesforceGeneralError as e:
+                            logger.error(f"Error: {e} with {select_string}")
+                            raise e                     
+                        except Exception as e:
+                            raise Exception(f"Error: {e} with {select_string}")                     
 
         logger.debug(f"unique_ids: {self.unique_ids}")
         return self.unique_ids
