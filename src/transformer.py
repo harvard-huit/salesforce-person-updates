@@ -1,7 +1,6 @@
 from common import logger
 from datetime import datetime
 import re
-from pprint import pprint, pp, pformat
 
 
 class SalesforceTransformer:

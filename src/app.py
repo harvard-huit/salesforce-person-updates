@@ -14,7 +14,7 @@ if stack == 'developer':
 
 
 #### DEV debugging section #########
-from pprint import pprint, pp, pformat
+from pprint import pformat
 
 f = open('../example_config.json')
 config = json.load(f)

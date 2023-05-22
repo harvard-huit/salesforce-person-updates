@@ -2,7 +2,6 @@ import json
 import jsonschema
 import logging
 from datetime import datetime, date
-from dotmap import DotMap
 from simple_salesforce import Salesforce, exceptions
 
 from common import logger
