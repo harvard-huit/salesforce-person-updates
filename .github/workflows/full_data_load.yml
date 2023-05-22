@@ -1,0 +1,110 @@
+name: Spot Data Update
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment: 
+        type: choice
+        default: 'dev'
+        options:
+          - 'dev'
+          - 'test'
+          - 'stage'
+          - 'prod'
+        required: true
+      salesforce_instance_id:
+        name: the salesforce instance id (from dynamo)
+        type: string
+        required: true
+        default: 'huit-full-sandbox'
+        
+
+env:
+  AWS_REGION: us-east-1
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  data_load: 
+    name: Spot data update on ${{ github.event.inputs.environment }} for ${{ github.event.inputs.people }}
+    runs-on: [ ubuntu-latest ]
+
+    steps:
+    #   - name: test task_version value
+    #     run: |
+    #       echo "\"${{ github.event.inputs.task_version }}\""
+
+    #   - name: Set task version format
+    #     if: ${{ github.event.inputs.task_version != '' }}
+    #     run: |
+    #       echo "task_version=:${{ github.event.inputs.task_version }}" >> $GITHUB_ENV
+
+      - name: Set admints-dev environment vars
+        if: ${{ github.event.inputs.environment == 'dev' || github.event.inputs.environment == 'test' }}
+        run: |
+          echo "account=001980101248" >> $GITHUB_ENV
+          echo "account_name=admintsdev" >> $GITHUB_ENV
+          echo "security_group=sg-07d8897b8146667d1" >> $GITHUB_ENV
+          echo "subnet=subnet-b1d4cac7" >> $GITHUB_ENV
+
+      - name: Set admints environment vars
+        if: ${{ github.event.inputs.environment == 'stage' || github.event.inputs.environment == 'prod' }}
+        run: |
+          echo "account=949726781110" >> $GITHUB_ENV
+          echo "account_name=admints" >> $GITHUB_ENV
+          echo "security_group=sg-0d4440255bb6c7b71" >> $GITHUB_ENV
+          echo "subnet=subnet-152e3063" >> $GITHUB_ENV
+
+      # Note: this login and the assume role below could be a single call
+      #  I have only separated them here to demonstrate how it would look
+      #  if we assumed roles from the instance role instead of this service account
+      #  (in that case, this login step just wouldn't be necessary)
+      - name: Login to AWS with a service account / iam user
+        # uses: aws-actions/configure-aws-credentials@13d241b293754004c80624b5567555c4a39ffbe3
+        uses: HUIT/configure-aws-credentials@13d241b293754004c80624b5567555c4a39ffbe3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_NONPROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_NONPROD }}
+          aws-region: ${{ env.AWS_REGION }}
+          # role-to-assume: ${{ github.event.inputs.role_to_assume }}
+          # role-duration-seconds: 1200
+          # role-session-name: MyDeploySession
+
+      - name: get current identity (should be service account)
+        run: aws sts get-caller-identity
+
+      - name: Assume Role for ${{ env.account_name }}
+        # uses: aws-actions/configure-aws-credentials@13d241b293754004c80624b5567555c4a39ffbe3
+        uses: HUIT/configure-aws-credentials@13d241b293754004c80624b5567555c4a39ffbe3
+        with:
+          # aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_NONPROD }}
+          # aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_NONPROD }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: 'arn:aws:iam::${{ env.account }}:role/AutomationDeployRole'
+          # role-to-assume: 'arn:aws:iam::001980101248:role/AutomationDeployRole'
+          # role-to-assume: 'arn:aws:iam::949726781110:role/AutomationDeployRole'
+          # Note: 900 is the minimum duration allowed
+          role-duration-seconds: 900
+          # role-session-name: MyDeploySession
+          role-skip-session-tagging: true
+          role-external-id: ${{ secrets.EXTERNAL_ID }}
+
+      - name: get current identity again
+        run: aws sts get-caller-identity
+
+      - name: run ${{ env.account_name }} ${{ github.event.inputs.environment }} spot update
+        run: |
+          aws ecs run-task \
+            --cluster aais-ecs-${{ github.event.inputs.environment }}-cluster \
+            --overrides '{"containerOverrides": [ {"name": "aais-services-${{ github.event.inputs.environment }}-feed-salesforce-person-updates", "environment": [ {"name": "SALESFORCE_INSTANCE_ID", "value": "${{ github.event.inputs.salesforce_instance_id }}"}, {"name": "action", "value": "full-person-load"}] } ] }' \
+            --task-definition arn:aws:ecs:us-east-1:${{ env.account }}:task-definition/aais-services-${{ github.event.inputs.environment }}-feed-salesforce-person-updates${{ env.task_version }} \
+            --network-configuration '{ "awsvpcConfiguration": { "assignPublicIp":"DISABLED", "securityGroups": ["${{ env.security_group }}"], "subnets": ["${{ env.subnet }}"]}}' \
+            --launch-type FARGATE
+
+        # Above Command without vars
+        # aws ecs run-task \
+        #   --cluster aais-ecs-dev-cluster \
+        #   --overrides '{"containerOverrides": [ {"name": "aais-ecs-dev-feed-salesforce-person-updates", "environment": [ {"name": "action", "value": "full"} ] } ] }' \
+        #   --task-definition arn:aws:ecs:us-east-1:001980101248:task-definition/aais-ecs-dev-feed-salesforce-person-updates:99
