@@ -50,13 +50,10 @@ class HarvardSalesforce:
         created_count = 0
         updated_count = 0
         error_count = 0
-        for response in responses:
+        for index, response in enumerate(responses):
             if response['success'] != True: 
-                errored_data = []           
-                errored_id = response['id']
-                for d in data:
-                    if d['id'] == errored_id:
-                        errored_data.append(d)
+                
+                errored_data = data[index]       
                 logger.error(f"Error in bulk data load: {response['errors']} ({errored_data})")
                 error_count += 1
             else:
@@ -65,9 +62,12 @@ class HarvardSalesforce:
                 else:
                     updated_count += 1
                 logger.debug(response)
-        logger.info(f"Updated {object} Records: {updated_count}")
-        logger.info(f"Created {object} Records: {created_count}")
-        logger.info(f"Errored {object} Records: {error_count}")
+        if updated_count > 0:
+            logger.info(f"Updated {object} Records: {updated_count}")
+        if created_count > 0:
+            logger.info(f"Created {object} Records: {created_count}")
+        if error_count > 0:
+            logger.info(f"Errored {object} Records: {error_count}")
         return True
     
     # this function will return a map of the contact ids to huid
