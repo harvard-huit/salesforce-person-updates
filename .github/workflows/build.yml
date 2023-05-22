@@ -1,0 +1,29 @@
+name: Build Code
+on:
+  push:
+    branches: [ dev ]
+  workflow_dispatch:
+
+env:
+  ARTIFACTORY_USER: ${{ secrets.ARTIFACTORY_USER }}
+  ARTIFACTORY_PWD: ${{ secrets.ARTIFACTORY_PWD }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  deploy:
+    name: Build Code
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with: 
+          path: ./salesforce-person-updates
+
+      - name: Build
+        run: |
+          cd person-updates
+          ./build.sh

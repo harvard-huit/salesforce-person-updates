@@ -5,6 +5,7 @@ from transformer import SalesforceTransformer
 from departments import Departments
 
 import os
+import threading
 import json
 from datetime import datetime
 if stack == 'developer':
@@ -24,6 +25,12 @@ pds_query = json.load(f)
 f.close()
 ####################################
 
+
+#### Collect action directive ######
+action = os.getenv("action") or None
+person_ids = os.getenv("person_ids") or []
+####################################
+
 class SalesforcePersonUpdates:
     def __init__(self):
         try:
@@ -36,20 +43,6 @@ class SalesforcePersonUpdates:
             # TODO: GET data/watermark from dynamodb based on client
             self.app_config = AppConfig("huit-full-sandbox", "aais-services-salesforce-person-updates-dev")
 
-            # initializing a salesforce instance
-            # hsf = HarvardSalesforce(
-            #     domain = 'test',
-            #     username = os.getenv('SF_USERNAME'),
-            #     password = os.getenv('SF_PASSWORD'),
-            #     consumer_key = os.getenv('SF_CLIENT_KEY'),
-            #     consumer_secret = os.getenv('SF_CLIENT_SECRET')
-            # )
-            # self.hsf = HarvardSalesforce(
-            #     domain = os.getenv('SF_DOMAIN'),
-            #     username = os.getenv('SF_USERNAME'),
-            #     password = os.getenv('SF_PASSWORD'),
-            #     token = os.getenv('SF_SECURITY_TOKEN'),
-            # )
             self.hsf = HarvardSalesforce(
                 domain = self.app_config.salesforce_domain,
                 username = self.app_config.salesforce_username,
@@ -57,7 +50,7 @@ class SalesforcePersonUpdates:
                 token = self.app_config.salesforce_token,
                 consumer_key = self.app_config.salesforce_token,
                 consumer_secret = self.app_config.salesforce_token
-            )            
+            )
 
             # check salesforce for required objects for push and get a map of the types
             self.hsf.getTypeMap(self.app_config.config.keys())
@@ -70,7 +63,7 @@ class SalesforcePersonUpdates:
 
             # self.pds_apikey = os.getenv("PDS_APIKEY")
             # initialize pds
-            self.pds = pds.People(apikey=self.app_config.pds_apikey)
+            self.pds = pds.People(apikey=self.app_config.pds_apikey, batch_size=200)
 
             # TODO: GET list of updated people since watermark 
 
@@ -120,34 +113,93 @@ class SalesforcePersonUpdates:
 
         self.app_config.update_watermark("department")
 
+    def process_people_batch(self, people: list=[]):
 
-    def process_people_batch(self, people=[]):
+        self.transformer.hashed_ids = self.hsf.getUniqueIds(
+            config=self.transformer.getTargetConfig('Contact'), 
+            source_data=people
+        )
 
         data = {}
-        data = self.transformer.transform(source_data=people, target_object='Contact')
+        # data = self.transformer.transform(source_data=people, target_object='Contact')
+        data_gen = self.transformer.transform(source_data=people, target_object='Contact')
+        for d in data_gen:
+            # logger.info(d)
+            for i, v in d.items():
+                if i not in data:
+                    data[i] = []
+                data[i].append(v)
 
-        logger.info(f"**** Push Contact data to SF  ****")
+
+        time_now = datetime.now().strftime('%H:%M:%S')
+        logger.info(f"**** Push Contact data to SF:  {time_now}")
         for object, object_data in data.items():
-            logger.info(f"object: {object}")
-            logger.info(pformat(object_data))
+            logger.debug(f"object: {object}")
+            logger.debug(pformat(object_data))
 
             self.hsf.pushBulk(object, object_data)
 
+        self.transformer.hashed_ids = self.hsf.getUniqueIds(
+            config=self.transformer.getSourceConfig('pds'), 
+            source_data=people
+        )
+
+
+        time_now = datetime.now().strftime('%H:%M:%S')
+        logger.info(f"Starting the rest: {time_now}")
+
         data = {}
-        data = self.transformer.transform(source_data=people, source_name='pds', exclude_target_objects=['Contact'])
 
-        logger.info(f"**** Push Remaining People data to SF  ****")
+        # data = self.transformer.transform(source_data=people, target_object='Contact')
+        data_gen = self.transformer.transform(source_data=people, source_name='pds', exclude_target_objects=['Contact'])
+        for data_element in data_gen:
+            # logger.info(pformat(data_element))
+            data_elements = []
+            if not isinstance(data_element, list):
+                data_elements = [data_element]
+            for d in data_elements:
+                for i, v in d.items():
+                    if i not in data:
+                        data[i] = []
+                    data[i].append(v)
+
+        # threads = []
+        # for target_object_name in self.app_config.config.keys():
+        #     thread = threading.Thread(
+        #         target=self.transformer.transform, 
+        #         kwargs={"people": people, "source_name": 'pds', "target_object": target_object_name}
+        #     )
+        #     thread.start()
+        #     threads.append(thread)
+        # for thread in threads:
+        #     thread.join()
+        #     data.update(thread.return_value)
+
+        
+
+
+        threads = []
+        time_now = datetime.now().strftime('%H:%M:%S')
+        logger.info(f"**** Push Remaining People data to SF:  {time_now}")
         for object, object_data in data.items():
-            logger.info(f"object: {object}")
-            logger.info(pformat(object_data))
+            logger.debug(f"object: {object}")
+            logger.debug(pformat(object_data))
 
-            self.hsf.pushBulk(object, object_data)    
+            # self.hsf.pushBulk(object, object_data)    
+            thread = threading.Thread(target=self.hsf.pushBulk, args=(object, object_data))
+            thread.start()
+            threads.append(thread)
+        
+        for thread in threads:
+            thread.join()
 
         # NOTE: see notes on this function
         # hsf.setDeleteds(object='Contact', id_type='HUDA__hud_UNIV_ID__c', deleted_flag='lastName', ids=['31598567'])
 
-    def update_single_person(self, huid):
+    def update_single_person(self, huid: str):
         pds_query = self.app_config.pds_query
+        if 'conditions' not in pds_query:
+            pds_query['conditions'] = {}
         pds_query['conditions']['univid'] = huid
         people = self.pds.get_people(pds_query)
         self.process_people_batch(people=people)
@@ -163,11 +215,15 @@ class SalesforcePersonUpdates:
         self.app_config.update_watermark("person")
 
     def full_people_data_load(self, dry_run=False):
+        logger.info(f"Processing a full data load!")
         self.people_data_load(dry_run=dry_run)
 
         self.app_config.update_watermark("person")
 
     def people_data_load(self, dry_run=False, pds_query=None):
+        start_time = datetime.now().strftime('%H:%M:%S')
+        logger.info(f"Starting data load: {start_time}")
+
         # without the pds_query, it uses the "full" configured query
         if pds_query is None:
             pds_query = self.app_config.pds_query
@@ -180,13 +236,22 @@ class SalesforcePersonUpdates:
         people = self.pds.make_people(results)
         logger.info(current_count)
 
+        count = 1
+        current_time = datetime.now().strftime('%H:%M:%S')
+        logger.info(f"Starting batch {count}: {current_time}")
+
         if not dry_run:
             self.process_people_batch(people)
         
         while(True):
             response = self.pds.next()
+            count += 1
             if not response:
                 break
+
+            current_time = datetime.now().strftime('%H:%M:%S')
+            logger.info(f"Starting batch {count}: {current_time}")
+
             results = response['results']
             people = self.pds.make_people(results)
             if not dry_run:
@@ -194,18 +259,29 @@ class SalesforcePersonUpdates:
             current_count = response['count']
             tally_count += current_count
 
-            logger.info(current_count)
+            current_time = datetime.now().strftime('%H:%M:%S')
+            logger.info(f"Finished batch {count}: {current_time}")
+
+            logger.info(f"{current_count} of {total_count} finished")
         
         if current_count != total_count:
             raise Exception(f"Error: PDS failed to retrieve all records")
         else:
-            logger.info(f"successfully finished full data load in {duration}")
+            logger.info(f"successfully finished full data load in ")
 
 
 sfpu = SalesforcePersonUpdates()
-# sfpu.update_single_person("80719647")
-# sfpu.full_people_data_load()
-# sfpu.update_people_data_load()
-# sfpu.departments_data_load(type="full")
-sfpu.departments_data_load(type="update")
+
+if action == 'single-person-update' and len(person_ids) > 0:
+    sfpu.update_single_person(person_ids)
+elif action == 'full-person-load':
+    sfpu.full_people_data_load()
+elif action == 'person-updates':
+    sfpu.update_people_data_load()
+elif action == 'full-department-load':
+    sfpu.departments_data_load(type="full")
+elif action == 'department-updates':
+    sfpu.departments_data_load(type="update")
+else: 
+    logger.warn(f"Warning: app triggered without a valid action: {action}")
 

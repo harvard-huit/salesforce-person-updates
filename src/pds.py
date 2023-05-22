@@ -1,12 +1,11 @@
 import requests
-import os
 import json
 from common import logger
 from dotmap import DotMap
 
 
 class People:
-    def __init__(self, apikey, batch_size=10):
+    def __init__(self, apikey, batch_size=50):
         if apikey == None:
             raise Exception("Error: apikey required")
 

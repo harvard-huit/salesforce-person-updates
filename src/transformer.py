@@ -1,4 +1,5 @@
 from common import logger
+from datetime import datetime
 import re
 from pprint import pprint, pp, pformat
 
@@ -28,7 +29,8 @@ class SalesforceTransformer:
 
     def transform(self, source_data, source_name=None, target_object=None, exclude_target_objects=[]):
 
-        logger.debug("Starting transfom")
+        start_time = datetime.now().strftime('%H:%M:%S')
+        logger.info(f"Starting transfom: {start_time}")
         if target_object is not None:
             source_config = self.getTargetConfig(target_object)
             source_name = source_config[target_object]['source']
@@ -36,12 +38,18 @@ class SalesforceTransformer:
             source_config = self.getSourceConfig(source_name)
         else:
             source_config = self.config
-        self.hashed_ids = self.hsf.getUniqueIds(config=source_config, source_data=source_data)
+        
+        time_now = datetime.now().strftime('%H:%M:%S')
+        logger.debug(f"Getting unique ids: {time_now}")
 
         data = {}
         best_branches = {}
+        count = 1
         for source_data_object in source_data:
 
+            time_now = datetime.now().strftime('%H:%M:%S')
+            logger.debug(f"person {count}: {time_now}")
+            count += 1
             salesforce_person = {}
             if 'Contact' in self.hashed_ids:
                 if self.hashed_ids['Contact']['id_name'] in source_data_object and 'Ids' in self.hashed_ids['Contact']:
@@ -58,6 +66,8 @@ class SalesforceTransformer:
                 if object_name in exclude_target_objects:
                     continue
                 current_record = {}
+                good_records = []
+                best_branches = {}
                 if source_name is None:
                     source_name = source_config[object_name]['source']
 
@@ -65,14 +75,12 @@ class SalesforceTransformer:
                 #   (otherwise, it's intention is to get a branch with multiple values per "person",
                 #   like names, emails, etc etc)
                 is_flat = source_config[object_name].get('flat') or False    
-
-                good_records = []
                 
                 object_config = source_config[object_name]['fields']
                 source_id_name = source_config[object_name]['Id'][source_name]
                 salesforce_id_name = source_config[object_name]['Id']['salesforce']
 
-                logger.debug(f"object: {object_name}")
+                # logger.debug(f"object: {object_name}")
 
                 # go through all of the target fields we'll be mapping to
                 # target is the field name of the data item in Salesforce
@@ -84,7 +92,7 @@ class SalesforceTransformer:
                     if not object_config[target]:
                         continue
 
-                    logger.debug(f"  target: {target}")
+                    # logger.debug(f"  target: {target}")
                     source_object = object_config[target]
 
                     # value that we're sending to SF
@@ -93,7 +101,7 @@ class SalesforceTransformer:
                     is_branched = False
 
                     when = None
-                    logger.debug(f"  source_object: {source_object}")
+                    # logger.debug(f"  source_object: {source_object}")
 
                     
                     if isinstance(source_object, list): 
@@ -113,13 +121,15 @@ class SalesforceTransformer:
                         pieces = value_reference.split(".")
                         first = pieces[0]
 
-                        logger.debug(f"    value_reference: {value_reference}:{source_data_object.get(value_reference)}")                     
-                        logger.debug(f"    when: {when}")
+                        # logger.debug(f"    value_reference: {value_reference}:{source_data_object.get(value_reference)}")                     
+                        # logger.debug(f"    when: {when}")
                         
                         # skip this ref if it's sf and there's no sf ref
                         
                         # check the value referenced in the config
                         if isinstance(source_data_object[first], (str, bool, int)):
+                            value = source_data_object[first]
+                        elif isinstance(source_data_object[first], dict) and len(pieces) < 2:
                             value = source_data_object[first]
                         elif isinstance(source_data_object[first], dict):
                             # if it's a dict, we need to get the piece further in
@@ -201,6 +211,7 @@ class SalesforceTransformer:
                                     # need this for identifying the branch type later
                                     best_branch['branch_name'] = first
 
+
                                     best_branches[pds_branch_id] = best_branch
 
                                 
@@ -223,7 +234,7 @@ class SalesforceTransformer:
                                 value = 'Y'
                             else:
                                 value = 'N'
-                        logger.debug(f"      value: {value}")
+                        # logger.debug(f"      value: {value}")
 
 
                         if not is_branched:
@@ -236,6 +247,7 @@ class SalesforceTransformer:
                     # END TARGET ***********************************************
 
                 branch = {}
+
                 for pds_branch_id, branch in best_branches.items():
                     
                     current_record[object_name] = {}
@@ -246,6 +258,10 @@ class SalesforceTransformer:
                         if pds_branch_id in self.hashed_ids[object_name]['Ids']:
                             sf_id = self.hashed_ids[object_name]['Ids'][pds_branch_id]
                             current_record[object_name]['Id'] = sf_id
+                        else: 
+                            continue
+                        
+                    
                     for target, source_value in source_config[object_name]['fields'].items():
                         
                         if isinstance(source_value, list):
@@ -256,7 +272,7 @@ class SalesforceTransformer:
 
                         for source in sources:
                             # for source in sources:
-                            logger.debug(f"source: {source}")
+                            # logger.debug(f"source: {source}")
                             value = None
                             source_pieces = source.split(".")
                             if source_pieces[0] not in [branch_name, 'sf']:
@@ -286,7 +302,6 @@ class SalesforceTransformer:
                                     current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value)
 
                         # logger.warn(f"Warning: unable to find valid source: ({source})")
-
                     good_records.append(current_record[object_name])
                     
 
@@ -295,22 +310,27 @@ class SalesforceTransformer:
 
                 if is_flat:
                     current_record = self.setId(source_data_object=source_data_object, object_name=object_name, current_record=current_record)
-                    data[object_name].append(current_record[object_name])
+                    # data[object_name].append(current_record[object_name])
+                    yield { object_name: current_record[object_name] }
                 elif not is_branched:
                     current_record = self.setId(source_data_object=source_data_object, object_name=object_name, current_record=current_record)
-                    data[object_name].append(current_record[object_name])
+                    # data[object_name].append(current_record[object_name])
+                    yield { object_name: current_record[object_name] }
                 else:
-                    data[object_name] = good_records
+                    # data[object_name] = good_records
+                    for good_record in good_records:
+                        yield { object_name: good_record }
             
-        logger.debug("Transform finished")
+        time_now = datetime.now().strftime('%H:%M:%S')
+        logger.debug(f"Transform finished: {start_time} -> {time_now}")
 
-        return data
+        # return data
     
 
     # this method will set the id of the current record given the source_data_object record, the object name and the config
     # NOTE: a record should be a single salesforce object name with objects that are not necessarily affiliated 
     #   with the same source_data_object
-    def setId(self, source_data_object, object_name, current_record={}):
+    def setId(self, source_data_object: dict, object_name: str, current_record: dict={}) -> dict:
         
         if 'Id' in self.config[object_name]:
             source_object = self.config[object_name]['Id']
@@ -351,6 +371,7 @@ class SalesforceTransformer:
                             current_record[object_name]['Id'] = self.hsf.validate(object=object_name, field='Id', value=value)
             else:
                 raise Exception("Error: config object's Id requires a pds and salesforce value to be able to match")
+        
         return current_record
                         
         

@@ -81,7 +81,7 @@ class AppConfig():
                 self.pds_query = json.loads(response.get('Item').get('pds_query').get('S'))
                 self.config = json.loads(response.get('Item').get('transformation_config').get('S'))
 
-                self.watermarks = json.loads(response.get('Item').get('watermarks').get('S'))
+                self.watermarks = response.get('Item').get('watermarks').get('M')
                 if os.getenv("FORCE_PERSON_WATERMARK"):
                     self.watermarks["person"] = os.getenv("FORCE_PERSON_WATERMARK")
                 if os.getenv("FORCE_DEPARTMENT_WATERMARK"):
@@ -91,7 +91,7 @@ class AppConfig():
                 #   this will also throw an error if the format is wrong on the watermark
                 datetime_watermarks = {}
                 for index, watermark in self.watermarks.items():
-                    datetime_watermarks[index] = datetime.strptime(watermark, '%Y-%m-%d %H:%M:%S').date()
+                    datetime_watermarks[index] = datetime.strptime(watermark['S'], '%Y-%m-%d %H:%M:%S').date()
                 self.watermarks = datetime_watermarks
 
                 self.config = json.loads(response.get('Item').get('transformation_config').get('S'))

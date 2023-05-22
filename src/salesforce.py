@@ -2,6 +2,7 @@ import json
 import jsonschema
 import logging
 from datetime import datetime, date
+from dotmap import DotMap
 from simple_salesforce import Salesforce 
 
 from common import logger
@@ -47,11 +48,27 @@ class HarvardSalesforce:
         logger.debug(f"pushBulk to {object} with {data}")
 
         responses = self.sf.bulk.__getattr__(object).upsert(data, external_id_field='Id')
+        created_count = 0
+        updated_count = 0
+        error_count = 0
         for response in responses:
-            if response['success'] != True:
-                raise Exception(f"Error in bulk data load: {response['errors']}")
+            if response['success'] != True: 
+                errored_data = []           
+                errored_id = response['id']
+                for d in data:
+                    if d['id'] == errored_id:
+                        errored_data.append(d)
+                logger.error(f"Error in bulk data load: {response['errors']} ({errored_data})")
+                error_count += 1
             else:
-                logger.info(response)
+                if response['created']:
+                    created_count += 1
+                else:
+                    updated_count += 1
+                logger.debug(response)
+        logger.info(f"Updated Records: {updated_count}")
+        logger.info(f"Created Records: {created_count}")
+        logger.info(f"Errored Records: {error_count}")
         return True
     
     # this function will return a map of the contact ids to huid
@@ -172,8 +189,8 @@ class HarvardSalesforce:
         if 'updateable' not in self.type_data[object][field]:
             raise Exception(f"Error: field ({field}) does not have an associated `updateable`")
 
-        # NOTE: Salesforce cannot take a null value directly, it needs to take the value: '#N/A'
-        if value is None:
+        # NOTE: Salesforce cannot take a null value directly, it needs to take the value: '#N/A'?
+        if not value:
             return None
 
         if not isinstance(value, (str, bool, int)):
@@ -238,7 +255,7 @@ class HarvardSalesforce:
     # output format should look like:
     #   { "SF OBJECT NAME": { "id_name": "PDS ID NAME", "Ids": { "HARVARD ID": "SALESFORCE ID", ... } } }
     def getUniqueIds(self, config, source_data, target_object=None):
-        if target_object is None:
+        if target_object is None or not self.unique_ids:
             self.unique_ids = {}
         for object in config.keys():
             if target_object is not None and target_object != object:
