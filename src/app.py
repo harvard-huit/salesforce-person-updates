@@ -12,17 +12,17 @@ if stack == 'developer':
     from dotenv import load_dotenv
     load_dotenv() 
 
-
 #### DEV debugging section #########
 from pprint import pformat
 
-f = open('../example_config.json')
-config = json.load(f)
-f.close()
+if stack == 'developer':
+    f = open('../example_config.json')
+    config = json.load(f)
+    f.close()
 
-f = open('../example_pds_query.json')
-pds_query = json.load(f)
-f.close()
+    f = open('../example_pds_query.json')
+    pds_query = json.load(f)
+    f.close()
 ####################################
 
 
