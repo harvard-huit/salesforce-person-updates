@@ -5,27 +5,28 @@ The salesforce-person-updates project pushes person data from the PDS to the spe
 
 ## Development Notes
 
-In order to work this locally, you'll need: 
+In order to run this locally, you'll need: 
 
-### Apikey to the PDS
+### Apikey to the PDS and or HR Departments API
 
 TODO: link to the PDS request form
 
 ### Test Salesforce instance
 
-A sandbox or development or scratch Salesforce instance.
+A sandbox or development or scratch Salesforce instance and an admin-level integration user. 
 
 ### .env file
 
-A `.env` file is the best way to work on this locally. In a deployed version, these would be defined in the ansible_vars files. 
+A `.env` file is the best way to work on this locally. Otherwise you'll need to have the data in an accessible dynamo table + secrets manager.  
 
-The file would look like:
+A local file would look like:
 ```
+LOCAL="True"
 STACK="developer"
 PDS_APIKEY="<PDS Apikey>"
 DEPT_APIKEY="<Departments API Apikey>"
 
-DEBUG="True"
+DEBUG="False"
 
 SF_USERNAME="<your salesforce username>"
 SF_PASSWORD="<your salesforce password>"
@@ -33,60 +34,45 @@ SF_DOMAIN="test"
 # SF_CLIENT_KEY="<your client key>"
 # SF_CLIENT_SECRET="<your client secret>"
 SF_SECURITY_TOKEN="<your token>"
+
+# PERSON_WATERMARK="2023-05-23 00:00:00"
+# DEPARTMENT_WATERMARK="2023-05-23 00:00:00"
+
+action="single-person-update"
+person_ids='["80719647"]'
+# action="full-person-load"
+
 ```
 
-`STACK` being `"developer"` skips ECS checks.
-`DEBUG` will set the logging level to debug. 
+ - `LOCAL` being "True" makes use of the example files and not dynamo+Secrets Manager
 
-You only need `SF_SECURITY_TOKEN` OR `SF_CLIENT_KEY` and `SF_CLIENT_SECRET`
+ - `STACK` being `"developer"` skips ECS checks.
+
+ - `DEBUG` will set the logging level to debug. There's a lot there though. 
+
+ - You only need `SF_SECURITY_TOKEN` OR `SF_CLIENT_KEY` and `SF_CLIENT_SECRET`
+
+ - `PERSON_WATERMARK` and `DEPARTMENT_WATERMARK` need to be of the format "YYYY-MM-DD HH:MM:SS", but they are optional, without them, they default to 1 day ago. 
+
+### Actions
+
+What is done is controlled by environment variables sent in to the app (through task definition overrides). 
+
+Possible actions:
+
+ - `single-person-update` requires an additional `person_ids` of the format "['huid', 'huid', 'huid']" so like, it actually does more than one, but let's say it's a single list? 
+
+ - `full-person-load` this one doesn't require anything additional and just uses the existing `pds_query`
+
+ - `person-updates` this one uses the person watermark
+
+ - `full-department-load` this one doesn't require anything additonal and just uses the full department list
+
+ - `department-updates` this one uses the department watermark
+
+
 
 ## TODO: Deployment Notes
-
-
-
-## Workflow
-
-This is an attempt to describe the workflow of this app. 
-
-### 0. This app is triggered. 
-
-### 1. Get confguration and data
-
-#### PDS Query
-
-This will be the query we use to initially limit data and get just the data we need. This will look something like `example_query.json`
-
-#### Configuration
-
-The config will look like the `example_config.json`.
-
-#### Watermark
-
-This controls when we last got updates. 
-
-#### Credentials
-
-Credentials are stored in Secrets Manager. The arn to the entries are in the Dynamo. 
-
-### 2. Connect to Salesforce and Generate Metadata Maps
-
-We get the metadata for all of the Salesforce Objects we're pushing to so we can do type validation before sending the data. 
-
-### 3. Connect to the PDS and get the data we need
-
-The query for the PDS is stored alongside other configurations in the Dynamo table. This can help limit what data it sorts through and improve speed while reducing space imprint.
-
-### 4. Transform the PDS data into the Config format
-
-This is the meat of the app, we're descifering what the mapping configuration means and creating a format for the bulk data API. 
-
-### 5. Push data to Salesforce
-
-We are using the Bulk API for this (through `simple-salesforce`). This API is typically asynchronous, however, we are using it synchronously so that we can "immediately" get feedback on if the call succeeded and log any issues. 
-
-### 6. Everyone is happy. 
-
-This is why we do what we do.
 
 
 

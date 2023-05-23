@@ -40,8 +40,10 @@ class SalesforcePersonUpdates:
                     logger.warning("WARNING: application already running")
                     exit()
 
-            # TODO: GET data/watermark from dynamodb based on client
-            self.app_config = AppConfig("huit-full-sandbox", "aais-services-salesforce-person-updates-dev")
+            if os.getenv("LOCAL") == "True":
+                self.app_config = AppConfig(id=None, table_name=None, local=True)
+            else:
+                self.app_config = AppConfig("huit-full-sandbox", "aais-services-salesforce-person-updates-dev")
 
             self.hsf = HarvardSalesforce(
                 domain = self.app_config.salesforce_domain,
@@ -162,20 +164,6 @@ class SalesforcePersonUpdates:
                     if i not in data:
                         data[i] = []
                     data[i].append(v)
-
-        # threads = []
-        # for target_object_name in self.app_config.config.keys():
-        #     thread = threading.Thread(
-        #         target=self.transformer.transform, 
-        #         kwargs={"people": people, "source_name": 'pds', "target_object": target_object_name}
-        #     )
-        #     thread.start()
-        #     threads.append(thread)
-        # for thread in threads:
-        #     thread.join()
-        #     data.update(thread.return_value)
-
-        
 
 
         threads = []

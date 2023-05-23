@@ -2,11 +2,10 @@
 # Imports
 #============================================================================================
 import os
-import configparser
 import urllib
 import json
 import boto3
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
 load_dotenv() 
@@ -31,12 +30,15 @@ else:
 
 logger = logging.getLogger(__name__)
 
+    
+
+
 
 #============================================================================================
 # AppConfig
 #============================================================================================
 class AppConfig():
-    def __init__(self, id, table_name):
+    def __init__(self, id, table_name, local=False):
 
         self.id = id
         self.name = id
@@ -61,7 +63,44 @@ class AppConfig():
         # for updates, this is what we'll use for updating the watermark
         self.starting_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-        self.get_config_values()
+        # if it's local, we try and populate all of the values from environment variables
+        if local:
+            f = open('../example_config.json')
+            self.config = json.load(f)
+            f.close()
+
+            f = open('../example_pds_query.json')
+            self.pds_query = json.load(f)
+            f.close()
+
+            self.pds_apikey = os.getenv('PDS_APIKEY')
+            self.dept_apikey = os.getenv('DEPT_APIKEY')
+
+            self.salesforce_username = os.getenv('SF_USERNAME') or None
+            self.salesforce_domain = os.getenv('SF_DOMAIN') or "test"
+            self.salesforce_password = os.getenv('SF_PASSWORD') or None
+            self.salesforce_token = os.getenv('SF_SECURITY_TOKEN') or None
+            self.salesforce_client_key = os.getenv('SF_CLIENT_KEY') or None
+            self.salesforce_client_secret = os.getenv('SF_CLIENT_SECRET') or None
+
+            one_day_ago = datetime.now() - timedelta(days=1)
+            person_watermark_env = os.getenv('PERSON_WATERMARK') or False
+            if person_watermark_env:
+                person_watermark = datetime.strptime(person_watermark_env, '%Y-%m-%d %H:%M:%S').date()
+            else:
+                person_watermark = one_day_ago
+            department_watermark_env = os.getenv('DEPARTMENT_WATERMARK') or False
+            if department_watermark_env:
+                department_watermark = datetime.strptime(department_watermark_env, '%Y-%m-%d %H:%M:%S').date()
+            else:
+                department_watermark = one_day_ago
+            self.watermarks = {
+                "person": person_watermark,
+                "department": department_watermark
+            }
+
+        else:
+            self.get_config_values()
 
     def get_config_values(self):
         # table_name = "aais-services-salesforce-person-updates-dev"

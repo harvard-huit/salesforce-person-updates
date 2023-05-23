@@ -337,3 +337,30 @@ class HarvardSalesforce:
 
         logger.debug(f"unique_ids: {self.unique_ids}")
         return self.unique_ids
+
+    # verify_logging_object
+    # makes sure the logging object exists on the target instance
+    def verify_logging_object(self):
+            
+        # check if MyObject exists
+        object_name = 'Logging__c'
+        object_description = self.sf.describe()
+
+        if object_name in [obj['name'] for obj in object_description['sobjects']]:
+            logger.debug(f"{object_name} exists")
+            # check if myField exists and is of type string
+            field_name = '__c'
+            object_fields = sf.MyObject__c.describe()['fields']
+            field_exists = False
+            for field in object_fields:
+                if field['name'] == field_name:
+                    field_exists = True
+                    if field['type'] == 'string':
+                        print(f"{field_name} exists and is of type string")
+                    else:
+                        print(f"{field_name} exists but is not of type string")
+                    break
+            if not field_exists:
+                print(f"{field_name} does not exist")
+        else:
+            print(f"{object_name} does not exist")
