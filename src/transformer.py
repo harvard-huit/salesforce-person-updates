@@ -67,6 +67,7 @@ class SalesforceTransformer:
                 current_record = {}
                 good_records = []
                 best_branches = {}
+                skip_object = False
                 if source_name is None:
                     source_name = source_config[object_name]['source']
 
@@ -144,8 +145,8 @@ class SalesforceTransformer:
                                             current_record[object_name] = {}
                                         current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value, identifier=source_data_object)
                                     else:
-                                        # then this person is not currently in salesforce
-                                        logger.warn(f"Warning: reference not found in Salesforce object ({first})")
+                                        logger.warn(f"Warning: reference not found in Salesforce object ({first}): identifier: {source_data_object}")
+                                        skip_object = True
                                 else:
                                     pass
                                     # logger.warn(f"Warning: reference ({pieces[1]}) not found in object ({source_data_object[first]})")
@@ -210,7 +211,6 @@ class SalesforceTransformer:
                                     # need this for identifying the branch type later
                                     best_branch['branch_name'] = first
 
-
                                     best_branches[pds_branch_id] = best_branch
 
                                 
@@ -258,7 +258,7 @@ class SalesforceTransformer:
                             sf_id = self.hashed_ids[object_name]['Ids'][pds_branch_id]
                             current_record[object_name]['Id'] = sf_id
                         else: 
-                            continue
+                            pass
                         
                     
                     for target, source_value in source_config[object_name]['fields'].items():
@@ -307,18 +307,19 @@ class SalesforceTransformer:
                 if object_name not in data: 
                     data[object_name] = []
 
-                if is_flat:
-                    current_record = self.setId(source_data_object=source_data_object, object_name=object_name, current_record=current_record)
-                    # data[object_name].append(current_record[object_name])
-                    yield { object_name: current_record[object_name] }
-                elif not is_branched:
-                    current_record = self.setId(source_data_object=source_data_object, object_name=object_name, current_record=current_record)
-                    # data[object_name].append(current_record[object_name])
-                    yield { object_name: current_record[object_name] }
-                else:
-                    # data[object_name] = good_records
-                    for good_record in good_records:
-                        yield { object_name: good_record }
+                if not skip_object:
+                    if is_flat:
+                        current_record = self.setId(source_data_object=source_data_object, object_name=object_name, current_record=current_record)
+                        # data[object_name].append(current_record[object_name])
+                        yield { object_name: current_record[object_name] }
+                    elif not is_branched:
+                        current_record = self.setId(source_data_object=source_data_object, object_name=object_name, current_record=current_record)
+                        # data[object_name].append(current_record[object_name])
+                        yield { object_name: current_record[object_name] }
+                    else:
+                        # data[object_name] = good_records
+                        for good_record in good_records:
+                            yield { object_name: good_record }
             
         time_now = datetime.now().strftime('%H:%M:%S')
         logger.debug(f"Transform finished: {start_time} -> {time_now}")

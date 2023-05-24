@@ -137,18 +137,19 @@ class HarvardSalesforce:
             
             # now we make sure the objects exist in salesforce
             try:
+                config_field = None
                 for object in config:
-                    sf_data = self.sf.query_all(f"SELECT FIELDS(ALL) FROM {object} LIMIT 1")
 
+                    description = self.sf.__getattr__(object).describe()
+                    
                     # in here we check that all fields we're trying to push to exist in the target salesforce
-                    fields = sf_data['records'][0].keys()
                     for config_field in config[object]['fields'].keys():
-                        if config_field not in fields:
+                        if config_field not in [f['name'] for f in description.get('fields')]:
                             raise Exception(f"Error: {config_field} not found in {object}")
 
 
             except Exception as e:
-                logger.error(f"Error: Salesforce Object {object} not found in target Salesforce")
+                logger.error(f"Error: Salesforce Object {object} or field {config_field} not found in target Salesforce")
                 raise e
 
 
@@ -289,7 +290,8 @@ class HarvardSalesforce:
                     id_names = [full_source_id_value]
 
                 self.unique_ids[object]['id_name'] = full_source_id_value
-
+                self.unique_ids[object]['Ids'] = {}
+                
                 for full_source_data_id_name in id_names:
 
                     source_data_object_branch = None
@@ -338,6 +340,7 @@ class HarvardSalesforce:
         logger.debug(f"unique_ids: {self.unique_ids}")
         return self.unique_ids
 
+    # TODO: this
     # verify_logging_object
     # makes sure the logging object exists on the target instance
     def verify_logging_object(self):
@@ -350,7 +353,7 @@ class HarvardSalesforce:
             logger.debug(f"{object_name} exists")
             # check if myField exists and is of type string
             field_name = '__c'
-            object_fields = sf.MyObject__c.describe()['fields']
+            object_fields = self.sf.MyObject__c.describe()['fields']
             field_exists = False
             for field in object_fields:
                 if field['name'] == field_name:

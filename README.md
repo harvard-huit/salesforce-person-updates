@@ -71,6 +71,9 @@ Possible actions:
  - `department-updates` this one uses the department watermark
 
 
+## Dynamo Table
+
+An export of a valid (at the time of writing this) dynamo entry in the table can be found here in the root of this repository. 
 
 ## TODO: Deployment Notes
 
