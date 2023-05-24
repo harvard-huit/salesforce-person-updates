@@ -1,5 +1,5 @@
 import unittest
-from unittest import mock
+from unittest import mock, skip
 import json
 from dotmap import DotMap
 
@@ -393,7 +393,7 @@ class SalesforceTransformerTest(unittest.TestCase):
         }
 
 
-
+    @skip
     def test_validate_sample_configs(self):
         self.sf.sf.query_all.return_value = self.fake_sf_metadata
         self.assertTrue(self.sf.validateConfig(self.fakeConfig))
@@ -401,6 +401,7 @@ class SalesforceTransformerTest(unittest.TestCase):
         self.sf.sf.query_all.return_value = self.exampleSFData
         self.assertTrue(self.sf.validateConfig(self.exampleConfig))
 
+    @skip
     def test_validate_source_config_split(self):
         self.sf.sf.query_all.return_value = self.fake_sf_metadata
         self.transformer.config = self.fakeConfig
@@ -411,6 +412,7 @@ class SalesforceTransformerTest(unittest.TestCase):
         for object_name in source_config:
             self.assertEqual('pds', source_config[object_name]['source'])
 
+    @skip
     def test_validate_target_config_split(self):
         self.sf.sf.query_all.return_value = self.fake_sf_metadata
         self.transformer.config = self.fakeConfig

@@ -141,6 +141,7 @@ class HarvardSalesforce:
                 for object in config:
 
                     description = self.sf.__getattr__(object).describe()
+
                     
                     # in here we check that all fields we're trying to push to exist in the target salesforce
                     for config_field in config[object]['fields'].keys():
