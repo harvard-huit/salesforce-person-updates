@@ -34,7 +34,10 @@ class HarvardSalesforce:
         except Exception as e:
             logger.error(f"Error: Salesforce connection failed to {self.username}@{self.domain}: {e}")
             raise e
-        
+
+        # this should be set once we have a list of objects to query
+        # through self.getTypeMap()
+        self.type_data = {}      
 
     # NOTE: this uses the Salesforce Bulk API
     # this API is generally async, but the way I'm using it (through simple-salesforce), it will wait (synchronously) for the job to finish 
@@ -43,7 +46,8 @@ class HarvardSalesforce:
     # to make best use of this, we will need to async it with something like asyncio
     # NOTE: the Bulk API can take a max of 10000 records at a time
     # a single record will take anywhere from 2-50 seconds
-    def pushBulk(self, object, data):
+    # dupe: this makes sure we don't keep retrying a dupe check
+    def pushBulk(self, object, data, dupe=False):
         logger.debug(f"pushBulk to {object} with {data}")
 
         responses = self.sf.bulk.__getattr__(object).upsert(data, external_id_field='Id')
@@ -53,8 +57,17 @@ class HarvardSalesforce:
         for index, response in enumerate(responses):
             if response['success'] != True: 
                 
-                errored_data = data[index]       
+                errored_data = data[index]
                 logger.error(f"Error in bulk data load: {response['errors']} ({errored_data})")
+
+                if response['errors'][0]['statusCode'] == 'DUPLICATES_DETECTED':
+
+                    if dupe:
+                        logger.error(f"Error: DUPLICATE DETECTED (unresoved): {errored_data}")
+                    else:
+                        logger.error(f"Error: DUPLICATE DETECTED -- Errored Data: {errored_data}")
+                        if self.check_duplicate(object, errored_data):
+                            error_count -= 1
                 error_count += 1
             else:
                 if response['created']:
@@ -108,7 +121,7 @@ class HarvardSalesforce:
     # then a more extensive jsonschema check
     # then it makes calls to salesforce to get the models and fields referenced in the config
     #   so we can know if all the data structures exist
-    def validateConfig(self, config):
+    def validateConfig(self, config, dry_run=False):
         try: 
 
             # first check to see if the config is valid as json
@@ -136,22 +149,22 @@ class HarvardSalesforce:
                 raise e
             
             # now we make sure the objects exist in salesforce
-            try:
-                config_field = None
-                for object in config:
+            if not dry_run:
+                try:
+                    config_field = None
+                    for object in config:
 
-                    description = self.sf.__getattr__(object).describe()
+                        description = self.sf.__getattr__(object).describe()
+                        
+                        # in here we check that all fields we're trying to push to exist in the target salesforce
+                        for config_field in config[object]['fields'].keys():
+                            if config_field not in [f['name'] for f in description.get('fields')]:
+                                raise Exception(f"Error: {config_field} not found in {object}")
 
-                    
-                    # in here we check that all fields we're trying to push to exist in the target salesforce
-                    for config_field in config[object]['fields'].keys():
-                        if config_field not in [f['name'] for f in description.get('fields')]:
-                            raise Exception(f"Error: {config_field} not found in {object}")
 
-
-            except Exception as e:
-                logger.error(f"Error: Salesforce Object {object} or field {config_field} not found in target Salesforce")
-                raise e
+                except Exception as e:
+                    logger.error(f"Error: Salesforce Object {object} or field {config_field} not found in target Salesforce")
+                    raise e
 
 
             return True
@@ -173,6 +186,8 @@ class HarvardSalesforce:
                 self.type_data[object][field['name']]['type'] = field['type'] 
                 self.type_data[object][field['name']]['updateable'] = field['updateable']
                 self.type_data[object][field['name']]['length'] = int(field['length'])
+                self.type_data[object][field['name']]['externalId'] = field['externalId']
+                self.type_data[object][field['name']]['unique'] = field['externalId']
 
         return self.type_data
     
@@ -264,11 +279,17 @@ class HarvardSalesforce:
     # output format should look like:
     #   { "SF OBJECT NAME": { "id_name": "PDS ID NAME", "Ids": { "HARVARD ID": "SALESFORCE ID", ... } } }
     def getUniqueIds(self, config, source_data, target_object=None):
+        
         if target_object is None or not self.unique_ids:
             self.unique_ids = {}
         for object in config.keys():
             if target_object is not None and target_object != object:
                 continue
+
+            # unique_object_fields = [i for i, obj in self.type_data[object].items() if obj['unique'] or obj['externalId']]
+            # unique_object_fields.append('Email')
+            # unique_object_fields.append('FirstName')
+            # unique_object_fields.append('LastName')
 
             self.unique_ids[object] = {}
 
@@ -277,6 +298,9 @@ class HarvardSalesforce:
                 # salesforce_id_name is the id name of the external id as it exists in salesforce
                 salesforce_id_name = config[object]['Id']['salesforce']
                 source_name = config[object]['source']
+
+                # if salesforce_id_name not in unique_object_fields:
+                #     unique_object_fields.append(salesforce_id_name)
 
                 # full_source_id_value is the id name of the SAME external id as it exists in the source data (e.g. pds or departments)
                 if source_name in config[object]['Id']:
@@ -322,19 +346,26 @@ class HarvardSalesforce:
                         try:
                             batch = ids[i:i + batch_size]
 
+                            # fields_string = ','.join(unique_object_fields)
                             ids_string = "'" + '\',\''.join(batch) + "'"
+                            # select_string = f"SELECT {object}.Id, {fields_string} FROM {object} WHERE {salesforce_id_name} IN({ids_string})"
                             select_string = f"SELECT {object}.Id, {salesforce_id_name} FROM {object} WHERE {salesforce_id_name} IN({ids_string})"
                             logger.debug(select_string)
                             sf_data = self.sf.query_all(select_string)
                             logger.debug(f"got this data from salesforce: {sf_data['records']}")
+
+                            # go through each record?
                             for record in sf_data['records']:
+                                
                                 if 'Ids' not in self.unique_ids[object]:
                                     self.unique_ids[object]['Ids'] = {}
-
                                 self.unique_ids[object]['Ids'][str(record[salesforce_id_name])] = record['Id']
+
+
+
                         except exceptions.SalesforceGeneralError as e:
                             logger.error(f"Error: {e} with {select_string}")
-                            raise e                     
+                            raise e             
                         except Exception as e:
                             raise Exception(f"Error: {e} with {select_string}")                     
 
@@ -368,3 +399,63 @@ class HarvardSalesforce:
                 print(f"{field_name} does not exist")
         else:
             print(f"{object_name} does not exist")
+
+    # this method is trying to find an Id for a record that failed as a dupe
+    # the `errored_data_object` should be of the same record that triggered the error
+    def check_duplicate(self, object_name, errored_data_object, dry_run=False):
+
+        # first we get all of the externalids/uniques for the object that we collected in type data
+        unique_object_fields = [i for i, obj in self.type_data[object_name].items() if obj['unique'] or obj['externalId']]
+
+        # build the where clause
+        whereses = []
+        where_clause = ""
+        for field in unique_object_fields:
+            if field in errored_data_object:
+                field_value = errored_data_object[field]
+                whereses.append(f"{field} = '{field_value}'")
+
+        # this is to handle the standard contact duplicate matching rule, or at least the most common breaking of it
+        # see: https://help.salesforce.com/s/articleView?language=en_US&id=sf.matching_rules_standard_contact_rule.htm&type=5
+        if object_name == 'Contact':
+            standard_contact_rule_string = ''
+            email = None
+            first_name = None
+            last_name = None
+            if 'Email' in errored_data_object and 'FirstName' in errored_data_object and 'LastName' in errored_data_object:
+                email = errored_data_object['Email']
+                first_name = errored_data_object['FirstName']
+                last_name = errored_data_object['LastName']
+                standard_contact_rule_string = f"(Email = '{email}' and LastName = '{last_name}' and FirstName = '{first_name}')"
+                
+                whereses.append(f"{standard_contact_rule_string}")
+        
+        where_clause = " or ".join(whereses)
+
+        select_string = f"SELECT {object_name}.Id FROM {object_name} WHERE {where_clause}"
+        logger.debug(select_string)
+        sf_data = self.sf.query_all(select_string)
+        logger.debug(f"got this data from salesforce: {sf_data['records']}")
+
+        # go through each record 
+        if len(sf_data['records']) > 1:
+            logger.error(f"Error: too many records found on object {object_name} with this data: {errored_data_object} -- Ids: {sf_data}")
+        elif len(sf_data['records']) < 1:
+            logger.error(f"Error: no records found on object {object_name} with this data: {errored_data_object}")
+        else:
+            found_id = sf_data['records'][0]['Id']
+            logger.debug(f"Success resolving duplicate! id: {found_id} trying to re-push record")
+            errored_data_object['Id'] = found_id
+            if not dry_run:
+                self.pushBulk(object_name, [errored_data_object], dupe=True)
+            return True
+
+
+
+
+
+        # then we use those ids to see if there's an Id for the record we're looking for
+        # we can do that in a single soql call
+        #   select Id from object_name where externalid1 = X || externalid2 = Y || email = Z and firstname and lastname ....
+        
+

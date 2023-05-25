@@ -271,6 +271,17 @@ elif action == 'full-department-load':
     sfpu.departments_data_load(type="full")
 elif action == 'department-updates':
     sfpu.departments_data_load(type="update")
+elif action == 'test':
+    # this action is for testing
+    logger.info("test action called")
+
+    mdapi = sfpu.hsf.sf.mdapi
+    query = mdapi.ListMetadataQuery(type='DuplicateRuleMatchRule')
+    response = mdapi.list_metadata(query)
+    logger.info(f"{response}")
+
 else: 
     logger.warn(f"Warning: app triggered without a valid action: {action}")
+
+
 

@@ -393,31 +393,28 @@ class SalesforceTransformerTest(unittest.TestCase):
         }
 
 
-    @skip
     def test_validate_sample_configs(self):
-        self.sf.sf.query_all.return_value = self.fake_sf_metadata
-        self.assertTrue(self.sf.validateConfig(self.fakeConfig))
+        # self.sf.sf.query_all.return_value = self.fake_sf_metadata
+        self.assertTrue(self.sf.validateConfig(self.fakeConfig, dry_run=True))
 
-        self.sf.sf.query_all.return_value = self.exampleSFData
-        self.assertTrue(self.sf.validateConfig(self.exampleConfig))
+        # self.sf.sf.query_all.return_value = self.exampleSFData
+        self.assertTrue(self.sf.validateConfig(self.exampleConfig, dry_run=True))
 
-    @skip
     def test_validate_source_config_split(self):
-        self.sf.sf.query_all.return_value = self.fake_sf_metadata
+        # self.sf.sf.query_all.return_value = self.fake_sf_metadata
         self.transformer.config = self.fakeConfig
         source_config = self.transformer.getSourceConfig('pds')
 
-        self.assertTrue(self.sf.validateConfig(source_config))
+        self.assertTrue(self.sf.validateConfig(source_config, dry_run=True))
         self.assertEqual(2, len(source_config))
         for object_name in source_config:
             self.assertEqual('pds', source_config[object_name]['source'])
 
-    @skip
     def test_validate_target_config_split(self):
-        self.sf.sf.query_all.return_value = self.fake_sf_metadata
+        # self.sf.sf.query_all.return_value = self.fake_sf_metadata
         self.transformer.config = self.fakeConfig
         target_config = self.transformer.getTargetConfig('Contact')
-        self.assertTrue(self.sf.validateConfig(target_config))
+        self.assertTrue(self.sf.validateConfig(target_config, dry_run=True))
         self.assertEqual(1, len(target_config))
         self.assertIn('Contact', target_config)
 

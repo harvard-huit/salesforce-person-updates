@@ -48,6 +48,7 @@ class HarvardSalesforceTest(unittest.TestCase):
             }
         }
 
+
         self.fakePersonData = [
             {
                 "personKey": "2940935f3b990174",
@@ -252,6 +253,30 @@ class HarvardSalesforceTest(unittest.TestCase):
                 exampleRecord['name'] = field
                 self.fakeSFDescribe['fields'].append(exampleRecord)
 
+        self.sf.type_data = {
+            'Contact': {}
+        }
+
+        # creating some sample type_data
+        normal_contact_fields = ["FirstName", "LastName", "Email"]
+        external_contact_fields = ["EPPN", "HUID"]
+        for field in normal_contact_fields:
+            self.sf.type_data['Contact'][field] = {
+                "type": "string",
+                "updateable": True,
+                "length": 100,
+                "externalId": False,
+                "unique": False
+            }
+        for field in external_contact_fields:
+            self.sf.type_data['Contact'][field] = {
+                "type": "string",
+                "updateable": True,
+                "length": 100,
+                "externalId": True,
+                "unique": False
+            }
+
         # this constructs a single record with all of the fields that are contained in the exampleConfig
         self.exampleSFDescribe = { 'fields': [] }
         exampleRecord = {}
@@ -284,28 +309,36 @@ class HarvardSalesforceTest(unittest.TestCase):
         self.assertIn('Ids', hashed_ids['Contact'])
         self.assertIn('2940935f3b990174', hashed_ids['Contact']['Ids'])
 
-    @skip
     def test_validate_config(self):
-        # self.sf.sf.__getattr__ = self.fakeSFDescribeFunction
+        self.assertTrue(self.sf.validateConfig(config=self.fakeConfig, dry_run=True))
 
-        # self.sf.sf.SFType.describe.return_value = self.fakeSFDescribe
-        # self.sf.sf.query_all.return_value = self.fakeSFData
-        self.assertTrue(self.sf.validateConfig(self.fakeConfig))
-
-    @skip
     def test_validate_example_config(self):
-        self.sf.sf.query_all.return_value = self.exampleSFData
-        self.assertTrue(self.sf.validateConfig(self.exampleConfig))
+        self.assertTrue(self.sf.validateConfig(config=self.exampleConfig, dry_run=True))
 
-    @skip
     def test_invalid_config(self):
-        self.sf.sf.query_all.return_value = self.exampleSFData
-        self.assertFalse(self.sf.validateConfig({
+        self.assertFalse(self.sf.validateConfig(config={
             "myObject": {
                 "fields": "something"
             }
-        }))
+        }, dry_run=True))
         
+    def test_check_duplicate_success(self):
+        self.sf.sf.query_all.return_value = {
+            "records": [{
+                'Id': '012345678'
+            }]
+        }
+
+        response = self.sf.check_duplicate(object_name='Contact', errored_data_object={
+            "EPPN": "1234"
+        }, dry_run=True)
+
+        self.assertTrue(response)
+
+
+
+
+
 
 if __name__ == '__main__':
     unittest.main()
