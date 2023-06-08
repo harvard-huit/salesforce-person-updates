@@ -123,6 +123,7 @@
         "employeeRoles.departmentEntryDate",
         "employeeRoles.employmentClass.code",
         "employeeRoles.employmentStatus.code",
+        "employeeRoles.primeRoleIndicator",
         "employeeRoles.hireDate",
         "employeeRoles.jobCode.code",
         "employeeRoles.addressPeoplesoftLocation.code",
@@ -134,6 +135,7 @@
         "employeeRoles.fulltimeFlag",
         "employeeRoles.majAffiliation.code",
         "employeeRoles.majAffiliation.description",
+        "employeeRoles.hrDeptOfficialDesc",
         "employeeRoles.paidFlag",
         "employeeRoles.subAffiliation.code",
         "employeeRoles.subAffiliation.description",
@@ -157,5 +159,12 @@
         "poiRoles.shortDescriptionLine1",
         "poiRoles.shortDescriptionLine2"
         
-    ]
+    ],
+    "conditions": {
+        "names.effectiveStatus.code": "A",
+        "names.personNameType.code": ["LISTING", "OFFICIAL"],
+        "emails.effectiveStatus.code": "A",
+        "emails.officialEmailIndicator": true,
+        "addresses.effectiveStatus.code": "A"
+    }
 }

@@ -64,6 +64,9 @@ class SalesforceTransformer:
             for object_name in source_config:
                 if object_name in exclude_target_objects:
                     continue
+
+                # if object_name != 'hed__Affiliation__c':
+                #     continue
                 current_record = {}
                 good_records = []
                 best_branches = {}
@@ -79,6 +82,9 @@ class SalesforceTransformer:
                 object_config = source_config[object_name]['fields']
                 source_id_name = source_config[object_name]['Id'][source_name]
                 salesforce_id_name = source_config[object_name]['Id']['salesforce']
+
+                is_branched = False
+
 
                 # logger.debug(f"object: {object_name}")
 
@@ -98,7 +104,6 @@ class SalesforceTransformer:
                     # value that we're sending to SF
                     value = ""
 
-                    is_branched = False
 
                     when = None
                     # logger.debug(f"  source_object: {source_object}")

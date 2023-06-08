@@ -37,6 +37,7 @@
             "HUDA__hud_EFF_STATUS__c": "effectiveStatus.code",
             "HUDA__hud_DECEASED_FLAG__c": "deceasedFlag",
             "HUDA__hud_EPPN__c": "eppn",
+            "HUDA__hud_UNIV_ID__c": "univid",
             "FirstName": {
                 "value": "names.firstName",
                 "when": {
@@ -61,7 +62,14 @@
             "HUDA__hud_INTERNAL_ID__c": "uuid",
             "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c": "personKey",
             "HUDA__hud_UUID__c": "uuid",
-            "HUDA__hud_GENDER__c": "sex.code"
+            "HUDA__hud_GENDER__c": "sex.code",
+            "Department": {
+                "value": "employeeRoles.hrDeptOfficialDesc",
+                "when": {
+                    "employeeRoles.primeRoleIndicator": true,
+                    "employeeRoles.employmentStatus.code": "A"
+                }
+            }
         }
     },
     "HUDA__hud_Name__c": {
@@ -103,7 +111,7 @@
             "HUDA__EFFDT__c": "emails.effectiveDate",
             "HUDA__EMAIL_ADDR_SOURCE__c": "emails.emailAddressSource",
             "HUDA__EMAIL_ADDR_TYPE__c": "emails.emailAddressType",
-            "HUDA__EMAIL_ADDRESS__c": "emails.emailAddressSource",
+            "HUDA__EMAIL_ADDRESS__c": "emails.email",
             "HUDA__EMAIL_DOMAIN_NAME__c": "emails.emailDomainName",
             "HUDA__EMAIL_USER_NAME__c": "emails.emailUserName",
             "HUDA__INTERNAL_ID__c": "uuid",

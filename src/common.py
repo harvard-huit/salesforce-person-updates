@@ -40,6 +40,8 @@ logger = logging.getLogger(__name__)
 class AppConfig():
     def __init__(self, id, table_name, local=False):
 
+        self.local = local
+
         self.id = id
         self.name = id
         self.table_name = table_name
@@ -64,7 +66,7 @@ class AppConfig():
         self.starting_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         # if it's local, we try and populate all of the values from environment variables
-        if local:
+        if self.local:
             f = open('../example_config.json')
             self.config = json.load(f)
             f.close()
@@ -197,31 +199,33 @@ class AppConfig():
             raise Exception(f"Error: failure to get secret value for {arn}")
     
     def update_watermark(self, watermark_name):
-        # change the watermarks back to strings
-        string_watermarks = {}
-        for index, watermark in self.watermarks.items():
-            if index == watermark_name:
-                string_watermarks[index] = self.starting_timestamp
-            else:
-                string_watermarks[index] = watermark.strftime('%Y-%m-%d %H:%M:%S')
+        # we don't want to be trying this if we're using local/developer settings
+        if not self.local:
+            # change the watermarks back to strings
+            string_watermarks = {}
+            for index, watermark in self.watermarks.items():
+                if index == watermark_name:
+                    string_watermarks[index] = self.starting_timestamp
+                else:
+                    string_watermarks[index] = watermark.strftime('%Y-%m-%d %H:%M:%S')
 
-        try: 
-            dynamodb = boto3.resource('dynamodb')
-            table = dynamodb.Table(self.table_name)
+            try: 
+                dynamodb = boto3.resource('dynamodb')
+                table = dynamodb.Table(self.table_name)
 
-            table.update_item(
-                Key={
-                    'id': self.id,
-                    'name': self.name
-                },
-                UpdateExpression='SET watermarks = :val',
-                ExpressionAttributeValues={
-                    ':val': string_watermarks
-                }
-            )
-        except Exception as e:
-            logger.error(f"Error: failiure to update dynamo table {self.table_name} with watermarks {string_watermarks}")
-            raise e
+                table.update_item(
+                    Key={
+                        'id': self.id,
+                        'name': self.name
+                    },
+                    UpdateExpression='SET watermarks = :val',
+                    ExpressionAttributeValues={
+                        ':val': string_watermarks
+                    }
+                )
+            except Exception as e:
+                logger.error(f"Error: failiure to update dynamo table {self.table_name} with watermarks {string_watermarks}")
+                raise e
 #============================================================================================
 # Other
 #============================================================================================

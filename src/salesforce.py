@@ -222,6 +222,12 @@ class HarvardSalesforce:
         field_type = self.type_data[object][field]['type']
         if field_type in ["textarea", "string"]:
             length = self.type_data[object][field]['length']
+            if isinstance(value, bool):
+                if value:
+                    return 1
+                else:
+                    return 0
+
             value = str(value)
             if value is None:
                 return None
@@ -376,29 +382,79 @@ class HarvardSalesforce:
     # verify_logging_object
     # makes sure the logging object exists on the target instance
     def verify_logging_object(self):
-            
+
         # check if MyObject exists
-        object_name = 'Logging__c'
+        object_name = 'HUD__Logging__c'
         object_description = self.sf.describe()
 
         if object_name in [obj['name'] for obj in object_description['sobjects']]:
             logger.debug(f"{object_name} exists")
-            # check if myField exists and is of type string
-            field_name = '__c'
             object_fields = self.sf.MyObject__c.describe()['fields']
-            field_exists = False
-            for field in object_fields:
-                if field['name'] == field_name:
-                    field_exists = True
-                    if field['type'] == 'string':
-                        print(f"{field_name} exists and is of type string")
-                    else:
-                        print(f"{field_name} exists but is not of type string")
-                    break
+            # check if myField exists and is of type string
+            for field_name in ['error__c', 'warning__c', 'info__c']:
+                field_exists = False
+                for field in object_fields:
+                    if field['name'] == field_name:
+                        field_exists = True
+                        if field['type'] == 'string':
+                            logger.info(f"{field_name} exists and is of type string")
+                        else:
+                            logger.info(f"{field_name} exists but is not of type string")
+                        break
             if not field_exists:
-                print(f"{field_name} does not exist")
+                logger.info(f"{field_name} does not exist")
+                return False
+            return True
         else:
-            print(f"{object_name} does not exist")
+            logger.info(f"{object_name} does not exist")
+            return False
+
+
+    # create_logging_object
+    # NOTE: this won't work for namespaced objects (objects that start with: "SOMETHING__")
+    #   so it's probably not going to work for us
+    #   Leaving this method in though to remind me of this limitation
+    def create_logging_object(self):
+        mdapi = self.sf.mdapi
+        if not self.verify_logging_object():
+
+            # Create the custom object
+            custom_object = mdapi.CustomObject(
+                fullName="HUD__Logging__c",
+                label="HUD Log",
+                pluralLabel="HUD Logs",
+                nameField=mdapi.CustomField(
+                    label="LogName",
+                    type=mdapi.FieldType("Text")
+                ),
+                fields=[
+                    {
+                        'fullName': 'timestamp__c',
+                        'label': 'Timestamp',
+                        'type': 'DateTime'
+                    },
+                    {
+                        'fullName': 'log__c',
+                        'label': 'Log',
+                        'type': 'TextArea'
+                    },
+                    {
+                        'fullName': 'log_type__c',
+                        'label': 'Log Type',
+                        'type': 'Text',
+                        'length': 20
+                    }
+                ],
+                deploymentStatus=mdapi.DeploymentStatus("Deployed"),
+                sharingModel=mdapi.SharingModel("ReadWrite")
+            )
+
+            mdapi.CustomObject.create(custom_object)
+
+
+
+        return self.verify_logging_object()
+    
 
     # this method is trying to find an Id for a record that failed as a dupe
     # the `errored_data_object` should be of the same record that triggered the error

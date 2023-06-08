@@ -102,9 +102,20 @@ class SalesforcePersonUpdates:
                     updated_results.append(department)
             results = updated_results        
 
+        self.transformer.hashed_ids = self.hsf.getUniqueIds(
+            config=self.transformer.getSourceConfig('departments'), 
+            source_data=results
+        )
+
         # data will have the structure of { "OBJECT": [{"FIELD": "VALUE"}, ...]}
         data = {}
-        data = self.transformer.transform(source_data=results, source_name='departments')
+        data_gen = self.transformer.transform(source_data=results, source_name='departments')
+        for d in data_gen:
+            for i, v in d.items():
+                if i not in data:
+                    data[i] = []
+                data[i].append(v)
+
 
         logger.info(f"**** Push Departments to SF  ****")
         for object, object_data in data.items():
@@ -170,10 +181,10 @@ class SalesforcePersonUpdates:
         time_now = datetime.now().strftime('%H:%M:%S')
         logger.info(f"**** Push Remaining People data to SF:  {time_now}")
         for object, object_data in data.items():
-            logger.debug(f"object: {object}")
-            logger.debug(pformat(object_data))
+            logger.info(f"object: {object}")
+            logger.info(pformat(object_data))
 
-            # self.hsf.pushBulk(object, object_data)    
+            self.hsf.pushBulk(object, object_data)    
             thread = threading.Thread(target=self.hsf.pushBulk, args=(object, object_data))
             thread.start()
             threads.append(thread)
@@ -275,10 +286,6 @@ elif action == 'test':
     # this action is for testing
     logger.info("test action called")
 
-    mdapi = sfpu.hsf.sf.mdapi
-    query = mdapi.ListMetadataQuery(type='DuplicateRuleMatchRule')
-    response = mdapi.list_metadata(query)
-    logger.info(f"{response}")
 
 else: 
     logger.warn(f"Warning: app triggered without a valid action: {action}")
