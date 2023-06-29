@@ -65,7 +65,7 @@ class SalesforceTransformer:
                 if object_name in exclude_target_objects:
                     continue
 
-                # if object_name != 'hed__Affiliation__c':
+                # if object_name != 'HUDA__hud_Address__c':
                 #     continue
                 current_record = {}
                 good_records = []
@@ -245,7 +245,8 @@ class SalesforceTransformer:
                             if object_name not in current_record:
                                 current_record[object_name] = {}
                             current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value, identifier=source_data_object)
-                        elif best_branch and is_flat: 
+                        # elif best_branch and is_flat: 
+                        elif best_branch: 
                             current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value, identifier=source_data_object)
 
                     # END TARGET ***********************************************
@@ -279,8 +280,11 @@ class SalesforceTransformer:
                             # logger.debug(f"source: {source}")
                             value = None
                             source_pieces = source.split(".")
-                            if source_pieces[0] not in [branch_name, 'sf']:
-                                continue
+
+                            # this might be needed for affiliations? (removing temporarily to get non-branch values in)
+                            # if source_pieces[0] not in [branch_name, 'sf']:
+                            #     continue
+                            
                             branch_temp = branch
                             if source_pieces[0] in source_data_object:
                                 logger.debug(f"  {source_pieces[0]} in source_data_object")

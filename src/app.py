@@ -184,7 +184,9 @@ class SalesforcePersonUpdates:
             logger.info(f"object: {object}")
             logger.info(pformat(object_data))
 
-            self.hsf.pushBulk(object, object_data)    
+            # unthreaded:
+            # self.hsf.pushBulk(object, object_data)    
+
             thread = threading.Thread(target=self.hsf.pushBulk, args=(object, object_data))
             thread.start()
             threads.append(thread)

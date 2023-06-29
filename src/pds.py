@@ -16,7 +16,7 @@ class People:
         self.count = 0
         self.total_count = 0
         self.batch_size = batch_size
-        self.pds_url = "https://go.apis.huit.harvard.edu/ats/person/v3/search"
+        self.pds_url = "https://go.apis.huit.harvard.edu/ats/person/v3/search?securityCategory=C"
 
         self.paginate = False
         self.session_id = None

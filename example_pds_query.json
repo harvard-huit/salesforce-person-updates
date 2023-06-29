@@ -10,6 +10,8 @@
         "effectiveDate",
         "deceasedFlag",
         "sex",
+        "privacyFerpaStatus",
+        "privacyFerpaPastStudent",
         "cacheUpdateDate",
 
         "names.personNameKey",
@@ -165,6 +167,20 @@
         "names.personNameType.code": ["LISTING", "OFFICIAL"],
         "emails.effectiveStatus.code": "A",
         "emails.officialEmailIndicator": true,
-        "addresses.effectiveStatus.code": "A"
+        "addresses.effectiveStatus.code": "A",
+        "locations.effectiveStatus.code": "A",
+        "not_required": [
+            "addresses",
+            "locations"
+        ],
+        "or": [
+            { 
+                "employeeRoles.employmentStatus.code": "A",
+                "employeeRoles.primeRoleIndicator": true
+            },
+            { 
+                "poiRoles.primeRoleIndicator": true
+            }
+        ]
     }
 }

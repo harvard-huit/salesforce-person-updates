@@ -69,7 +69,9 @@
                     "employeeRoles.primeRoleIndicator": true,
                     "employeeRoles.employmentStatus.code": "A"
                 }
-            }
+            },
+            "HUDA__hud_PRIVACY_FERPA_STATUS__c": "privacyFerpaStatus",
+            "HUDA__hud_PRIVACY_FERPA_PAST_STU__c": "privacyFerpaPastStudent"
         }
     },
     "HUDA__hud_Name__c": {
