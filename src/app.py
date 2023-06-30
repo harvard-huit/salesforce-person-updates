@@ -28,7 +28,7 @@ if stack == 'developer':
 
 #### Collect action directive ######
 action = os.getenv("action") or None
-person_ids = os.getenv("person_ids") or []
+person_ids = json.loads(os.getenv("person_ids")) or []
 ####################################
 
 class SalesforcePersonUpdates:
@@ -197,11 +197,11 @@ class SalesforcePersonUpdates:
         # NOTE: see notes on this function
         # hsf.setDeleteds(object='Contact', id_type='HUDA__hud_UNIV_ID__c', deleted_flag='lastName', ids=['31598567'])
 
-    def update_single_person(self, huid: str):
+    def update_single_person(self, huids):
         pds_query = self.app_config.pds_query
         if 'conditions' not in pds_query:
             pds_query['conditions'] = {}
-        pds_query['conditions']['univid'] = huid
+        pds_query['conditions']['univid'] = huids
         people = self.pds.get_people(pds_query)
         self.process_people_batch(people=people)
 
