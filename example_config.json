@@ -137,7 +137,6 @@
             "HUDA__ADDR_MAIL_REALM_CD__c": "addresses.addressMailRealmCode",
             "HUDA__ADDR_CATEGORY_CD__c": "addresses.addressCategory.code",
             "HUDA__ADDR_CITY__c": "addresses.addressCity",
-            "HUDA__ADDR_ISO_COUNTRY_CD__c": "addresses.addressCountry.code",
             "HUDA__EFF_STATUS__c": "addresses.effectiveStatus.code",
             "HUDA__EFFDT__c": "addresses.effectiveDate",
             "HUDA__UNIV_ID__c": "univid",

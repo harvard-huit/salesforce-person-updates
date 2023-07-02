@@ -92,6 +92,21 @@ class HarvardSalesforce:
         logger.info(f"got this data from salesforce: {sf_data}")
         return sf_data
     
+    # this function soft-deletes the records included in the list argument
+    # WARNING: this currently has no real world use, it's just being used for debugging purposes
+    def delete_records(self, object_name: dict, ids: list):
+        logger.warn(f"WARNING: bulk soft DELETE to {object} with {ids}")
+        logger.warn(f"WARNING: this operation has no real world use and should only be used for debugging purposes in test orgs")
+
+        data = []
+        for id in ids:
+            data.append({
+                'Id': id
+            })
+        responses = self.sf.bulk.__getattr__(object_name).delete(data,batch_size=10000,use_serial=True)
+        logger.warn(f"WARNING: DELETED ids from {object_name} with response: {responses}")
+        return True
+
     # NOTE: the integration user I'm using seems to only have GET/POST/HEAD permissions (on standard objects at least)
     #  update() requires PATCH and I don't know where that permission is in Salesforce yet, it would also need to be set by the admins, so maybe don't?
     # NOTE: this will set "all" deleted flags at once with the Bulk API
@@ -339,10 +354,12 @@ class HarvardSalesforce:
 
                     # example: person in people
                     for source_data_object in source_data:
+
                         # if it's a branch
                         if source_data_object_branch is not None:
-                            for b in source_data_object[source_data_object_branch]:
-                                ids.append(str(b[source_data_id_name]))
+                            if source_data_object_branch in source_data_object:
+                                for b in source_data_object[source_data_object_branch]:
+                                    ids.append(str(b[source_data_id_name]))
                         # if it's not a branch
                         else:
                             ids.append(str(source_data_object[source_data_id_name]))

@@ -271,6 +271,41 @@ class SalesforcePersonUpdates:
         else:
             logger.info(f"successfully finished full data load in ")
 
+    # unfinished
+    def delete_people(self, dry_run: bool=False, huids: list=[]):
+        pds_query = self.app_config.pds_query
+        # clear conditions
+        pds_query['conditions'] = {}
+        # if 'conditions' not in pds_query:
+        #     pds_query['conditions'] = {}
+        pds_query['conditions']['univid'] = huids
+
+        response = self.pds.search(pds_query)
+        current_count = response['count']
+        size = self.pds.batch_size
+        total_count = response['total_count']
+        tally_count = current_count
+        results = response['results']
+
+        self.transformer.hashed_ids = self.hsf.getUniqueIds(
+            config=self.transformer.getSourceConfig('pds'), 
+            source_data=results
+        )
+
+        
+
+        for object_name, hashed_ids in self.transformer.hashed_ids.items():
+            ids = []
+            for source_id, salesforce_id in hashed_ids["Ids"].items():
+                ids.append(salesforce_id)
+
+            if not dry_run:
+                self.hsf.delete_records(object_name=object_name, ids=ids)
+
+        logger.info(f"Done")
+
+
+
 
 sfpu = SalesforcePersonUpdates()
 
@@ -284,10 +319,13 @@ elif action == 'full-department-load':
     sfpu.departments_data_load(type="full")
 elif action == 'department-updates':
     sfpu.departments_data_load(type="update")
+elif action == 'delete-people':
+    sfpu.delete_people(dry_run=True, huids=person_ids)
 elif action == 'test':
     # this action is for testing
     logger.info("test action called")
 
+    logger.info("done test")
 
 else: 
     logger.warn(f"Warning: app triggered without a valid action: {action}")
