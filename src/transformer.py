@@ -241,9 +241,10 @@ class SalesforceTransformer:
                         # logger.debug(f"      value: {value}")
 
 
+                        if object_name not in current_record:
+                            current_record[object_name] = {}
+
                         if not is_branched:
-                            if object_name not in current_record:
-                                current_record[object_name] = {}
                             current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value, identifier=source_data_object)
                         # elif best_branch and is_flat: 
                         elif best_branch: 
