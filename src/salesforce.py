@@ -21,6 +21,7 @@ class HarvardSalesforce:
                     security_token=token,
                     domain=self.domain
                 )
+
             elif(consumer_key is not None and consumer_secret is not None):
                 self.sf = Salesforce(
                     username=self.username,
@@ -86,12 +87,105 @@ class HarvardSalesforce:
     # this function will return a map of the contact ids to huid
     # NOTE: that there doesn't seem to be a good way to get multiple results without a soql query
     def getContactIds(self, id_type, ids):
-        logger.info(f"getContactIds with the following huids: {ids}")
+        logger.debug(f"getContactIds with the following huids: {ids}")
         ids_string = "'" + '\',\''.join(ids) + "'"
         sf_data = self.sf.query_all(f"SELECT Contact.id, {id_type} FROM Contact WHERE {id_type} IN({ids_string})")
-        logger.info(f"got this data from salesforce: {sf_data}")
+        logger.debug(f"got this data from salesforce: {sf_data}")
+        return sf_data
+
+    # get all data from an object given the reference and ids
+    def get_object_data(self, object_name, contact_ref, contact_ids):
+        logger.debug(f"get_all_data with the following ids: {contact_ids}")
+        ids_string = "'" + '\',\''.join(contact_ids) + "'"
+        sf_data = self.sf.query_all(f"SELECT Fields(ALL) FROM {object_name} WHERE {contact_ref} IN({ids_string}) LIMIT 100")
+        logger.debug(f"got this data from salesforce: {sf_data}")
         return sf_data
     
+    # this is meant to take the output from compare_records and push it to a tsv file
+    # with no output_file, it will just return the data as a string
+    def compare_to_tsv(self, data, output_file:str=None):
+        tsv_data = f"Id\tField\tSand Value\tProd Value\tMatch\n"
+        id_string = None
+        if 'ids' in data:
+            id_string = f"Mismatched ids\t\t{data['ids']['sand']}\t{data['ids']['prod']}\n"
+            del data['ids']
+        for id_value, id_data in data.items():
+            tsv_data += "\n".join([f"{id_value}\t{index}\t{res['sand']}\t{res['prod']}\t{res.get('match', None)}" for index, res in id_data.items()]) 
+            if output_file:
+                with open(output_file, 'w') as file:
+                        file.write(tsv_data)
+                        
+        if id_string:
+            tsv_data += "\n" + id_string
+
+        return tsv_data
+    
+
+    # this is intended to compare record sets (coming from a get_data_object or other soql result set)
+    def compare_records(self, object_name, ref_field, dataset1, dataset2, all=True):
+        logger.info(f"Comparing {object_name} Records:")
+
+        # we want to skip these fields, they'll always be different
+        ignore_fields = ['Id', 'attributes', 'OwnerId', 'Name', 'CreatedDate', 'CreatedById', 'LastModifiedDate', 
+                         'LastModifiedById', 'SystemModstamp', 'AccountId', 'LastActivityDate', 'LastViewedDate', 
+                         'LastReferenceDate', 'IAM_Grouper_WS_Customers__c', 'IAM_Grouper_App_Customers__c', 
+                         'PAM__Partner_Server_URL_80__c', 'IAM_Harvard_Key_Auth_CAS_Owners__c']
+
+        result = {}
+
+        if len(dataset1['records']) != len(dataset2['records']):
+            logger.error(f"Error: not correct number of records")
+            logger.error(f"Sand has:")
+            for record in dataset1['records']:
+                logger.error(f"{record[ref_field]}")
+            logger.error(f"Prod has:")
+            for record in dataset2['records']:
+                logger.error(f"{record[ref_field]}")
+            result['ids'] = {
+                "sand": [record[ref_field] for record in dataset1['records']],
+                "prod": [record[ref_field] for record in dataset2['records']]
+            }
+
+        for contact2 in dataset2['records']:
+            for contact1 in dataset1['records']:
+                found_record = False
+                if contact1[ref_field] == contact2[ref_field]:
+                    id_value = contact1[ref_field]
+                    logger.info(f"Record {ref_field}: {id_value}")
+                    found_record = True
+                    for field, value in contact2.items():
+                        this_result = {}
+                        if field not in contact1:
+                            logger.error(f"{field} not found in test instance")
+                            continue
+                        if field in ignore_fields:
+                            continue
+
+                        if contact1[field] == contact2[field]:
+                            if all:
+                                logger.info(f"{field}, {contact1[field]}, {contact2[field]}, MATCH")
+                                this_result = {
+                                    "sand": contact1[field],
+                                    "prod": contact2[field],
+                                    "match": True
+                                }
+                                if id_value not in result:
+                                    result[id_value] = {}
+                                result[id_value][field] = this_result
+                        else:
+                            logger.error(f"{field}, {contact1[field]}, {contact2[field]}, ERROR")
+                            this_result = {
+                                "sand": contact1[field],
+                                "prod": contact2[field],
+                                "match": False
+                            }
+                            if id_value not in result:
+                                result[id_value] = {}
+                            result[id_value][field] = this_result
+
+        return result
+
+
     # this function soft-deletes the records included in the list argument
     # WARNING: this currently has no real world use, it's just being used for debugging purposes
     def delete_records(self, object_name: dict, ids: list):

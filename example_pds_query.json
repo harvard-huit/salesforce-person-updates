@@ -179,7 +179,7 @@
                 "employeeRoles.primeRoleIndicator": true
             },
             { 
-                "poiRoles.primeRoleIndicator": true
+                "poiRoles.roleEndDate": ">now"
             }
         ]
     }
