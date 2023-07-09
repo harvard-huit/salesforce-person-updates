@@ -5,3 +5,4 @@ requests==2.31.0
 simple-salesforce==1.12.3
 python-dotenv
 asyncio==3.4.3
+pds @ git+https://github.huit.harvard.edu/HUIT/py-pds@v1.0.0
