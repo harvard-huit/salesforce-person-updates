@@ -25,7 +25,8 @@ RUN \
 COPY src /opt/app
 WORKDIR /opt/app
 
-# Install the Python modules our API application uses.
+
+# # Install the Python modules our API application uses.
 RUN pip3 install -r requirements.txt
 
 # Needed for boto to be able to find the parameter store
