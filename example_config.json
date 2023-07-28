@@ -32,8 +32,6 @@
             "salesforce": "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c"
         },
         "fields": {
-            "Birthdate": "birthDate",
-            "HUDA__hud_BIRTH_DT__c": "birthDate",
             "HUDA__hud_EFF_STATUS__c": "effectiveStatus.code",
             "HUDA__hud_DECEASED_FLAG__c": "deceasedFlag",
             "HUDA__hud_EPPN__c": "eppn",
@@ -59,10 +57,8 @@
             },
             "HUDA__hud_ADID__c": "netid",
             "HUDA__hud_EFFDT__c": "effectiveDate",
-            "HUDA__hud_INTERNAL_ID__c": "uuid",
             "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c": "personKey",
             "HUDA__hud_UUID__c": "uuid",
-            "HUDA__hud_GENDER__c": "sex.code",
             "Department": {
                 "value": "employeeRoles.hrDeptOfficialDesc",
                 "when": {
@@ -70,8 +66,9 @@
                     "employeeRoles.employmentStatus.code": "A"
                 }
             },
-            "HUDA__hud_PRIVACY_FERPA_STATUS__c": "privacyFerpaStatus",
-            "HUDA__hud_PRIVACY_FERPA_PAST_STU__c": "privacyFerpaPastStudent"
+            "HUDA__hud_PRIVACY_FERPA_STATUS__c": "privacyFerpaStatus.code",
+            "HUDA__hud_PRIVACY_FERPA_PAST_STU__c": "privacyFerpaPastStudent.code",
+            "HUDA__hud_PRIVACY_VALUE__c": "privacyValue.code"
         }
     },
     "HUDA__hud_Name__c": {
@@ -213,6 +210,7 @@
         },
         "fields": {
             "hed__Contact__c": "sf.contact.id",
+            "hed__Account__c": "sf.department.id",
             "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c": "personKey",
             "HUDA__hud_PERSON_ROLES_KEY__c": ["employeeRoles.personRoleKey", "poiRoles.personRoleKey", "studentRoles.personRoleKey"],
             "HUDA__hud_EFF_STATUS__c": ["employeeRoles.effectiveStatus.code", "poiRoles.effectiveStatus.code", "studentRoles.effectiveStatus.code"],

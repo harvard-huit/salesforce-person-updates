@@ -110,10 +110,10 @@ class HarvardSalesforce:
             id_string = f"Mismatched ids\t\t{data['ids']['sand']}\t{data['ids']['prod']}\n"
             del data['ids']
         for id_value, id_data in data.items():
-            tsv_data += "\n".join([f"{id_value}\t{index}\t{res['sand']}\t{res['prod']}\t{res.get('match', None)}" for index, res in id_data.items()]) 
+            tsv_data += "\n" + "\n".join([f"{id_value}\t{index}\t{res['sand']}\t{res['prod']}\t{res.get('match', None)}" for index, res in id_data.items()]) + "\n"
             if output_file:
                 with open(output_file, 'w') as file:
-                        file.write(tsv_data)
+                    file.write(tsv_data)
                         
         if id_string:
             tsv_data += "\n" + id_string
@@ -128,8 +128,11 @@ class HarvardSalesforce:
         # we want to skip these fields, they'll always be different
         ignore_fields = ['Id', 'attributes', 'OwnerId', 'Name', 'CreatedDate', 'CreatedById', 'LastModifiedDate', 
                          'LastModifiedById', 'SystemModstamp', 'AccountId', 'LastActivityDate', 'LastViewedDate', 
-                         'LastReferenceDate', 'IAM_Grouper_WS_Customers__c', 'IAM_Grouper_App_Customers__c', 
-                         'PAM__Partner_Server_URL_80__c', 'IAM_Harvard_Key_Auth_CAS_Owners__c']
+                         'LastReferenceDated', 'IAM_Grouper_WS_Customers__c', 'IAM_Grouper_App_Customers__c', 
+                         'PAM__Partner_Server_URL_80__c', 'IAM_Harvard_Key_Auth_CAS_Owners__c', 'IAM_Midas_Customers__c',
+                         'CloudAware_Application__c', 'PAM__Contact_Score_Rating__c', 'PAM__Contact_Score__c',
+                         'IAM_IDP_Customers__c', 'IAM_IIQ_Customers__c'
+                         ]
 
         result = {}
 
@@ -151,7 +154,7 @@ class HarvardSalesforce:
                 found_record = False
                 if contact1[ref_field] == contact2[ref_field]:
                     id_value = contact1[ref_field]
-                    logger.info(f"Record {ref_field}: {id_value}")
+                    logger.debug(f"Record {ref_field}: {id_value}")
                     found_record = True
                     for field, value in contact2.items():
                         this_result = {}
@@ -163,7 +166,7 @@ class HarvardSalesforce:
 
                         if contact1[field] == contact2[field]:
                             if all:
-                                logger.info(f"{field}, {contact1[field]}, {contact2[field]}, MATCH")
+                                logger.debug(f"{field}, {contact1[field]}, {contact2[field]}, MATCH")
                                 this_result = {
                                     "sand": contact1[field],
                                     "prod": contact2[field],
@@ -173,7 +176,7 @@ class HarvardSalesforce:
                                     result[id_value] = {}
                                 result[id_value][field] = this_result
                         else:
-                            logger.error(f"{field}, {contact1[field]}, {contact2[field]}, ERROR")
+                            logger.debug(f"{field}, {contact1[field]}, {contact2[field]}, ERROR")
                             this_result = {
                                 "sand": contact1[field],
                                 "prod": contact2[field],

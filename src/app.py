@@ -195,8 +195,8 @@ class SalesforcePersonUpdates:
         time_now = datetime.now().strftime('%H:%M:%S')
         logger.info(f"**** Push Remaining People data to SF:  {time_now}")
         for object, object_data in data.items():
-            logger.info(f"object: {object}")
-            logger.info(pformat(object_data))
+            logger.debug(f"object: {object}")
+            logger.debug(pformat(object_data))
 
             # unthreaded:
             # self.hsf.pushBulk(object, object_data)    
@@ -362,7 +362,7 @@ elif action == 'compare':
                         contact_ref = field
             data1 = sfpu.hsf.get_object_data(object_name, contact_ref, contact_ids1)
             data2 = sfpu.hsf2.get_object_data(object_name, contact_ref, contact_ids2)
-            result = sfpu.hsf.compare_records(object_name=object_name, ref_field=ref_field, dataset1=data1, dataset2=data2, all=False)
+            result = sfpu.hsf.compare_records(object_name=object_name, ref_field=ref_field, dataset1=data1, dataset2=data2, all=True)
 
             # tsv_result = sfpu.hsf.compare_to_tsv(result, f"{output_folder}{object_name}.test.tsv")
             tsv_result = sfpu.hsf.compare_to_tsv(result)
@@ -371,12 +371,20 @@ elif action == 'compare':
             # sheet = workbook.active
             title = f"{object_name}"
             sheet = workbook.create_sheet(title=title)
-
+            
             list_result = tsv_result.split("\n")
             for lr in list_result:
                 row_list = lr.split("\t")
+                if object_name == 'HUDA__hud_Address__c':
+                    logger.info(row_list)
                 sheet.append(row_list)
-            # workbook[title] = sheet
+
+
+            for column_cells in sheet.columns:
+                new_column_length = max(len(str(cell.value)) for cell in column_cells)
+                new_column_letter = column_cells[0].column_letter
+                if new_column_length > 0:
+                    sheet.column_dimensions[new_column_letter].width = new_column_length*1.23
 
         # remove the default sheet
         workbook.remove(workbook.active)
@@ -392,50 +400,6 @@ elif action == 'test':
     # this action is for testing
     logger.info("test action called")
 
-    from openpyxl import Workbook
-
-    output_folder = os.getenv("output_folder", "../test_output/")
-
-
-
-    contact_response1 = sfpu.hsf.getContactIds('HUDA__hud_UNIV_ID__c', person_ids)
-    contact_ids1 = [record['Id'] for record in contact_response1['records']]
-    contact_response2 = sfpu.hsf2.getContactIds('HUDA__hud_UNIV_ID__c', person_ids)
-    contact_ids2 = [record['Id'] for record in contact_response2['records']]
-
-
-    object_name = 'Contact'
-    object_config = sfpu.app_config.config[object_name]
-
-    # if object_config['source'] != 'pds':
-    #     continue
-    ref_field = object_config['Id']['salesforce']
-    contact_ref = 'Contact.id'
-    for field, value in object_config['fields'].items():
-        if isinstance(value, str):
-            if value.startswith("sf."):
-                contact_ref = field
-    data1 = sfpu.hsf.get_object_data(object_name, contact_ref, contact_ids1)
-    data2 = sfpu.hsf2.get_object_data(object_name, contact_ref, contact_ids2)
-    result = sfpu.hsf.compare_records(object_name=object_name, ref_field=ref_field, dataset1=data1, dataset2=data2, all=True)
-
-    # tsv_result = sfpu.hsf.compare_to_tsv(result, f"{output_folder}{object_name}.test.tsv")
-    tsv_result = sfpu.hsf.compare_to_tsv(result)
-
-    # Create a new workbook
-    workbook = Workbook()
-
-    # Select the active sheet
-    # sheet = workbook.active
-    sheet = workbook.create_sheet(title="Contact")
-
-    list_result = tsv_result.split("\n")
-    for lr in list_result:
-        row_list = lr.split("\t")
-        sheet.append(row_list)
-
-    # Save the workbook
-    workbook.save(f"{output_folder}test.xlsx")
 
     logger.info("done test")
 

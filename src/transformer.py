@@ -235,9 +235,9 @@ class SalesforceTransformer:
 
                         if isinstance(value, bool):
                             if value:
-                                value = 'Y'
+                                value = 1
                             else:
-                                value = 'N'
+                                value = 0
                         # logger.debug(f"      value: {value}")
 
 
