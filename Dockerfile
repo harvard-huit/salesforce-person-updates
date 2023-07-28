@@ -18,6 +18,7 @@ RUN \
 	rpm -Uvh http://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm; \
 	yum -y install python${pythonmajor}; \
 	yum -y install python${pythonmajor}-pip; \
+	yum -y install git \
 	yum clean all
 
 # Install Python application and change working directory to it.
