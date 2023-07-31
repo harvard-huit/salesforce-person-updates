@@ -105,7 +105,7 @@ jobs:
           echo $CONTAINER_OVERRIDES
           echo "CONTAINER_OVERRIDES=$CONTAINER_OVERRIDES" >> $GITHUB_ENV
 
-      - name: run ${{ env.account_name }} ${{ github.event.inputs.environment }} spot update
+      - name: Run ${{ github.event.inputs.environment }} spot update on [${{ github.event.inputs.people }}]
         run: |
           aws ecs run-task \
             --cluster aais-ecs-${{ github.event.inputs.environment }}-cluster \
