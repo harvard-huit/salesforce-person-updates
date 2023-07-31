@@ -26,6 +26,7 @@ RUN \
 	dnf -y install gcc python${PYTHON_VERSION}-devel && \
 	# Required for the Oracle client to execute
 	dnf -y install libnsl && \
+	dnf -y install git && \
 	# Cleanup
 	dnf clean all && \
 	rm -rf /var/cache/dnf
@@ -37,7 +38,7 @@ WORKDIR /opt/app
 
 
 # # Install the Python modules our API application uses.
-RUN pip3 install -r requirements.txt
+RUN python${PYTHON_VERSION} -m pip install --user --no-cache-dir -r requirements.txt
 
 # Needed for boto to be able to find the parameter store
 ENV AWS_DEFAULT_REGION us-east-1
