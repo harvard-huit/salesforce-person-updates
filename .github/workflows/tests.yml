@@ -2,6 +2,10 @@ name: Unit Tests
 on:
   workflow_dispatch:
   push:
+    paths: 
+      - 'src/'
+      - 'Dockerfile'
+      - '.github/workflows/tests.yml'
 
 defaults:
   run:
