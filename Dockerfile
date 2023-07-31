@@ -47,4 +47,4 @@ ENV AWS_DEFAULT_REGION us-east-1
 ARG STACK
 
 # Start app.py from our src folder.
-ENTRYPOINT [ "python3", "-u", "app.py" ]
+ENTRYPOINT [ "sh", "-c", "python${PYTHON_VERSION} -u app.py" ]
