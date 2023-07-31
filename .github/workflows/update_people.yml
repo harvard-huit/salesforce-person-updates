@@ -93,6 +93,9 @@ jobs:
                   "name": "SALESFORCE_INSTANCE_ID", 
                   "value": "${{ github.event.inputs.salesforce_instance_id }}"
                 }, {
+                  "name": "TABLE_NAME", 
+                  "value": "aais-services-salesforce-person-updates-${{ github.event.inputs.environment }}"
+                }, {
                   "name": "action", 
                   "value": "single-person-update"
                 }, {
@@ -102,7 +105,8 @@ jobs:
               ]
             } 
           ]'
-          printf "%s\n" "CONTAINER_OVERRIDES='$CONTAINER_OVERRIDES'" >> $GITHUB_ENV
+          CONTAINER_OVERRIDES=$(echo "$CONTAINER_OVERRIDES" | tr -d '\n')
+          echo "CONTAINER_OVERRIDES=$CONTAINER_OVERRIDES" >> $GITHUB_ENV
 
       - name: Run ${{ github.event.inputs.environment }} spot update on [${{ github.event.inputs.people }}]
         run: |
