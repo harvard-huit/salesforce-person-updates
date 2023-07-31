@@ -1,4 +1,4 @@
-name: Build Code
+name: Build Image
 on:
   push:
     branches: [ dev ]
@@ -7,6 +7,7 @@ on:
         - 'Dockerfile'
         - 'gunicorn.sh'
         - 'requirements.txt'
+        - '.github/workflows/build.yml'
   workflow_dispatch:
     inputs:
       version:
@@ -22,7 +23,7 @@ defaults:
     shell: bash
 
 jobs:
-  deploy:
+  build:
     name: Build Code ${{ github.event.inputs.version }}
     runs-on: ubuntu-latest
 

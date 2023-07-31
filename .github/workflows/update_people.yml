@@ -77,6 +77,7 @@ jobs:
           role-to-assume: 'arn:aws:iam::${{ env.account }}:role/AutomationDeployRole'
           role-duration-seconds: 1200
           role-session-name: MyDeploySession
+          role-skip-session-tagging: true
           role-external-id: ${{ secrets.EXTERNAL_ID }}
 
       - name: get current identity
@@ -101,6 +102,7 @@ jobs:
               ]
             } 
           ]'
+          echo $CONTAINER_OVERRIDES
           echo "CONTAINER_OVERRIDES=$CONTAINER_OVERRIDES" >> $GITHUB_ENV
 
       - name: run ${{ env.account_name }} ${{ github.event.inputs.environment }} spot update

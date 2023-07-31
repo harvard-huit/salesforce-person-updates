@@ -1,4 +1,4 @@
-name: Deploy Runtime
+name: Deploy Task Definition
 on:
   # push:
   #   branches: [ dev ]
@@ -27,7 +27,7 @@ defaults:
 
 jobs:
   deploy:
-    name: Deploy to ${{ github.event.inputs.environment }}
+    name: Deploy ${{ github.event.inputs.version }} to ${{ github.event.inputs.environment }}
     runs-on: ubuntu-latest
 
     steps:
