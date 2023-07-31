@@ -40,10 +40,15 @@ class SalesforcePersonUpdates:
                     logger.warning("WARNING: application already running")
                     exit()
 
+            self.salesforce_instance_id = os.getenv("SALESFORCE_INSTANCE_ID", None)
+            self.table_name = os.getenv("TABLE_NAME", None)
+            if self.salesforce_instance_id is None or self.table_name is None:
+                raise Exception("ERROR: SALESFORCE_INSTANCE_ID and TABLE_NAME are required env vars, these tell us where to get the configuration.")
+
             if os.getenv("LOCAL") == "True":
                 self.app_config = AppConfig(id=None, table_name=None, local=True)
             else:
-                self.app_config = AppConfig("huit-full-sandbox", "aais-services-salesforce-person-updates-dev")
+                self.app_config = AppConfig(self.salesforce_instance_id, self.table_name)
 
             self.hsf = HarvardSalesforce(
                 domain = self.app_config.salesforce_domain,
