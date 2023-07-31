@@ -19,6 +19,7 @@ RUN \
 	yum -y install python${pythonmajor}; \
 	yum -y install python${pythonmajor}-pip; \
 	yum -y install git \
+	dnf -y install openssl && \
 	yum clean all
 
 # Install Python application and change working directory to it.
