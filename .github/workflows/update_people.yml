@@ -102,8 +102,7 @@ jobs:
               ]
             } 
           ]'
-          echo $CONTAINER_OVERRIDES
-          echo "CONTAINER_OVERRIDES=$CONTAINER_OVERRIDES" >> $GITHUB_ENV
+          printf "%s\n" "CONTAINER_OVERRIDES='$CONTAINER_OVERRIDES'" >> $GITHUB_ENV
 
       - name: Run ${{ github.event.inputs.environment }} spot update on [${{ github.event.inputs.people }}]
         run: |
