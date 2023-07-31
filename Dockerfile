@@ -1,7 +1,7 @@
 # Generate Docker image file.
 
 # Run it on latest Amazon Linux 2.
-FROM amazonlinux:2
+FROM amazonlinux:2023
 LABEL maintainer="jcleveng@fas.harvard.edu"
 
 # Python version to install
