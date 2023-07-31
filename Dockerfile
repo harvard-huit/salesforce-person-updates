@@ -5,7 +5,9 @@ FROM amazonlinux:2023
 LABEL maintainer="jcleveng@fas.harvard.edu"
 
 # Python version to install
-ENV pythonmajor 3
+ENV PYTHON_MAJOR_VERSION 3
+ENV PYTHON_MINOR_VERSION 11
+ENV PYTHON_VERSION ${PYTHON_MAJOR_VERSION}.${PYTHON_MINOR_VERSION}
 
 # Do a bunch of installs, all combined into a single RUN command because it
 # dramatically reduces the size of the image file (in this case from 427MB
@@ -14,13 +16,20 @@ ENV pythonmajor 3
 # 	- add the EPEL yum repo
 #		- install python
 RUN \
-	yum -y update --security; \
-	rpm -Uvh http://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm; \
-	yum -y install python${pythonmajor}; \
-	yum -y install python${pythonmajor}-pip; \
-	yum -y install git \
+	dnf -y update --security && \
 	dnf -y install openssl && \
-	yum clean all
+	dnf -y install shadow-utils && \
+	# Python and pip installation
+	dnf -y install python${PYTHON_VERSION} && \
+	dnf -y install python${PYTHON_VERSION}-pip && \
+	# Required for cx_Oracle wheel to build
+	dnf -y install gcc python${PYTHON_VERSION}-devel && \
+	# Required for the Oracle client to execute
+	dnf -y install libnsl && \
+	# Cleanup
+	dnf clean all && \
+	rm -rf /var/cache/dnf
+
 
 # Install Python application and change working directory to it.
 COPY src /opt/app
