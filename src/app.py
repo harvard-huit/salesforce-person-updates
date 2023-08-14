@@ -1,3 +1,4 @@
+from logging import LogRecord
 from common import isTaskRunning, logger, stack, AppConfig
 import pds
 from salesforce import HarvardSalesforce
@@ -7,6 +8,7 @@ from departments import Departments
 import os
 import threading
 import json
+import logging
 from datetime import datetime
 if stack == 'developer':
     from dotenv import load_dotenv
@@ -35,16 +37,23 @@ class SalesforcePersonUpdates:
     def __init__(self):
         try:
             if(stack != "developer"):
+                # NOTE: this doesn't work / make sense as is
+                #       this also needs to check if it's running on a particular SF instance
                 logger.info("Checking if task is already running")
                 if isTaskRunning() and stack != 'developer':
                     logger.warning("WARNING: application already running")
                     exit()
 
+            self.salesforce_instance_id = os.getenv("SALESFORCE_INSTANCE_ID", None)
+            self.table_name = os.getenv("TABLE_NAME", None)
+
+            current_time_mash = datetime.now().strftime('%Y%m%d%H%M')
+            self.run_id = f"{self.salesforce_instance_id}_{current_time_mash}"
+
+
             if os.getenv("LOCAL") == "True":
                 self.app_config = AppConfig(id=None, table_name=None, local=True)
             else:
-                self.salesforce_instance_id = os.getenv("SALESFORCE_INSTANCE_ID", None)
-                self.table_name = os.getenv("TABLE_NAME", None)
                 if self.salesforce_instance_id is None or self.table_name is None:
                     raise Exception("ERROR: SALESFORCE_INSTANCE_ID and TABLE_NAME are required env vars, these tell us where to get the configuration.")
 
@@ -98,8 +107,59 @@ class SalesforcePersonUpdates:
 
         except Exception as e:
             logger.error(f"Run failed with error: {e}")
+            self.run_log.append(f"Error: Run failed with {e}")
             raise e
 
+    # this will make logs come out as json and send logs elsewhere
+    def setup_logging(self, logger=logging.getLogger(__name__)):
+
+        class JSONFormatter(logging.Formatter):
+            def __init__(self, run_id, sfpu: SalesforcePersonUpdates):
+                super().__init__()
+                self.run_id = run_id
+                self.sfpu = sfpu
+
+            # NOTE: do not add a logger statement in this function, it will cause an infinite loop
+            def format(self, record: LogRecord) -> str:
+                log_data = {
+                    'run_id': self.run_id,
+                    'timestamp': self.formatTime(record),
+                    'level': record.levelname,
+                    'message': record.getMessage(),
+                    'logger': record.name,
+                    'pathname': record.pathname,
+                    'lineno': record.lineno
+                }
+
+                self.sfpu.push_log(message=record.getMessage(), levelname=record.levelname, datetime=None, run_id=sfpu.run_id)
+
+                # return super().format(record)
+                return json.dumps(log_data)
+                                    
+        # remove existing handlers
+        for handler in logger.handlers[:]:
+            logger.removeHandler(handler)
+
+        stream_handler = logging.StreamHandler()
+        formatter = JSONFormatter(run_id=self.run_id, sfpu=self)
+        stream_handler.setFormatter(formatter)
+        logger.addHandler(stream_handler)
+
+        return logger
+
+    # NOTE: do not add a logger statement in this function, it will cause an infinite loop
+    def push_log(self, message, levelname, datetime, run_id, log_object="huit__Log__c"):
+        data = {
+            "huit__Message__c": message,
+            "huit__Source__c": "HUD",
+            "huit__Level__c": levelname,
+            "huit__RunId__c": run_id,
+            "huit__Datetime__c": datetime
+        }
+        try:
+            response = self.hsf.sf.__getattr__(log_object).create(data)
+        except Exception as e:
+            raise Exception(f"Logging failed: {data} :: {e}")
 
     # valid types are "full" and "update"
     def departments_data_load(self, type="full"):
@@ -136,7 +196,7 @@ class SalesforcePersonUpdates:
                 data[i].append(v)
 
 
-        logger.info(f"**** Push Departments to SF  ****")
+        logger.debug(f"**** Push Departments to SF  ****")
         for object, object_data in data.items():
             logger.debug(f"object: {object}")
             logger.debug(pformat(object_data))
@@ -164,7 +224,7 @@ class SalesforcePersonUpdates:
 
 
         time_now = datetime.now().strftime('%H:%M:%S')
-        logger.info(f"**** Push Contact data to SF:  {time_now}")
+        logger.debug(f"**** Push Contact data to SF:  {time_now}")
         for object, object_data in data.items():
             logger.debug(f"object: {object}")
             logger.debug(pformat(object_data))
@@ -178,7 +238,7 @@ class SalesforcePersonUpdates:
 
 
         time_now = datetime.now().strftime('%H:%M:%S')
-        logger.info(f"Starting the rest: {time_now}")
+        logger.debug(f"Starting related data: {time_now}")
 
         data = {}
 
@@ -198,7 +258,7 @@ class SalesforcePersonUpdates:
 
         threads = []
         time_now = datetime.now().strftime('%H:%M:%S')
-        logger.info(f"**** Push Remaining People data to SF:  {time_now}")
+        logger.debug(f"**** Push Remaining People data to SF:  {time_now}")
         for object, object_data in data.items():
             logger.debug(f"object: {object}")
             logger.debug(pformat(object_data))
@@ -254,7 +314,6 @@ class SalesforcePersonUpdates:
         tally_count = current_count
         results = response['results']
         people = self.pds.make_people(results)
-        logger.info(current_count)
 
         count = 1
         current_time = datetime.now().strftime('%H:%M:%S')
@@ -290,8 +349,8 @@ class SalesforcePersonUpdates:
         else:
             logger.info(f"successfully finished full data load in ")
 
-    # unfinished
-    def delete_people(self, dry_run: bool=False, huids: list=[]):
+    # This is not intended for much use.
+    def delete_people(self, dry_run: bool=True, huids: list=[]):
         pds_query = self.app_config.pds_query
         # clear conditions
         pds_query['conditions'] = {}
@@ -323,10 +382,47 @@ class SalesforcePersonUpdates:
 
         logger.info(f"Done")
 
+    def check_updateds(self):
+        # 1. Get all (external) IDs from Salesforce
+        object_name = 'Contact'
+        external_id = 'HUDA__hud_EPPN__c'
+        all_sf_ids = self.hsf.get_all_external_ids(object_name=object_name, external_id=external_id)
+        
+        # 2. Call PDS with those IDs
+
+        # we only need to know if these are getttable, it doesn't matter what other fields or conditions are in the provided query
+        pds_query = {}
+        pds_query['fields'] = ['eppn']
+        pds_query['conditions'] = {}
+        pds_query['conditions']['eppn'] = all_sf_ids
+
+        people = self.pds.get_people(pds_query)
+
+        # make it a list
+        all_pds_ids = []
+        for person in people:
+            all_pds_ids.append(person['eppn'])
+        
+        logger.debug(f"All PDS ids: {all_pds_ids}")
+
+        # 3. Diff the lists
+
+        not_updating_ids = [item for item in all_sf_ids if item not in all_pds_ids]
+        not_updating_ids.append('2940935f3b990174')
+
+        logger.info(f"These ids ({external_id}) are no longer being updated: {not_updating_ids}")
+
+        # 4. Mark the ones that don't show up
+        self.hsf.flag_field(object_name=object_name, external_id=external_id, flag_name='huit__Updated__c', value=False, ids=not_updating_ids)
+
+    
 
 
 
 sfpu = SalesforcePersonUpdates()
+# if not os.getenv("LOCAL"):
+#     logger = sfpu.setup_logging(logger=logger)
+logger = sfpu.setup_logging(logger=logger)
 
 if action == 'single-person-update' and len(person_ids) > 0:
     sfpu.update_single_person(person_ids)
@@ -340,6 +436,8 @@ elif action == 'department-updates':
     sfpu.departments_data_load(type="update")
 elif action == 'delete-people':
     sfpu.delete_people(dry_run=True, huids=person_ids)
+elif action == 'mark-not-updated':
+    sfpu.check_updateds()
 elif action == 'compare':
 
     output_folder = os.getenv("output_folder", "../test_output/")
@@ -380,8 +478,6 @@ elif action == 'compare':
             list_result = tsv_result.split("\n")
             for lr in list_result:
                 row_list = lr.split("\t")
-                if object_name == 'HUDA__hud_Address__c':
-                    logger.info(row_list)
                 sheet.append(row_list)
 
 
@@ -409,7 +505,7 @@ elif action == 'test':
     logger.info("done test")
 
 else: 
-    logger.warn(f"Warning: app triggered without a valid action: {action}")
+    logger.warning(f"Warning: app triggered without a valid action: {action}")
 
 
 

@@ -23,6 +23,8 @@
         "names.effectiveDate",
         "names.updateDate",
 
+        "pronouns.pronouns",
+
         "emails.personEmailKey",
         "emails.email",
         "emails.officialEmailIndicator",

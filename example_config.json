@@ -31,7 +31,12 @@
             "pds": "personKey",
             "salesforce": "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c"
         },
+        "updatedFlag": "huit__Updated__c",
         "fields": {
+            "huit__Updated__c": {
+                "value": true,
+                "static": true
+            },
             "HUDA__hud_EFF_STATUS__c": "effectiveStatus.code",
             "HUDA__hud_DECEASED_FLAG__c": "deceasedFlag",
             "HUDA__hud_EPPN__c": "eppn",
@@ -68,7 +73,8 @@
             },
             "HUDA__hud_PRIVACY_FERPA_STATUS__c": "privacyFerpaStatus.code",
             "HUDA__hud_PRIVACY_FERPA_PAST_STU__c": "privacyFerpaPastStudent.code",
-            "HUDA__hud_PRIVACY_VALUE__c": "privacyValue.code"
+            "HUDA__hud_PRIVACY_VALUE__c": "privacyValue.code",
+            "huit__Pronouns__c": "pronouns.pronouns"
         }
     },
     "HUDA__hud_Name__c": {
@@ -84,7 +90,6 @@
             "HUDA__EFFDT__c": "names.effectiveDate",
             "HUDA__NAME_FIRST__c": "names.firstName",
             "HUDA__UNIV_ID__c": "univid",
-            "HUDA__INTERNAL_ID__c": "uuid",
             "HUDA__NAME_LAST__c": "names.lastName",
             "HUDA__NAME_MIDDLE__c": "names.middleName",
             "HUDA__MULE_UNIQUE_PERSON_KEY__c": "personKey",
@@ -113,7 +118,6 @@
             "HUDA__EMAIL_ADDRESS__c": "emails.email",
             "HUDA__EMAIL_DOMAIN_NAME__c": "emails.emailDomainName",
             "HUDA__EMAIL_USER_NAME__c": "emails.emailUserName",
-            "HUDA__INTERNAL_ID__c": "uuid",
             "HUDA__MULE_UNIQUE_PERSON_KEY__c": "personKey",
             "HUDA__OFFICIAL_EMAIL_INDICATOR__c": "emails.officialEmailIndicator",
             "HUDA__PRIVACY_VALUE__c": "emails.privacyValue.code",
@@ -131,13 +135,12 @@
         "fields": {
             "HUDA__Address_Contact__c": "sf.contact.id",
             "HUDA__CONTACT_ADDRESS_KEY__c": "addresses.addressKey",
-            "HUDA__ADDR_MAIL_REALM_CD__c": "addresses.addressMailRealmCode",
             "HUDA__ADDR_CATEGORY_CD__c": "addresses.addressCategory.code",
             "HUDA__ADDR_CITY__c": "addresses.addressCity",
+            "HUDA__ADDR_ISO_COUNTRY_CD__c": "addresses.addressCountry.code",
             "HUDA__EFF_STATUS__c": "addresses.effectiveStatus.code",
             "HUDA__EFFDT__c": "addresses.effectiveDate",
             "HUDA__UNIV_ID__c": "univid",
-            "HUDA__INTERNAL_ID__c": "uuid",
             "HUDA__ADDR_PS_LOCATION_CD__c": "addresses.psLocation.code",
             "HUDA__MULE_UNIQUE_PERSON_KEY__c": "personKey",
             "HUDA__ADDR_POSTAL_CD__c": "addresses.addressPostalCode",
@@ -147,7 +150,6 @@
             "HUDA__ADDR_LINE1__c": "addresses.addressStreet1",
             "HUDA__ADDR_LINE2__c": "addresses.addressStreet2",
             "HUDA__ADDR_LINE3__c": "addresses.addressStreet3",
-            "HUDA__ADDR_ID__c": "addresses.addrId",
             "HUDA__UPDATE_DT__c": "addresses.updateDate"        
         }
     },
@@ -165,10 +167,7 @@
             "HUDA__CONTACT_DATA_EXT__c": "phones.dataExtension",
             "HUDA__CONTACT_DATA_SUBTYPE_CD__c": "phones.dataSubtype",
             "HUDA__CONTACT_DATA_TYPE_CD__c": "phones.dataType",
-            "HUDA__CONTACT_DIR_LISTING_KEY__c": "phones.contactDirListingKey",
             "HUDA__EFF_STATUS__c": "phones.effectiveStatus.code",
-            "HUDA__UNIV_ID__c": "univid",
-            "HUDA__INTERNAL_ID__c": "uuid",
             "HUDA__LISTING_CATEGORY__c": "phones.listingCategory",
             "HUDA__LISTING_ID__c": "phones.listingId",
             "HUDA__MULE_UNIQUE_PERSON_KEY__c": "personKey",
@@ -188,11 +187,8 @@
             "HUDA__CONTACT_LOCATION_KEY__c": "locations.personLocationKey",
             "HUDA__BLDG_LOC__c": "locations.location",
             "HUDA__BLDG_LOC_IDENTIFIER__c": "locations.locationIdentifier",
-            "HUDA__CONTACT_DIR_LISTING_KEY__c": "locations.contactDirListingKey",
             "HUDA__EFF_STATUS__c": "locations.effectiveStatus.code",
             "HUDA__EFFDT__c": "locations.effectiveDate",
-            "HUDA__UNIV_ID__c": "univid",
-            "HUDA__INTERNAL_ID__c": "uuid",
             "HUDA__LISTING_CATEGORY__c": "locations.listingCategory",
             "HUDA__LISTING_ID__c": "locations.listingId",
             "HUDA__LOC_TYPE_CD__c": "locations.locationType.code",
@@ -210,7 +206,6 @@
         },
         "fields": {
             "hed__Contact__c": "sf.contact.id",
-            "hed__Account__c": "sf.department.id",
             "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c": "personKey",
             "HUDA__hud_PERSON_ROLES_KEY__c": ["employeeRoles.personRoleKey", "poiRoles.personRoleKey", "studentRoles.personRoleKey"],
             "HUDA__hud_EFF_STATUS__c": ["employeeRoles.effectiveStatus.code", "poiRoles.effectiveStatus.code", "studentRoles.effectiveStatus.code"],

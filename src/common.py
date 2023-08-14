@@ -19,18 +19,19 @@ import logging
 stack = os.getenv('STACK') or 'developer'
 debug = os.getenv('DEBUG') == "True" or False
 logging_format = "%(levelname)s %(msg)s"
-if stack == 'developer':
-    # logging_format = "%(asctime)s %(levelname)s %(name)s %(pathname)s.%(lineno)s %(msg)s"
-    logging_format = "%(msg)s"
-
-if debug:
-    logging.basicConfig(level=logging.DEBUG, format=logging_format)
-else:
-    logging.basicConfig(level=logging.INFO, format=logging_format)
 
 logger = logging.getLogger(__name__)
+if debug:
+    logger.setLevel(logging.DEBUG)
+else:
+    logger.setLevel(logging.INFO)
 
-    
+stream_handler = logging.StreamHandler()
+formatter = logging.Formatter(logging_format)
+stream_handler.setFormatter(formatter)
+logger.addHandler(stream_handler)
+
+
 
 
 

@@ -48,10 +48,10 @@ class HarvardSalesforce:
     # NOTE: the Bulk API can take a max of 10000 records at a time
     # a single record will take anywhere from 2-50 seconds
     # dupe: this makes sure we don't keep retrying a dupe check
-    def pushBulk(self, object, data, dupe=False):
-        logger.debug(f"pushBulk to {object} with {data}")
+    def pushBulk(self, object, data, dupe=False, id_name='Id'):
+        logger.debug(f"upsert to {object} with {data}")
 
-        responses = self.sf.bulk.__getattr__(object).upsert(data, external_id_field='Id')
+        responses = self.sf.bulk.__getattr__(object).upsert(data, external_id_field=id_name)
         created_count = 0
         updated_count = 0
         error_count = 0
@@ -84,6 +84,7 @@ class HarvardSalesforce:
             logger.info(f"Errored {object} Records: {error_count}")
         return True
     
+
     # this function will return a map of the contact ids to huid
     # NOTE: that there doesn't seem to be a good way to get multiple results without a soql query
     def getContactIds(self, id_type, ids):
@@ -92,6 +93,40 @@ class HarvardSalesforce:
         sf_data = self.sf.query_all(f"SELECT Contact.id, {id_type} FROM Contact WHERE {id_type} IN({ids_string})")
         logger.debug(f"got this data from salesforce: {sf_data}")
         return sf_data
+    
+    # this will return a list of all of the values found on the object
+    def get_all_external_ids(self, object_name, external_id):
+        logger.debug(f"get_all_external_ids getting all {external_id} from {object_name}")
+        
+
+        sf_data = self.sf.query_all(f"SELECT {external_id} FROM {object_name}")
+        logger.debug(f"got this data from salesforce: {sf_data}")
+        all_ids = []
+        for record in sf_data['records']:
+            if record[external_id] is not None:
+                all_ids.append(record[external_id])
+
+        logger.debug(all_ids)
+        return all_ids
+    
+    def flag_field(self, object_name: str, external_id: str, flag_name: str, value: any, ids: list):
+        batch_size = 500
+        for i in range(0, len(ids), batch_size):
+            try:
+                batch = ids[i:i + batch_size]
+                data = []
+                for id in batch:
+                    data_object = {}
+                    data_object[external_id] = id
+                    data_object[flag_name] = value
+                    data.append(data_object)
+                self.pushBulk(object=object_name, data=data, id_name=external_id)
+
+            except Exception as e:
+                logger.error("Failure to flag fields")
+                raise
+
+
 
     # get all data from an object given the reference and ids
     def get_object_data(self, object_name, contact_ref, contact_ids):
@@ -216,7 +251,7 @@ class HarvardSalesforce:
             data.append(obj)
 
         responses = self.sf.bulk.__getattr__(object).upsert(data, external_id_field=id_type)
-        logger.info(responses)
+        logger.warn(responses)
 
         for response in responses:
             if(response['success'] != True):
@@ -389,6 +424,11 @@ class HarvardSalesforce:
             except ValueError as e:
                 logger.error(f"Error converting {object}.{field} ({value}) to double/float: {e}. Identifier: {identifier}")
                 return None
+        elif field_type in ["boolean"]:
+            try:
+                return value in [True, False]
+            except ValueError as e:
+                logger.error(f"Error: field {field} is a boolean, must be True or False. Tried value: {value}")
         else:
             logger.error(f"Error: unhandled field_type: {field_type}. Please check config and target Salesforce instance")
             return None
@@ -510,17 +550,17 @@ class HarvardSalesforce:
                 for field in object_fields:
                     if field['name'] == field_name:
                         field_exists = True
-                        if field['type'] == 'string':
-                            logger.info(f"{field_name} exists and is of type string")
+                        if field['level'] == 'string':
+                            logger.debug(f"{field_name} exists and is of type string")
                         else:
-                            logger.info(f"{field_name} exists but is not of type string")
+                            logger.debug(f"{field_name} exists but is not of type string")
                         break
             if not field_exists:
-                logger.info(f"{field_name} does not exist")
+                logger.warn(f"{field_name} does not exist")
                 return False
             return True
         else:
-            logger.info(f"{object_name} does not exist")
+            logger.warn(f"{object_name} does not exist")
             return False
 
 

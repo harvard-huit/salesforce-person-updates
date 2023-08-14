@@ -117,6 +117,15 @@ class SalesforceTransformer:
                                 value_references = [source_object['value']]
                             if 'when' in source_object:
                                 when = source_object['when']
+                            if 'static' in source_object:
+                                # if it's a static value, just record the value in the current record and move on
+                                # it's going to be the same value all the way through 
+                                if source_object['static'] == True:
+                                    value = source_object['value']
+                                    if object_name not in current_record:
+                                        current_record[object_name] = {}
+                                    current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value, identifier=source_data_object)
+                                    continue
                         elif isinstance(source_object, (str)):
                             value_references = [source_object]
 
@@ -150,7 +159,7 @@ class SalesforceTransformer:
                                             current_record[object_name] = {}
                                         current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value, identifier=source_data_object)
                                     else:
-                                        logger.warn(f"Warning: reference not found in Salesforce object ({first}): identifier: {source_data_object}")
+                                        # logger.warn(f"Warning: reference not found in Salesforce object ({first})")
                                         skip_object = True
                                 else:
                                     pass
