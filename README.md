@@ -2,6 +2,7 @@
 
 The salesforce-person-updates project pushes person data from the PDS to the specified Salesforce instance. 
 
+This is coupled loosely with / build alongside the [HUD Salesforce Package](https://github.huit.harvard.edu/HUIT/salesforce-harvard-data-package).
 
 ## Development Notes
 
