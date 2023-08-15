@@ -15,11 +15,16 @@ TODO: link to the PDS request form
 
 A sandbox or development or scratch Salesforce instance and an admin-level integration user. 
 
-### .env file
+### Environment Options
+
+#### .env file
 
 A `.env` file is the best way to work on this locally. Otherwise you'll need to have the data in an accessible dynamo table + secrets manager.  
 
-A local file would look like:
+<details>
+<summary>
+A local file would look like this
+</summary>
 ```
 LOCAL="True"
 STACK="developer"
@@ -39,20 +44,30 @@ SF_SECURITY_TOKEN="<your token>"
 # DEPARTMENT_WATERMARK="2023-05-23 00:00:00"
 
 action="single-person-update"
-person_ids='["80719647"]'
+person_ids=["80719647"]
 # action="full-person-load"
-
 ```
+</details>
 
  - `LOCAL` being "True" makes use of the example files and not dynamo+Secrets Manager
 
  - `STACK` being `"developer"` skips ECS checks.
 
- - `DEBUG` will set the logging level to debug. There's a lot there though. 
+ - `DEBUG` will set the logging level to debug. There's a lot there though so in general, you'll want this set to `False` (or unset). (This can be enabled on specific runs though to help find issues.)
 
  - You only need `SF_SECURITY_TOKEN` OR `SF_CLIENT_KEY` and `SF_CLIENT_SECRET`
 
  - `PERSON_WATERMARK` and `DEPARTMENT_WATERMARK` need to be of the format "YYYY-MM-DD HH:MM:SS", but they are optional, without them, they default to 1 day ago. 
+
+#### Using Configurations in AWS Dynamo
+
+If you have access and a configuration defined in DynamoDB, you can reference it with these environment variables:
+ - `SALESFORCE_INSTANCE_ID` (example: `huit-full-sandbox`)
+ - `TABLE_NAME` (example: `aais-services-salesforce-person-updates-dev`)
+
+To use this, you must ensure the `LOCAL` env var is not set to `True` (or is unset).
+
+(The only other environment variable strictly needed in addition to these is `STACK`) 
 
 ### Actions
 
@@ -64,20 +79,65 @@ Possible actions:
 
  - `full-person-load` this one doesn't require anything additional and just uses the existing `pds_query`
 
- - `person-updates` this one uses the person watermark
+ - `person-updates` this one uses the person watermark and will find updates to send along
 
  - `full-department-load` this one doesn't require anything additonal and just uses the full department list
 
  - `department-updates` this one uses the department watermark
+
+ - `mark-not-updated` this one will check the ids (`eppn`s) in the Salesforce instance against those that can be queried (with the instance's PDS key). Ids that are not queryable are not being updated by this system and are marked by the "HUIT Updated" (`huit__Updated__c`) flag.
+
+Local-only actions:
+
+ - `delete-people` similar to `single-person-update` it can take a list of Ids and will (soft) delete them. This has no real-world application, but is useful in development / debugging.
+ - `compare` this one requires a list of Ids and another Salesforce Instance (usually a production instance) that it will compare records against. The environment variables for the other instance should be in the following env vars:
+   - `SF_USERNAME2` (example `integration_uds@harvard.edu`)
+   - `SF_PASSWORD2` (example ... ah ah ah, almost got me!)
+   - `SF_DOMAIN2` (example `test`/`login` (or unset for production))
+   - `SF_CLIENT_KEY2` (example `?????????.???????????????????????.??????????????????==`)
+   - `SF_CLIENT_SECRET2` (example `??????????????????????????????????????????????????????`)
+   - `SF_SECURITY_TOKEN2` (example `????????????????????`)
+     - (again, only a token OR client key/secret are required)
+
 
 
 ## Dynamo Table
 
 An export of a valid (at the time of writing this) dynamo entry in the table can be found here in the root of this repository. 
 
-## TODO: Deployment Notes
+## Deployment Notes
+
+Building and deployment will be done through Github Actions.
+
+### Build Action
+
+A build will take the code on the dev branch and assign it to a version tag. This image is then pushed to Artifactory.
+
+The pattern being used here is `v0.0.0` for production images and `v0.0.0-dev` for beta/test versions. 
+
+### Deploy Task Definition Action
+
+A deploy action will push / update a task definition for a specific environment. It will assign a version tag to an environment. Please note this does not run anything, it just prepares the environment to be able to run. 
+
+## Running
+
+Running this application can be done a few ways. The two main ways are one-off runs (from Github Actions) and scheduled tasks. 
+
+### Github Action Runs
+
+A "run" will trigger from the Github Actions, but the action does not (can not?) report on success. In order to see that, you must (currently) look at the Splunk (or Salesforce) logs. 
+
+ - **Spot Update**: this will run the `single-update-action` action given a comma separated list of ids (huids).
+ - **Full Data Load**: this will run the `full-person-load` action. It will take some time. 
 
 
+## Splunk Logs
+
+Logs can be found on the HUIT Splunk instance: `https://harvard.splunkcloud.com/en-US/app/CADM_HUIT_AdminTS_AAIS/search`
+
+Some useful queries:
+ - **All logs**: `index="huit-admints-aais-dev" "attrs.APP_NAME"="salesforce-person-updates"`
+ - **Errors**: `index="huit-admints-aais-dev" "attrs.APP_NAME"="salesforce-person-updates" error` (see what I did there?)
 
 ## Notes on simple-salesforce
 
