@@ -22,9 +22,11 @@ A sandbox or development or scratch Salesforce instance and an admin-level integ
 A `.env` file is the best way to work on this locally. Otherwise you'll need to have the data in an accessible dynamo table + secrets manager.  
 
 <details>
+
 <summary>
 A local file would look like this
 </summary>
+
 ```
 LOCAL="True"
 STACK="developer"
@@ -47,6 +49,7 @@ action="single-person-update"
 person_ids=["80719647"]
 # action="full-person-load"
 ```
+
 </details>
 
  - `LOCAL` being "True" makes use of the example files and not dynamo+Secrets Manager
