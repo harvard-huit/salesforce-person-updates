@@ -107,7 +107,6 @@ class SalesforcePersonUpdates:
 
         except Exception as e:
             logger.error(f"Run failed with error: {e}")
-            self.run_log.append(f"Error: Run failed with {e}")
             raise e
 
     # this will make logs come out as json and send logs elsewhere

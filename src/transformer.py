@@ -29,7 +29,7 @@ class SalesforceTransformer:
     def transform(self, source_data, source_name=None, target_object=None, exclude_target_objects=[]):
 
         start_time = datetime.now().strftime('%H:%M:%S')
-        logger.info(f"Starting transfom: {start_time}")
+        logger.debug(f"Starting transfom: {start_time}")
         if target_object is not None:
             source_config = self.getTargetConfig(target_object)
             source_name = source_config[target_object]['source']

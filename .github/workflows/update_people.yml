@@ -59,6 +59,7 @@ jobs:
           echo "account_name=admintsdev" >> $GITHUB_ENV
           echo "security_group=sg-07d8897b8146667d1" >> $GITHUB_ENV
           echo "subnet=subnet-b1d4cac7" >> $GITHUB_ENV
+          echo "table_name=aais-services-salesforce-person-updates-dev" >> $GITHUB_ENV
 
       - name: Set admints environment vars
         if: ${{ github.event.inputs.environment == 'stage' || github.event.inputs.environment == 'prod' }}
@@ -67,6 +68,8 @@ jobs:
           echo "account_name=admints" >> $GITHUB_ENV
           echo "security_group=sg-0d4440255bb6c7b71" >> $GITHUB_ENV
           echo "subnet=subnet-152e3063" >> $GITHUB_ENV
+          echo "table_name=aais-services-salesforce-person-updates-prod" >> $GITHUB_ENV
+
 
       - name: Login to AWS with a service account / iam user
         uses: HUIT/configure-aws-credentials@13d241b293754004c80624b5567555c4a39ffbe3
@@ -94,7 +97,7 @@ jobs:
                   "value": "${{ github.event.inputs.salesforce_instance_id }}"
                 }, {
                   "name": "TABLE_NAME", 
-                  "value": "aais-services-salesforce-person-updates-${{ github.event.inputs.environment }}"
+                  "value": "${{ github.env.table_name }}"
                 }, {
                   "name": "action", 
                   "value": "single-person-update"
