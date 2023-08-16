@@ -64,7 +64,7 @@ class AppConfig():
         self.dept_apikey = None
 
         # for updates, this is what we'll use for updating the watermark
-        self.starting_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        self.starting_timestamp = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
 
         # if it's local, we try and populate all of the values from environment variables
         if self.local:
@@ -89,12 +89,12 @@ class AppConfig():
             one_day_ago = datetime.now() - timedelta(days=1)
             person_watermark_env = os.getenv('PERSON_WATERMARK') or False
             if person_watermark_env:
-                person_watermark = datetime.strptime(person_watermark_env, '%Y-%m-%d %H:%M:%S').date()
+                person_watermark = datetime.strptime(person_watermark_env, '%Y-%m-%dT%H:%M:%S').date()
             else:
                 person_watermark = one_day_ago
             department_watermark_env = os.getenv('DEPARTMENT_WATERMARK') or False
             if department_watermark_env:
-                department_watermark = datetime.strptime(department_watermark_env, '%Y-%m-%d %H:%M:%S').date()
+                department_watermark = datetime.strptime(department_watermark_env, '%Y-%m-%dT%H:%M:%S').date()
             else:
                 department_watermark = one_day_ago
             self.watermarks = {
@@ -133,7 +133,7 @@ class AppConfig():
                 #   this will also throw an error if the format is wrong on the watermark
                 datetime_watermarks = {}
                 for index, watermark in self.watermarks.items():
-                    datetime_watermarks[index] = datetime.strptime(watermark['S'], '%Y-%m-%d %H:%M:%S').date()
+                    datetime_watermarks[index] = datetime.strptime(watermark['S'], '%Y-%m-%dT%H:%M:%S').date()
                 self.watermarks = datetime_watermarks
 
                 self.config = json.loads(response.get('Item').get('transformation_config').get('S'))
@@ -208,7 +208,7 @@ class AppConfig():
                 if index == watermark_name:
                     string_watermarks[index] = self.starting_timestamp
                 else:
-                    string_watermarks[index] = watermark.strftime('%Y-%m-%d %H:%M:%S')
+                    string_watermarks[index] = watermark.strftime('%Y-%m-%dT%H:%M:%S')
 
             try: 
                 dynamodb = boto3.resource('dynamodb')
