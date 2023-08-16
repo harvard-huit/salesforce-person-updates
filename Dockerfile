@@ -34,6 +34,7 @@ RUN \
 
 # Install Python application and change working directory to it.
 COPY src /opt/app
+COPY config.schema.json /opt/app
 WORKDIR /opt/app
 
 
