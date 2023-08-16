@@ -30,7 +30,10 @@ if stack == 'developer':
 
 #### Collect action directive ######
 action = os.getenv("action") or None
-person_ids = json.loads(os.getenv("person_ids")) or []
+if os.getenv("person_ids"):
+    person_ids = json.loads(os.getenv("person_ids"))
+else:
+    person_ids = []
 ####################################
 
 class SalesforcePersonUpdates:
