@@ -114,7 +114,7 @@ jobs:
       - name: Run ${{ github.event.inputs.environment }} spot update on [${{ github.event.inputs.people }}]
         run: |
           aws ecs run-task \
-            --cluster aais-ecs-${{ github.event.inputs.environment }}-cluster \
+            --cluster aais-services-${{ github.event.inputs.environment }}-cluster \
             --overrides '{"containerOverrides": ${{ env.CONTAINER_OVERRIDES }} }' \
             --task-definition arn:aws:ecs:us-east-1:${{ env.account }}:task-definition/aais-services-${{ github.event.inputs.environment }}-feed-salesforce-person-updates${{ env.task_version }} \
             --network-configuration '{ "awsvpcConfiguration": { "assignPublicIp":"DISABLED", "securityGroups": ["${{ env.security_group }}"], "subnets": ["${{ env.subnet }}"]}}' \

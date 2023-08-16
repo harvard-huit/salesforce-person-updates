@@ -97,7 +97,7 @@ jobs:
       - name: run ${{ env.account_name }} ${{ github.event.inputs.environment }} spot update
         run: |
           aws ecs run-task \
-            --cluster aais-ecs-${{ github.event.inputs.environment }}-cluster \
+            --cluster aais-services-${{ github.event.inputs.environment }}-cluster \
             --overrides '{"containerOverrides": [ {"name": "aais-services-${{ github.event.inputs.environment }}-feed-salesforce-person-updates", "environment": [ {"name": "SALESFORCE_INSTANCE_ID", "value": "${{ github.event.inputs.salesforce_instance_id }}"}, {"name": "action", "value": "full-person-load"}] } ] }' \
             --task-definition arn:aws:ecs:us-east-1:${{ env.account }}:task-definition/aais-services-${{ github.event.inputs.environment }}-feed-salesforce-person-updates${{ env.task_version }} \
             --network-configuration '{ "awsvpcConfiguration": { "assignPublicIp":"DISABLED", "securityGroups": ["${{ env.security_group }}"], "subnets": ["${{ env.subnet }}"]}}' \
