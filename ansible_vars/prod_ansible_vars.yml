@@ -23,7 +23,7 @@ target_app_name: "salesforce-person-updates"
 
 target_container_image: "artifactory.huit.harvard.edu/ats-docker/salesforce-person-updates"
 
-target_container_credentials: "arn:aws:secretsmanager:us-east-1:001980101248:secret:aais-services-artifactory-creds-sEMlXO"
+target_container_credentials: "arn:aws:secretsmanager:us-east-1:949726781110:secret:aais-services-prod-artifactory-creds-BVDDOX"
 target_container_host: "artifactory.huit.harvard.edu:443"
 
 target_launchtype: "FARGATE"
