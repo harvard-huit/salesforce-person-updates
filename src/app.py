@@ -36,7 +36,7 @@ person_ids = json.loads(os.getenv("person_ids")) or []
 class SalesforcePersonUpdates:
     def __init__(self):
         try:
-            if(stack != "developer"):
+            if(stack != "developer" and False):
                 # NOTE: this doesn't work / make sense as is
                 #       this also needs to check if it's running on a particular SF instance
                 logger.info("Checking if task is already running")
@@ -64,8 +64,8 @@ class SalesforcePersonUpdates:
                 username = self.app_config.salesforce_username,
                 password = self.app_config.salesforce_password,
                 token = self.app_config.salesforce_token,
-                consumer_key = self.app_config.salesforce_token,
-                consumer_secret = self.app_config.salesforce_token
+                consumer_key = self.app_config.salesforce_client_key,
+                consumer_secret = self.app_config.salesforce_client_secret
             )
 
             second_salesforce_username = os.getenv('SF_USERNAME2', None)
