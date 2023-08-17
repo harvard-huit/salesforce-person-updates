@@ -291,7 +291,7 @@ class SalesforcePersonUpdates:
             watermark = self.app_config.watermarks['person']
 
         pds_query = self.app_config.pds_query
-        pds_query['conditions']['updateDate'] = ">" + watermark.strftime('%Y-%m-%d %H:%M:%S')
+        pds_query['conditions']['updateDate'] = ">" + watermark.strftime('%Y-%m-%dT%H:%M:%S')
         self.people_data_load(pds_query=pds_query)
 
         self.app_config.update_watermark("person")
