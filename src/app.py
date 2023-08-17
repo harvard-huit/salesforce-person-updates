@@ -324,7 +324,6 @@ class SalesforcePersonUpdates:
         if not dry_run:
             self.process_people_batch(people)
         logger.info(f"Finished batch {count}: {tally_count} of {total_count} at {current_time}")
-        tally_count += current_count
 
         
         while(True):
