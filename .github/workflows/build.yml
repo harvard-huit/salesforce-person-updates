@@ -3,7 +3,7 @@ on:
   push:
     branches: [ dev ]
     paths: 
-        - 'src/'
+        - 'src/**'
         - 'config.schema.json'
         - 'Dockerfile'
         - 'gunicorn.sh'
