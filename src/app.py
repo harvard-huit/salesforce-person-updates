@@ -319,21 +319,28 @@ class SalesforcePersonUpdates:
 
         count = 1
         current_time = datetime.now().strftime('%H:%M:%S')
-        logger.info(f"Starting batch {count}: {current_time}")
+        logger.debug(f"Starting batch {count}: {current_time}")
 
         if not dry_run:
             self.process_people_batch(people)
-        logger.info(f"Finished batch {count}: {tally_count} of {total_count} at {current_time}")
+        logger.info(f"Finished batch {count}: {tally_count} of {total_count}")
 
-        
+        max_count = (total_count / size)
+
         while(True):
             response = self.pds.next()
             count += 1
+
+            # this should trigger if response is None or {}, which is what happens when pagination finishes.
             if not response:
                 break
 
+            if response['total_count'] != total_count:
+                logger.error(f"Something went wrong with PDS pagination. Total counts changed from {total_count} to {response['total_count']}")
+                raise
+
             current_time = datetime.now().strftime('%H:%M:%S')
-            logger.info(f"Starting batch {count}: {current_time}")
+            logger.debug(f"Starting batch {count}: {current_time}")
 
             results = response['results']
             people = self.pds.make_people(results)
@@ -342,13 +349,17 @@ class SalesforcePersonUpdates:
             current_count = response['count']
 
             current_time = datetime.now().strftime('%H:%M:%S')
-            logger.info(f"Finished batch {count}: {tally_count} of {total_count} at {current_time}")
+            logger.info(f"Finished batch {count}: {tally_count} of {total_count}")
             tally_count += current_count
+
+            if count > (max_count + 5):
+                logger.error(f"Something probably went wrong with the batching. Max estimated batch number ({max_count}) exceeded.")
+                raise Exception(f"estimated max_count: {max_count}, batch_size: {size}, batch number (count): {count}, total_count: {total_count}")
         
         if tally_count != total_count:
             raise Exception(f"Error: PDS failed to retrieve all records")
         else:
-            logger.info(f"successfully finished full data load in ")
+            logger.info(f"successfully finished data load: {self.run_id}")
 
     # This is not intended for much use.
     def delete_people(self, dry_run: bool=True, huids: list=[]):
@@ -384,25 +395,29 @@ class SalesforcePersonUpdates:
         logger.info(f"Done")
 
     def check_updateds(self):
+
         # 1. Get all (external) IDs from Salesforce
         object_name = 'Contact'
-        external_id = 'HUDA__hud_EPPN__c'
+        # get the external id we're using in the config for this org
+        external_id = self.app_config.config['Contact']['Id']['salesforce']
+        pds_id = self.app_config.config['Contact']['Id']['pds']
         all_sf_ids = self.hsf.get_all_external_ids(object_name=object_name, external_id=external_id)
         
         # 2. Call PDS with those IDs
 
-        # we only need to know if these are getttable, it doesn't matter what other fields or conditions are in the provided query
+        # we only need to know if these are getttable, 
+        #   it doesn't matter what other fields or conditions are in the provided query
         pds_query = {}
-        pds_query['fields'] = ['eppn']
+        pds_query['fields'] = [pds_id]
         pds_query['conditions'] = {}
-        pds_query['conditions']['eppn'] = all_sf_ids
+        pds_query['conditions'][pds_id] = all_sf_ids
 
         people = self.pds.get_people(pds_query)
 
         # make it a list
         all_pds_ids = []
         for person in people:
-            all_pds_ids.append(person['eppn'])
+            all_pds_ids.append(person[pds_id])
         
         logger.debug(f"All PDS ids: {all_pds_ids}")
 
@@ -411,7 +426,7 @@ class SalesforcePersonUpdates:
         not_updating_ids = [item for item in all_sf_ids if item not in all_pds_ids]
         not_updating_ids.append('2940935f3b990174')
 
-        logger.info(f"These ids ({external_id}) are no longer being updated: {not_updating_ids}")
+        logger.info(f"These ids ({external_id}) are no longer being updated: {not_updating_ids}. These have been marked as no longer updated.")
 
         # 4. Mark the ones that don't show up
         self.hsf.flag_field(object_name=object_name, external_id=external_id, flag_name='huit__Updated__c', value=False, ids=not_updating_ids)
