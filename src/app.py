@@ -357,9 +357,10 @@ class SalesforcePersonUpdates:
                 raise Exception(f"estimated max_count: {max_count}, batch_size: {size}, batch number (count): {count}, total_count: {total_count}")
         
         if tally_count != total_count:
+            logger.error(f"PDS failed to retrieve all records ({tally_count} != {total_count})")
             raise Exception(f"Error: PDS failed to retrieve all records")
         else:
-            logger.info(f"successfully finished data load: {self.run_id}")
+            logger.info(f"Successfully finished data load: {self.run_id}")
 
     # This is not intended for much use.
     def delete_people(self, dry_run: bool=True, huids: list=[]):
@@ -392,7 +393,7 @@ class SalesforcePersonUpdates:
             if not dry_run:
                 self.hsf.delete_records(object_name=object_name, ids=ids)
 
-        logger.info(f"Done")
+        logger.info(f"Delete Done, I hope you meant to do that.")
 
     def check_updateds(self):
 
@@ -516,12 +517,10 @@ elif action == 'compare':
 elif action == 'test':
     # this action is for testing
     logger.info("test action called")
-
-
-    logger.info("done test")
+    logger.info("done test action")
 
 else: 
-    logger.warning(f"Warning: app triggered without a valid action: {action}")
+    logger.warning(f"Warning: app triggered without a valid action: {action}, please see documentation for more information.")
 
 
 
