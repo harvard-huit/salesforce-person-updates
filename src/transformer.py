@@ -302,14 +302,7 @@ class SalesforceTransformer:
                                     source_pieces = source_pieces[1:]
                                 else:
                                     branch_temp = source_data_object
-                            if source_pieces[0] in branch_temp:
-                                logger.debug(f"  {source_pieces[0]} in branch")
-                                if len(source_pieces) == 1:
-                                    value = branch_temp[source_pieces[0]]
-                                elif len(source_pieces) == 2:
-                                    if source_pieces[1] in branch_temp[source_pieces[0]]:
-                                        value = branch_temp[source_pieces[0]][source_pieces[1]]
-                                current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value, identifier=source_data_object)
+
                             if source_pieces[0] == 'sf':
                                 source_pieces = source_pieces[1:]
                                 if source_pieces[0] in salesforce_person:
@@ -318,6 +311,18 @@ class SalesforceTransformer:
                                     elif isinstance(salesforce_person, dict) and len(source_pieces) == 2:
                                         value = salesforce_person[source_pieces[0]][source_pieces[1]]
                                     current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value, identifier=source_data_object)
+                                    break
+                                
+                            if source_pieces[0] in branch_temp:
+                                logger.debug(f"  {source_pieces[0]} in branch")
+                                if len(source_pieces) == 1:
+                                    value = branch_temp[source_pieces[0]]
+                                elif len(source_pieces) == 2:
+                                    if source_pieces[1] in branch_temp[source_pieces[0]]:
+                                        value = branch_temp[source_pieces[0]][source_pieces[1]]
+                                current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value, identifier=source_data_object)
+                                # break out of the sources, we already found the one for this target
+                                break
 
                         # logger.warn(f"Warning: unable to find valid source: ({source})")
                     good_records.append(current_record[object_name])
@@ -337,9 +342,13 @@ class SalesforceTransformer:
                         yield { object_name: current_record[object_name] }
                     else:
                         # data[object_name] = good_records
+                        
                         for good_record in good_records:
-                            yield { object_name: good_record }
-            
+                            if good_record[salesforce_id_name]:
+                                yield { object_name: good_record }
+                            else:
+                                logger.error(f"Problem processing {object_name} record, required external id not found: {good_record}")
+                                raise Exception(f"Problem processing {object_name} record, required external id not found: {good_record}")
         time_now = datetime.now().strftime('%H:%M:%S')
         logger.debug(f"Transform finished: {start_time} -> {time_now}")
 

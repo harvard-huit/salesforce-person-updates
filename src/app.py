@@ -434,12 +434,12 @@ class SalesforcePersonUpdates:
 
     
 
-
-
 sfpu = SalesforcePersonUpdates()
-# if not os.getenv("LOCAL"):
-#     logger = sfpu.setup_logging(logger=logger)
-logger = sfpu.setup_logging(logger=logger)
+
+# We don't need to set up the logging to salesforce if we're running locally
+#  unless we're testing that
+if not os.getenv("LOCAL"):
+    logger = sfpu.setup_logging(logger=logger)
 
 if action == 'single-person-update' and len(person_ids) > 0:
     sfpu.update_single_person(person_ids)
