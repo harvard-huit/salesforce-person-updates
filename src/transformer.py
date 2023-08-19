@@ -292,8 +292,8 @@ class SalesforceTransformer:
                             source_pieces = source.split(".")
 
                             # this might be needed for affiliations? (removing temporarily to get non-branch values in)
-                            # if source_pieces[0] not in [branch_name, 'sf']:
-                            #     continue
+                            if source_pieces[0] not in [branch_name, 'sf']:
+                                continue
                             
                             branch_temp = branch
                             if source_pieces[0] in source_data_object:
@@ -312,7 +312,7 @@ class SalesforceTransformer:
                                         value = salesforce_person[source_pieces[0]][source_pieces[1]]
                                     current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value, identifier=source_data_object)
                                     break
-                                
+
                             if source_pieces[0] in branch_temp:
                                 logger.debug(f"  {source_pieces[0]} in branch")
                                 if len(source_pieces) == 1:
@@ -320,6 +320,10 @@ class SalesforceTransformer:
                                 elif len(source_pieces) == 2:
                                     if source_pieces[1] in branch_temp[source_pieces[0]]:
                                         value = branch_temp[source_pieces[0]][source_pieces[1]]
+                                else:
+                                    current_record[object_name][target] = None
+                                    continue
+
                                 current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value, identifier=source_data_object)
                                 # break out of the sources, we already found the one for this target
                                 break
