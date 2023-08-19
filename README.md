@@ -77,7 +77,7 @@ To use this, you must ensure the `LOCAL` env var is not set to `True` (or is uns
 
 What is done is controlled by environment variables sent in to the app (through task definition overrides). 
 
-Possible actions:
+#### Possible actions:
 
  - `single-person-update` requires an additional `person_ids` of the format "['huid', 'huid', 'huid']" so like, it actually does more than one, but let's say it's a single list? 
 
@@ -91,7 +91,7 @@ Possible actions:
 
  - `mark-not-updated` this one will check the ids (`eppn`s) in the Salesforce instance against those that can be queried (with the instance's PDS key). Ids that are not queryable are not being updated by this system and are marked by the "HUIT Updated" (`huit__Updated__c`) flag.
 
-Local-only actions:
+#### Local-only actions:
 
  - `delete-people` similar to `single-person-update` it can take a list of Ids and will (soft) delete them. This has no real-world application, but is useful in development / debugging.
  - `compare` this one requires a list of Ids and another Salesforce Instance (usually a production instance) that it will compare records against. The environment variables for the other instance should be in the following env vars:
@@ -108,6 +108,68 @@ Local-only actions:
 ## Dynamo Table
 
 An export of a valid (at the time of writing this) dynamo entry in the table can be found here in the root of this repository. 
+
+The dynamo table includes a configuration, a pds query, and references to credentials stored in secrets manager. 
+
+### Configuration
+
+The configuration is the heart of this application. Each Salesforce instance will have its own configuration that will map fields from the PDS (and departments (and potentially other data sources)) to Objects in Salesforce. 
+
+#### `source`
+
+This defines which data set we're making use of for this object. For example, `departments` or `pds`.
+
+#### `flat`
+
+This helps visually and programatically identify which Objects will be 1:1 and which will be flattened. An example of a "flat" Object would be `Contact`. 
+
+#### `Id`
+
+The most important fields of an object are the `external id` we're using to confirm uniqueness. An Object in Salesforce needs to have an external id that will be unique/have meaning to the source system. (For example, a person role key or an eppn). This is what ensures that we update the appropriate records. 
+
+The `Id` field in the config maps the external id field name in Salesforce to the external id field name in the source system. 
+
+#### `when` conditional
+
+There will be times when we have 2 values for a single field. For instance, a `Contact` record can only have one primary last name, but the PDS can return many. We could limit the names coming in by pearing down the PDS query, but they might also want all names pushed into another Object. In the HUDA implementation, this was the pre-defined `HUDA__hud_Names__c` Object. To handle this, a `when` operator was implemented to help control what gets populated in a flattened data set. 
+
+##### default when
+
+When we have multiple values for the same target field, sometimes we can't know if we'll get one, even with a defined `when`. For example, if we're looking for the email that has the `primaryEmailIndicator` set, because we don't have any kind of real MDM, we need to make a decision. As such, the default when is the value that has the latest updated date associated with it. 
+
+#### `sf.*` References
+
+The `sf` reference identifies source data that comes from Salesforce itself. This is necessary for gathering and defining reference fields. For example, relationship objects will have a reference to a `Contact` record. A query is done before relationship objects are processed to create a mapping of existing Contacts and the relationship fields they have. This is built from the `Id`s associated with the mapping. When a `Contact` reference is not found, it means it's a new relationship. 
+
+#### Multiple Potential Sources
+
+One of the more annoying aspects of the transform logic was creating a way for `employeeRoles`, `studentRoles`, and `poiRoles` to be merged into a single Object (`hed__Affiliation`). 
+
+The way this was done was by having a target field be given an array of source fields. This indicates any of those fields would be able to be pushed into the target. 
+
+```
+  "HUDA__hud_PERSON_ROLES_KEY__c": ["employeeRoles.personRoleKey", "poiRoles.personRoleKey", "studentRoles.personRoleKey"],
+  "HUDA__hud_EFF_STATUS__c": ["employeeRoles.effectiveStatus.code", "poiRoles.effectiveStatus.code", "studentRoles.effectiveStatus.code"],
+  "HUDA__hud_EFFDT__c": ["employeeRoles.effectiveDate", "poiRoles.effectiveDate", "studentRoles.effectiveDate"],
+```
+
+To do this, it needs to loop through all possible values for each source record and if it finds one, uses that one. This was also done to work with the `Id` source fields. 
+
+#### `static` Fields
+
+A field is static when we're not actually getting it from a source, we're just setting it. Currently, the only `static` field in known use is to flag updated records. 
+
+This indicates that that field will have a single, unchanging value. (In this case, huit_Updated__c will always be given the value of `true`).
+```js
+  "fields": {
+      "huit__Updated__c": {
+          "value": true,
+          "static": true
+      },
+```
+
+
+
 
 ## Deployment Notes
 
