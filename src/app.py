@@ -10,14 +10,14 @@ import threading
 import json
 import logging
 from datetime import datetime
-if stack == 'developer':
-    from dotenv import load_dotenv
-    load_dotenv() 
 
 #### DEV debugging section #########
 from pprint import pformat
 
 if stack == 'developer':
+    from dotenv import load_dotenv
+    load_dotenv() 
+
     f = open('../example_config.json')
     config = json.load(f)
     f.close()
