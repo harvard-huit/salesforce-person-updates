@@ -4,6 +4,29 @@ The salesforce-person-updates project pushes person data from the PDS to the spe
 
 This is coupled loosely with / build alongside the [HUD Salesforce Package](https://github.huit.harvard.edu/HUIT/salesforce-harvard-data-package).
 
+## Features
+
+ - Fully customizable data delivery
+   - giving the customers what they want where they want it
+   - each customer will have their own data transformation configuration
+   - get as much or as little data as each customer wants
+   - this was the main feature this project is delivering on
+   - ability to flatten (or unflatten) data as needed
+ - Log transparency 
+   - when python throws a log, it is mirrored in the system (assuming they have the HUD package installed)
+ - Mark records that are no longer being updated via this system
+   - Currently natively supporting `Contact`
+   - Can be configured (a flag field can be manually added to the desired object and declared in the config)
+ - Significantly better error detection and logging
+ - Automatic duplicate resolution
+   - detecting and dealing with duplicates 
+   - duplicates are logged and proactively prevented when possible
+ - Data validation
+   - nothing gets pushed to Salesforce before being validated against the data model it's pushing to
+ - Data agnostic
+   - we're not just limited to PDS and Departments data
+   - if we want to add another data source, assuming we can get it as reasonably clean json, we can
+
 ## Development Notes
 
 In order to run this locally, you'll need: 
