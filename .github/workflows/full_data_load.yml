@@ -97,7 +97,7 @@ jobs:
                   "value": "full-person-load"
                 }, {
                   "name": "batch_size", 
-                  "value": 200
+                  "value": "200"
                 }
               ]
             } 
