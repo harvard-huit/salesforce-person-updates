@@ -1,4 +1,6 @@
 name: Deploy Task Definition
+run-name: Deploying ${{ github.event.inputs.version }} to ${{ github.event.inputs.environment }}
+
 on:
   # push:
   #   branches: [ dev ]

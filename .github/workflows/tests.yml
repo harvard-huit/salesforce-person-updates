@@ -1,4 +1,6 @@
 name: Unit Tests
+run-name: Unit Testing ${{ github.ref_name }}
+
 on:
   workflow_dispatch:
   push:

@@ -1,4 +1,5 @@
 name: Full Data Load
+run-name: Full data load on ${{ github.event.inputs.environment }} for ${{ github.event.inputs.salesforce_instance_id }}
 
 on:
   workflow_dispatch:
@@ -25,8 +26,6 @@ env:
 defaults:
   run:
     shell: bash
-
-run-name: Full data load on ${{ github.event.inputs.environment }} for ${{ github.event.inputs.salesforce_instance_id }}
 
 jobs:
   data_load: 

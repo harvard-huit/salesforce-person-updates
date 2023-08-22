@@ -1,4 +1,5 @@
 name: Spot Data Update
+run-name: Spot data update on ${{ github.event.inputs.environment }} for ${{ github.event.inputs.people }}
 
 on:
   workflow_dispatch:
@@ -27,8 +28,6 @@ on:
         required: false
         default: ''
         
-        
-
 env:
   AWS_REGION: us-east-1
 
