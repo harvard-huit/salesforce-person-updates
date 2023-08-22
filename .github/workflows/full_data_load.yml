@@ -18,7 +18,15 @@ on:
         type: string
         required: true
         default: 'huit-full-sandbox'
-        
+      cpu:
+        type: number
+        required: true
+        default: 1024
+      memory:
+        type: number
+        required: false
+        default: 2048
+              
 
 env:
   AWS_REGION: us-east-1
@@ -84,8 +92,8 @@ jobs:
           CONTAINER_OVERRIDES='[ 
             {
               "name": "aais-services-${{ github.event.inputs.environment }}-feed-salesforce-person-updates", 
-              "cpu": 4096,
-              "memory": 8192,
+              "cpu": ${{ github.event.inputs.cpu }},
+              "memory": ${{ github.event.inputs.memory }},
               "environment": [ 
                 {
                   "name": "SALESFORCE_INSTANCE_ID", 
