@@ -34,6 +34,8 @@ if os.getenv("person_ids"):
     person_ids = json.loads(os.getenv("person_ids"))
 else:
     person_ids = []
+
+batch_size_override = os.getenv("batch_size") or None
 ####################################
 
 class SalesforcePersonUpdates:
@@ -96,7 +98,11 @@ class SalesforcePersonUpdates:
 
             # self.pds_apikey = os.getenv("PDS_APIKEY")
             # initialize pds
-            self.pds = pds.People(apikey=self.app_config.pds_apikey, batch_size=500)
+            if batch_size_override:
+                batch_size = int(batch_size_override)
+            else:
+                batch_size = 500
+            self.pds = pds.People(apikey=self.app_config.pds_apikey, batch_size=batch_size)
 
             # TODO: GET list of updated people since watermark 
 
