@@ -26,9 +26,11 @@ defaults:
   run:
     shell: bash
 
+run-name: Full data load on ${{ github.event.inputs.environment }} for ${{ github.event.inputs.salesforce_instance_id }}
+
 jobs:
   data_load: 
-    run-name: Full data load on ${{ github.event.inputs.environment }} for ${{ github.event.inputs.salesforce_instance_id }}
+    name: Full data load on ${{ github.event.inputs.environment }} for ${{ github.event.inputs.salesforce_instance_id }}
     runs-on: [ ubuntu-latest ]
 
     steps:
