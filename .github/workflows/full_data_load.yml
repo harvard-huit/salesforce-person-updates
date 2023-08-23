@@ -18,14 +18,10 @@ on:
         type: string
         required: true
         default: 'huit-full-sandbox'
-      cpu:
-        type: number
-        required: true
-        default: 1024
-      memory:
+      batch_size:
         type: number
         required: false
-        default: 2048
+        default: 500
               
 
 env:
@@ -106,7 +102,7 @@ jobs:
                   "value": "full-person-load"
                 }, {
                   "name": "batch_size", 
-                  "value": "200"
+                  "value": ${{ github.event.inputs.batch_size }}
                 }
               ]
             } 
