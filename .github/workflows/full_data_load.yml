@@ -102,7 +102,7 @@ jobs:
                   "value": "full-person-load"
                 }, {
                   "name": "batch_size", 
-                  "value": ${{ github.event.inputs.batch_size }}
+                  "value": "${{ github.event.inputs.batch_size }}""
                 }
               ]
             } 
