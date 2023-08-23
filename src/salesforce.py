@@ -12,6 +12,8 @@ class HarvardSalesforce:
     def __init__(self, domain, username, password, consumer_key=None, consumer_secret=None, token=None):
         self.domain = domain
         self.username = username
+        # list of job references
+        self.jobs = []
         try: 
             logger.debug(f"Salesforce initializing to {self.domain} as {self.username}")
             if(token is not None):
@@ -51,39 +53,95 @@ class HarvardSalesforce:
     def pushBulk(self, object, data, dupe=False, id_name='Id'):
         logger.debug(f"upsert to {object} with {data}")
 
-        responses = self.sf.bulk.__getattr__(object).upsert(data, external_id_field=id_name)
-        created_count = 0
-        updated_count = 0
-        error_count = 0
-        for index, response in enumerate(responses):
-            if response['success'] != True: 
+        responses = self.sf.bulk.__getattr__(object).upsert(data, external_id_field=id_name, batch_size=5000, use_serial=True, bypass_results=True)
+        logger.info(f"{responses}")
+        for response in responses:
+            if 'job_id' in response:
+                self.jobs.append({
+                    "object": object,
+                    "job_id": response['job_id']
+                })
+            else: 
+                logger.warning(f"Bulk response with no job id: {response}")
+        
+
+
+        # self.log_jobs()
+
+        # created_count = 0
+        # updated_count = 0
+        # error_count = 0
+        # for index, response in enumerate(responses):
+        #     if response['success'] != True: 
                 
-                errored_data = data[index]
-                logger.error(f"Error in bulk data load: {response['errors']} ({errored_data})")
+        #         errored_data = data[index]
+        #         logger.error(f"Error in bulk data load: {response['errors']} ({errored_data})")
 
-                if response['errors'][0]['statusCode'] == 'DUPLICATES_DETECTED':
+        #         if response['errors'][0]['statusCode'] == 'DUPLICATES_DETECTED':
 
-                    if dupe:
-                        logger.error(f"Error: DUPLICATE DETECTED (unresoved): {errored_data}")
-                    else:
-                        logger.error(f"Error: DUPLICATE DETECTED -- Errored Data: {errored_data}")
-                        if self.check_duplicate(object, errored_data):
-                            error_count -= 1
-                error_count += 1
-            else:
-                if response['created']:
-                    created_count += 1
-                else:
-                    updated_count += 1
-                logger.debug(response)
-        if updated_count > 0:
-            logger.info(f"Updated {object} Records: {updated_count}")
-        if created_count > 0:
-            logger.info(f"Created {object} Records: {created_count}")
-        if error_count > 0:
-            logger.info(f"Errored {object} Records: {error_count}")
+        #             if dupe:
+        #                 logger.error(f"Error: DUPLICATE DETECTED (unresoved): {errored_data}")
+        #             else:
+        #                 logger.error(f"Error: DUPLICATE DETECTED -- Errored Data: {errored_data}")
+        #                 if self.check_duplicate(object, errored_data):
+        #                     error_count -= 1
+        #         error_count += 1
+        #     else:
+        #         if response['created']:
+        #             created_count += 1
+        #         else:
+        #             updated_count += 1
+        #         logger.debug(response)
+        # if updated_count > 0:
+        #     logger.info(f"Updated {object} Records: {updated_count}")
+        # if created_count > 0:
+        #     logger.info(f"Created {object} Records: {created_count}")
+        # if error_count > 0:
+        #     logger.info(f"Errored {object} Records: {error_count}")
         return True
     
+    # this will check for outstanding jobs and log them if they're done
+    def log_jobs(self):
+        pass
+        # if len(self.jobs) > 0:
+        #     job_id_string = [job['job_id'] for job in self.jobs]
+        #     sf_data = self.sf.query_all(f"SELECT Id, Status, JobType, CreatedBy.Name, CreatedDate, CompletedDate, NumberOfErrors FROM AsyncApexJob WHERE Id IN({job_id_string})")
+            
+        #     for job in sf_data:
+        #         logger.info(job['Status'])
+
+
+        # created_count = 0
+        # updated_count = 0
+        # error_count = 0
+        # for index, response in enumerate(responses):
+        #     if response['success'] != True: 
+                
+        #         errored_data = data[index]
+        #         logger.error(f"Error in bulk data load: {response['errors']} ({errored_data})")
+
+        #         if response['errors'][0]['statusCode'] == 'DUPLICATES_DETECTED':
+
+        #             if dupe:
+        #                 logger.error(f"Error: DUPLICATE DETECTED (unresoved): {errored_data}")
+        #             else:
+        #                 logger.error(f"Error: DUPLICATE DETECTED -- Errored Data: {errored_data}")
+        #                 if self.check_duplicate(object, errored_data):
+        #                     error_count -= 1
+        #         error_count += 1
+        #     else:
+        #         if response['created']:
+        #             created_count += 1
+        #         else:
+        #             updated_count += 1
+        #         logger.debug(response)
+        # if updated_count > 0:
+        #     logger.info(f"Updated {object} Records: {updated_count}")
+        # if created_count > 0:
+        #     logger.info(f"Created {object} Records: {created_count}")
+        # if error_count > 0:
+        #     logger.info(f"Errored {object} Records: {error_count}")
+
 
     # this function will return a map of the contact ids to huid
     # NOTE: that there doesn't seem to be a good way to get multiple results without a soql query

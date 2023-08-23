@@ -35,7 +35,7 @@ if os.getenv("person_ids"):
 else:
     person_ids = []
 
-batch_size_override = os.getenv("batch_size") or None
+batch_size_override = os.getenv("BATCH_SIZE") or None
 ####################################
 
 class SalesforcePersonUpdates:
@@ -273,6 +273,8 @@ class SalesforcePersonUpdates:
 
             # unthreaded:
             # self.hsf.pushBulk(object, object_data)    
+            
+            # NOTE: since switching to async bulk calls, threading is probably moot here
 
             thread = threading.Thread(target=self.hsf.pushBulk, args=(object, object_data))
             thread.start()
@@ -523,6 +525,13 @@ elif action == 'compare':
 elif action == 'test':
     # this action is for testing
     logger.info("test action called")
+
+
+    endpoint = "limits"
+    response = sfpu.hsf.sf.restful(endpoint, method='GET')
+    logger.info(response)        
+
+
     logger.info("done test action")
 
 else: 
