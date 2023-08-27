@@ -14,6 +14,7 @@ class HarvardSalesforce:
         self.username = username
         # list of job references
         self.jobs = []
+        self.unique_ids = {}
         try: 
             logger.debug(f"Salesforce initializing to {self.domain} as {self.username}")
             if(token is not None):
@@ -51,64 +52,83 @@ class HarvardSalesforce:
     # a single record will take anywhere from 2-50 seconds
     # dupe: this makes sure we don't keep retrying a dupe check
     def pushBulk(self, object, data, dupe=False, id_name='Id'):
-        logger.debug(f"upsert to {object} with {data}")
+        logger.debug(f"upsert to {object} with {len(data)} records")
 
-        responses = self.sf.bulk.__getattr__(object).upsert(data, external_id_field=id_name, batch_size=5000, use_serial=True, bypass_results=True)
-        logger.info(f"{responses}")
-        for response in responses:
-            if 'job_id' in response:
-                self.jobs.append({
-                    "object": object,
-                    "job_id": response['job_id']
-                })
-            else: 
-                logger.warning(f"Bulk response with no job id: {response}")
+        # responses = self.sf.bulk.__getattr__(object).upsert(data, external_id_field=id_name, batch_size=5000, use_serial=True, bypass_results=True)
+        responses = self.sf.bulk.__getattr__(object).upsert(data, external_id_field=id_name)
+        
+        
+        # logger.info(f"{responses}")
+        # for response in responses:
+        #     if 'job_id' in response:
+        #         self.jobs.append(response['job_id'])
+        #     elif 'bypass_results' not in response:
+        #         logger.warning(f"Bulk response with no job id: {response}")
         
 
 
         # self.log_jobs()
 
-        # created_count = 0
-        # updated_count = 0
-        # error_count = 0
-        # for index, response in enumerate(responses):
-        #     if response['success'] != True: 
+
+        created_count = 0
+        updated_count = 0
+        error_count = 0
+        for index, response in enumerate(responses):
+            if response['success'] != True: 
                 
-        #         errored_data = data[index]
-        #         logger.error(f"Error in bulk data load: {response['errors']} ({errored_data})")
+                errored_data = data[index]
+                logger.error(f"Error in bulk data load: {response['errors']} ({errored_data})")
 
-        #         if response['errors'][0]['statusCode'] == 'DUPLICATES_DETECTED':
+                if response['errors'][0]['statusCode'] == 'DUPLICATES_DETECTED':
 
-        #             if dupe:
-        #                 logger.error(f"Error: DUPLICATE DETECTED (unresoved): {errored_data}")
-        #             else:
-        #                 logger.error(f"Error: DUPLICATE DETECTED -- Errored Data: {errored_data}")
-        #                 if self.check_duplicate(object, errored_data):
-        #                     error_count -= 1
-        #         error_count += 1
-        #     else:
-        #         if response['created']:
-        #             created_count += 1
-        #         else:
-        #             updated_count += 1
-        #         logger.debug(response)
-        # if updated_count > 0:
-        #     logger.info(f"Updated {object} Records: {updated_count}")
-        # if created_count > 0:
-        #     logger.info(f"Created {object} Records: {created_count}")
-        # if error_count > 0:
-        #     logger.info(f"Errored {object} Records: {error_count}")
+                    if dupe:
+                        logger.error(f"Error: DUPLICATE DETECTED (unresoved): {errored_data}")
+                    else:
+                        logger.error(f"Error: DUPLICATE DETECTED -- Errored Data: {errored_data}")
+                        if self.check_duplicate(object, errored_data):
+                            error_count -= 1
+                error_count += 1
+            else:
+                if response['created']:
+                    created_count += 1
+                else:
+                    updated_count += 1
+                logger.debug(response)
+        if updated_count > 0:
+            logger.info(f"Updated {object} Records: {updated_count}")
+        if created_count > 0:
+            logger.info(f"Created {object} Records: {created_count}")
+        if error_count > 0:
+            logger.info(f"Errored {object} Records: {error_count}")
+
+
+
         return True
     
     # this will check for outstanding jobs and log them if they're done
     def log_jobs(self):
-        pass
-        # if len(self.jobs) > 0:
-        #     job_id_string = [job['job_id'] for job in self.jobs]
-        #     sf_data = self.sf.query_all(f"SELECT Id, Status, JobType, CreatedBy.Name, CreatedDate, CompletedDate, NumberOfErrors FROM AsyncApexJob WHERE Id IN({job_id_string})")
+
+
+        # NOTE: this query can get the status, but not results
+        # job_id_string = [job['job_id'] for job in self.jobs]
+        # sf_data = self.sf.query_all(f"SELECT Id, Status, JobType, CreatedBy.Name, CreatedDate, CompletedDate, NumberOfErrors FROM AsyncApexJob WHERE Id IN({job_id_string})")
             
-        #     for job in sf_data:
-        #         logger.info(job['Status'])
+        
+
+        for job in self.jobs:
+            endpoint = "jobs/ingest/" + job['job_id']
+            response = self.sf.restful(endpoint)
+            logger.info("******************************")
+            logger.info(f"object: {response['object']}")
+            logger.info(f"state: {response['state']}")
+            logger.info(f"numberRecordsProcessed: {response['numberRecordsProcessed']}")
+            if int(response['numberRecordsProcessed']) > 0:
+                success_endpoint = f"{endpoint}/successfulResults/"
+                response = self.sf.restful(success_endpoint)
+            logger.info(f"numberRecordsFailed: {response['numberRecordsFailed']}")
+            if response['numberRecordsFailed'] > 0:
+                success_endpoint = f"{endpoint}/failedResults/"
+                response = self.sf.restful(success_endpoint)
 
 
         # created_count = 0
@@ -495,9 +515,7 @@ class HarvardSalesforce:
     # output format should look like:
     #   { "SF OBJECT NAME": { "id_name": "PDS ID NAME", "Ids": { "HARVARD ID": "SALESFORCE ID", ... } } }
     def getUniqueIds(self, config, source_data, target_object=None):
-        
-        if target_object is None or not self.unique_ids:
-            self.unique_ids = {}
+                    
         for object in config.keys():
             if target_object is not None and target_object != object:
                 continue
@@ -507,7 +525,8 @@ class HarvardSalesforce:
             # unique_object_fields.append('FirstName')
             # unique_object_fields.append('LastName')
 
-            self.unique_ids[object] = {}
+            if object not in self.unique_ids:
+                self.unique_ids[object] = {}
 
             if 'Id' in config[object]:
 
@@ -590,7 +609,6 @@ class HarvardSalesforce:
         logger.debug(f"unique_ids: {self.unique_ids}")
         return self.unique_ids
 
-    # TODO: this
     # verify_logging_object
     # makes sure the logging object exists on the target instance
     def verify_logging_object(self):

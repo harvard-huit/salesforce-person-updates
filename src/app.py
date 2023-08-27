@@ -9,7 +9,10 @@ import os
 import threading
 import json
 import logging
+import time
 from datetime import datetime
+
+import requests
 
 #### DEV debugging section #########
 from pprint import pformat
@@ -104,13 +107,10 @@ class SalesforcePersonUpdates:
                 batch_size = 500
             self.pds = pds.People(apikey=self.app_config.pds_apikey, batch_size=batch_size)
 
-            # TODO: GET list of updated people since watermark 
-
-
+            self.batch_threads = []
 
             self.transformer = SalesforceTransformer(config=self.app_config.config, hsf=self.hsf)
 
-            # self.process_people_batch(people)
 
 
 
@@ -220,33 +220,24 @@ class SalesforcePersonUpdates:
             source_data=people
         )
 
+        logger.info(f"Processing {len(people)} Contact records")
         data = {}
-        # data = self.transformer.transform(source_data=people, target_object='Contact')
         data_gen = self.transformer.transform(source_data=people, target_object='Contact')
         for d in data_gen:
-            # logger.info(d)
             for i, v in d.items():
                 if i not in data:
                     data[i] = []
                 data[i].append(v)
 
 
-        time_now = datetime.now().strftime('%H:%M:%S')
-        logger.debug(f"**** Push Contact data to SF:  {time_now}")
         for object, object_data in data.items():
-            logger.debug(f"object: {object}")
-            logger.debug(pformat(object_data))
-
+            logger.info(f"Upserting to {object} with {len(object_data)} records")
             self.hsf.pushBulk(object, object_data)
 
         self.transformer.hashed_ids = self.hsf.getUniqueIds(
             config=self.transformer.getSourceConfig('pds'), 
             source_data=people
         )
-
-
-        time_now = datetime.now().strftime('%H:%M:%S')
-        logger.debug(f"Starting related data: {time_now}")
 
         data = {}
 
@@ -263,25 +254,25 @@ class SalesforcePersonUpdates:
                         data[i] = []
                     data[i].append(v)
 
+        branch_threads = []
 
-        threads = []
-        time_now = datetime.now().strftime('%H:%M:%S')
-        logger.debug(f"**** Push Remaining People data to SF:  {time_now}")
         for object, object_data in data.items():
-            logger.debug(f"object: {object}")
-            logger.debug(pformat(object_data))
+            logger.info(f"Upserting to {object} with {len(object_data)} records")
 
             # unthreaded:
             # self.hsf.pushBulk(object, object_data)    
-            
-            # NOTE: since switching to async bulk calls, threading is probably moot here
 
             thread = threading.Thread(target=self.hsf.pushBulk, args=(object, object_data))
             thread.start()
-            threads.append(thread)
+            branch_threads.append(thread)
         
-        for thread in threads:
+        for thread in branch_threads:
             thread.join()
+
+        # for thread in self.threads.copy():
+        #     if not thread.is_alive():
+        #         self.threads.remove(thread)
+
 
         # NOTE: see notes on this function
         # hsf.setDeleteds(object='Contact', id_type='HUDA__hud_UNIV_ID__c', deleted_flag='lastName', ids=['31598567'])
@@ -291,8 +282,21 @@ class SalesforcePersonUpdates:
         if 'conditions' not in pds_query:
             pds_query['conditions'] = {}
         pds_query['conditions']['univid'] = huids
-        people = self.pds.get_people(pds_query)
-        self.process_people_batch(people=people)
+        # people = self.pds.get_people(pds_query)
+
+
+        # self.process_people_batch(people=people)
+
+
+        self.people_data_load(pds_query=pds_query)
+
+        logger.info(f"Finished spot data load. Waiting for batch jobs to finish. ")
+        while(self.batch_threads):
+            #  logger.info(f"{len(self.batch_threads)} remaining threads")
+            for thread in self.batch_threads.copy():
+                if not thread.is_alive():
+                    self.batch_threads.remove(thread)
+
 
     def update_people_data_load(self, watermark: datetime=None):
         if not watermark:
@@ -308,8 +312,25 @@ class SalesforcePersonUpdates:
         logger.info(f"Processing a full data load!")
         self.people_data_load(dry_run=dry_run)
 
+        logger.info(f"Finished full data load. Waiting for batch jobs to finish. ")
+        while(self.batch_threads):
+            #  logger.info(f"{len(self.batch_threads)} remaining threads")
+            for thread in self.batch_threads.copy():
+                if not thread.is_alive():
+                    self.batch_threads.remove(thread)
+
         self.app_config.update_watermark("person")
 
+
+    # This method creates a thread for each batch, this may seem like a lot, but it is necessitated by the following factors:
+    #   1. If we rely on the async of a bulk push, we cannot get the results (created/updated/error results)
+    #      (as I was unable to get the API to return results. If this changes in the future, we could rethink that)
+    #      Without the results, we cannot resolve duplicate errors or have good logging
+    #   2. It needs to be async in some way to make sure the PDS pagination timeout does not happen
+    #   3. If we collect results and THEN process, that is too memory intensive and requires sizing up the instance
+    # NOTE: we don't allow more than 5 parent threads to run at a time
+    #       and the max bulk load jobs Salesforce will handle at once is 5.
+    #       Some batch jobs will take an excessively long time (20 minutes) most will take 30 seconds.
     def people_data_load(self, dry_run=False, pds_query=None):
         start_time = datetime.now().strftime('%H:%M:%S')
         logger.info(f"Starting data load: {start_time}")
@@ -330,12 +351,27 @@ class SalesforcePersonUpdates:
         logger.debug(f"Starting batch {count}: {current_time}")
 
         if not dry_run:
-            self.process_people_batch(people)
+            # self.process_people_batch(people)
+            thread = threading.Thread(target=self.process_people_batch, args=(people,))
+            thread.start()
+            self.batch_threads.append(thread)
+
+        
         logger.info(f"Finished batch {count}: {tally_count} of {total_count}")
 
         max_count = (total_count / size)
 
         while(True):
+            # make sure we don't have too many threads going (max it at 5)
+            while len(self.batch_threads) >= 3:
+                time.sleep(10)
+                for thread in self.batch_threads.copy():
+                    # logger.info(f"{len(self.batch_threads)} unresolved threads")
+                    if not thread.is_alive():
+                        self.batch_threads.remove(thread)
+
+            time.sleep(30)
+
             response = self.pds.next()
             count += 1
 
@@ -348,22 +384,31 @@ class SalesforcePersonUpdates:
                 raise
 
             current_time = datetime.now().strftime('%H:%M:%S')
-            logger.debug(f"Starting batch {count}: {current_time}")
+            logger.info(f"Starting batch {count} with {len(self.batch_threads)} threads in process.")
 
             results = response['results']
             people = self.pds.make_people(results)
             if not dry_run:
-                self.process_people_batch(people)
+                # self.process_people_batch(people)
+                thread = threading.Thread(target=self.process_people_batch, args=(people,))
+                thread.start()
+                self.batch_threads.append(thread)
+
             current_count = response['count']
 
-            current_time = datetime.now().strftime('%H:%M:%S')
-            logger.info(f"Finished batch {count}: {tally_count} of {total_count}")
+            # logger.info(f"Finished batch {count}: {tally_count} of {total_count}")
             tally_count += current_count
 
             if count > (max_count + 5):
                 logger.error(f"Something probably went wrong with the batching. Max estimated batch number ({max_count}) exceeded.")
                 raise Exception(f"estimated max_count: {max_count}, batch_size: {size}, batch number (count): {count}, total_count: {total_count}")
-        
+            
+
+            for thread in self.batch_threads.copy():
+                # logger.info(f"{len(self.batch_threads)} unresolved threads")
+                if not thread.is_alive():
+                    self.batch_threads.remove(thread)
+
         if tally_count != total_count:
             logger.error(f"PDS failed to retrieve all records ({tally_count} != {total_count})")
             raise Exception(f"Error: PDS failed to retrieve all records")
@@ -433,7 +478,6 @@ class SalesforcePersonUpdates:
         # 3. Diff the lists
 
         not_updating_ids = [item for item in all_sf_ids if item not in all_pds_ids]
-        not_updating_ids.append('2940935f3b990174')
 
         logger.info(f"These ids ({external_id}) are no longer being updated: {not_updating_ids}. These have been marked as no longer updated.")
 
@@ -446,7 +490,7 @@ sfpu = SalesforcePersonUpdates()
 
 # We don't need to set up the logging to salesforce if we're running locally
 #  unless we're testing that
-if not os.getenv("LOCAL"):
+if not os.getenv("LOCAL") and not os.getenv("SIMPLE_LOGS"):
     logger = sfpu.setup_logging(logger=logger)
 
 if action == 'single-person-update' and len(person_ids) > 0:
@@ -526,11 +570,7 @@ elif action == 'test':
     # this action is for testing
     logger.info("test action called")
 
-
-    endpoint = "limits"
-    response = sfpu.hsf.sf.restful(endpoint, method='GET')
-    logger.info(response)        
-
+    sfpu.full_people_data_load(dry_run=True)
 
     logger.info("done test action")
 
