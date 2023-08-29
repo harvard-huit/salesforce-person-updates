@@ -328,12 +328,11 @@ class SalesforcePersonUpdates:
     #      Without the results, we cannot resolve duplicate errors or have good logging
     #   2. It needs to be async in some way to make sure the PDS pagination timeout does not happen
     #   3. If we collect results and THEN process, that is too memory intensive and requires sizing up the instance
-    # NOTE: we don't allow more than 5 parent threads to run at a time
+    # NOTE: we don't allow more than 3 parent threads to run at a time
     #       and the max bulk load jobs Salesforce will handle at once is 5.
     #       Some batch jobs will take an excessively long time (20 minutes) most will take 30 seconds.
     def people_data_load(self, dry_run=False, pds_query=None):
-        start_time = datetime.now().strftime('%H:%M:%S')
-        logger.info(f"Starting data load: {start_time}")
+        logger.info(f"Starting data load")
 
         # without the pds_query, it uses the "full" configured query
         if pds_query is None:
@@ -362,7 +361,7 @@ class SalesforcePersonUpdates:
         max_count = (total_count / size)
 
         while(True):
-            # make sure we don't have too many threads going (max it at 5)
+            # make sure we don't have too many threads going (max it at 3)
             while len(self.batch_threads) >= 3:
                 time.sleep(10)
                 for thread in self.batch_threads.copy():
@@ -370,6 +369,7 @@ class SalesforcePersonUpdates:
                     if not thread.is_alive():
                         self.batch_threads.remove(thread)
 
+            # just adding a sleep here to give it a little breather, this may not be necessary
             time.sleep(30)
 
             response = self.pds.next()
@@ -404,31 +404,27 @@ class SalesforcePersonUpdates:
                 raise Exception(f"estimated max_count: {max_count}, batch_size: {size}, batch number (count): {count}, total_count: {total_count}")
             
 
+            # this will close off threads that are done, once closed, the threads will be able to bubble logs up
             for thread in self.batch_threads.copy():
-                # logger.info(f"{len(self.batch_threads)} unresolved threads")
                 if not thread.is_alive():
                     self.batch_threads.remove(thread)
 
+        # this is a sanity check to make sure there wasn't an issue with the PDS pagination
         if tally_count != total_count:
             logger.error(f"PDS failed to retrieve all records ({tally_count} != {total_count})")
             raise Exception(f"Error: PDS failed to retrieve all records")
         else:
             logger.info(f"Successfully finished data load: {self.run_id}")
 
-    # This is not intended for much use.
+    # This is intended for debug use only.
+    # We should not be deleting any records.
     def delete_people(self, dry_run: bool=True, huids: list=[]):
         pds_query = self.app_config.pds_query
         # clear conditions
         pds_query['conditions'] = {}
-        # if 'conditions' not in pds_query:
-        #     pds_query['conditions'] = {}
         pds_query['conditions']['univid'] = huids
 
         response = self.pds.search(pds_query)
-        current_count = response['count']
-        size = self.pds.batch_size
-        total_count = response['total_count']
-        tally_count = current_count
         results = response['results']
 
         self.transformer.hashed_ids = self.hsf.getUniqueIds(
@@ -484,13 +480,75 @@ class SalesforcePersonUpdates:
         # 4. Mark the ones that don't show up
         self.hsf.flag_field(object_name=object_name, external_id=external_id, flag_name='huit__Updated__c', value=False, ids=not_updating_ids)
 
+    # this method will create xls files with comparisons of data from 2 salesforce sources
+    # it can only really be run locally and also requires a second set of salesforce credentials
+    # it isn't well fleshed out, but it works
+    # What makes it helpful for testers is to have the output_folder set to something that is mapped to Sharepoint
+    def compare_records(self):
+        output_folder = os.getenv("output_folder", "../test_output/")
+
+        from openpyxl import Workbook
+
+        for person_id in person_ids:
+
+            workbook = Workbook()
+
+            contact_response1 = sfpu.hsf.getContactIds('HUDA__hud_UNIV_ID__c', [person_id])
+            contact_ids1 = [record['Id'] for record in contact_response1['records']]
+            contact_response2 = sfpu.hsf2.getContactIds('HUDA__hud_UNIV_ID__c', [person_id])
+            contact_ids2 = [record['Id'] for record in contact_response2['records']]
+
+
+            for object_name, object_config in sfpu.app_config.config.items():
+                if object_config['source'] != 'pds':
+                    continue
+                ref_field = object_config['Id']['salesforce']
+                contact_ref = 'Contact.id'
+                for field, value in object_config['fields'].items():
+                    if isinstance(value, str):
+                        if value.startswith("sf."):
+                            contact_ref = field
+                data1 = sfpu.hsf.get_object_data(object_name, contact_ref, contact_ids1)
+                data2 = sfpu.hsf2.get_object_data(object_name, contact_ref, contact_ids2)
+                result = sfpu.hsf.compare_records(object_name=object_name, ref_field=ref_field, dataset1=data1, dataset2=data2, all=True)
+
+                # tsv_result = sfpu.hsf.compare_to_tsv(result, f"{output_folder}{object_name}.test.tsv")
+                tsv_result = sfpu.hsf.compare_to_tsv(result)
+
+                # Select the active sheet
+                # sheet = workbook.active
+                title = f"{object_name}"
+                sheet = workbook.create_sheet(title=title)
+                
+                list_result = tsv_result.split("\n")
+                for lr in list_result:
+                    row_list = lr.split("\t")
+                    sheet.append(row_list)
+
+
+                for column_cells in sheet.columns:
+                    new_column_length = max(len(str(cell.value)) for cell in column_cells)
+                    new_column_letter = column_cells[0].column_letter
+                    if new_column_length > 0:
+                        sheet.column_dimensions[new_column_letter].width = new_column_length*1.23
+
+            # remove the default sheet
+            workbook.remove(workbook.active)
+
+            # Save the workbook
+            filename= f"{output_folder}{person_id}_compare_results.xlsx"
+            if os.path.exists(filename):
+                response = os.remove(filename)
+            workbook.save(filename)
+
+
     
 
 sfpu = SalesforcePersonUpdates()
 
 # We don't need to set up the logging to salesforce if we're running locally
 #  unless we're testing that
-if not os.getenv("LOCAL") and not os.getenv("SIMPLE_LOGS"):
+if not os.getenv("SIMPLE_LOGS"):
     logger = sfpu.setup_logging(logger=logger)
 
 if action == 'single-person-update' and len(person_ids) > 0:
@@ -508,69 +566,10 @@ elif action == 'delete-people':
 elif action == 'mark-not-updated':
     sfpu.check_updateds()
 elif action == 'compare':
-
-    output_folder = os.getenv("output_folder", "../test_output/")
-
-    from openpyxl import Workbook
-
-    for person_id in person_ids:
-
-        workbook = Workbook()
-
-        contact_response1 = sfpu.hsf.getContactIds('HUDA__hud_UNIV_ID__c', [person_id])
-        contact_ids1 = [record['Id'] for record in contact_response1['records']]
-        contact_response2 = sfpu.hsf2.getContactIds('HUDA__hud_UNIV_ID__c', [person_id])
-        contact_ids2 = [record['Id'] for record in contact_response2['records']]
-
-
-        for object_name, object_config in sfpu.app_config.config.items():
-            if object_config['source'] != 'pds':
-                continue
-            ref_field = object_config['Id']['salesforce']
-            contact_ref = 'Contact.id'
-            for field, value in object_config['fields'].items():
-                if isinstance(value, str):
-                    if value.startswith("sf."):
-                        contact_ref = field
-            data1 = sfpu.hsf.get_object_data(object_name, contact_ref, contact_ids1)
-            data2 = sfpu.hsf2.get_object_data(object_name, contact_ref, contact_ids2)
-            result = sfpu.hsf.compare_records(object_name=object_name, ref_field=ref_field, dataset1=data1, dataset2=data2, all=True)
-
-            # tsv_result = sfpu.hsf.compare_to_tsv(result, f"{output_folder}{object_name}.test.tsv")
-            tsv_result = sfpu.hsf.compare_to_tsv(result)
-
-            # Select the active sheet
-            # sheet = workbook.active
-            title = f"{object_name}"
-            sheet = workbook.create_sheet(title=title)
-            
-            list_result = tsv_result.split("\n")
-            for lr in list_result:
-                row_list = lr.split("\t")
-                sheet.append(row_list)
-
-
-            for column_cells in sheet.columns:
-                new_column_length = max(len(str(cell.value)) for cell in column_cells)
-                new_column_letter = column_cells[0].column_letter
-                if new_column_length > 0:
-                    sheet.column_dimensions[new_column_letter].width = new_column_length*1.23
-
-        # remove the default sheet
-        workbook.remove(workbook.active)
-
-        # Save the workbook
-        filename= f"{output_folder}{person_id}_compare_results.xlsx"
-        if os.path.exists(filename):
-            response = os.remove(filename)
-        workbook.save(filename)
-
-
+    sfpu.compare_records()
 elif action == 'test':
     # this action is for testing
     logger.info("test action called")
-
-    sfpu.full_people_data_load(dry_run=True)
 
     logger.info("done test action")
 
