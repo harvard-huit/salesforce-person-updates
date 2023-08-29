@@ -44,29 +44,30 @@ class HarvardSalesforce:
         self.type_data = {}      
 
     # NOTE: this uses the Salesforce Bulk API
-    # this API is generally async, but the way I'm using it (through simple-salesforce), it will wait (synchronously) for the job to finish 
+    # this API is generally async, but the way I'm using it, it will wait (synchronously) for the job to finish 
     # this allows us to get the error logs without having to wait/check
     # that will probably be too slow to do fully sync
-    # to make best use of this, we will need to async it with something like asyncio
+    # to make best use of this, we will need to async it with something like asyncio/threading
     # NOTE: the Bulk API can take a max of 10000 records at a time
     # a single record will take anywhere from 2-50 seconds
     # dupe: this makes sure we don't keep retrying a dupe check
     def pushBulk(self, object, data, dupe=False, id_name='Id'):
         logger.debug(f"upsert to {object} with {len(data)} records")
 
+        # This will send the upsert as async, the results will just be a jobId that you can query for results later (in theory)
         # responses = self.sf.bulk.__getattr__(object).upsert(data, external_id_field=id_name, batch_size=5000, use_serial=True, bypass_results=True)
+
+        # This is the sync/blocking version of the upsert, it will return with the results of each record
         responses = self.sf.bulk.__getattr__(object).upsert(data, external_id_field=id_name)
         
         
+        # Keeping this in here as a way to work with async pushes in the future
         # logger.info(f"{responses}")
         # for response in responses:
         #     if 'job_id' in response:
         #         self.jobs.append(response['job_id'])
         #     elif 'bypass_results' not in response:
         #         logger.warning(f"Bulk response with no job id: {response}")
-        
-
-
         # self.log_jobs()
 
 
@@ -106,13 +107,19 @@ class HarvardSalesforce:
         return True
     
     # this will check for outstanding jobs and log them if they're done
+    # this does NOT work to get results
+    # a call to /jobs/ingest/JOBID will return as it should, in json, but will only have 
+    #   - number of processed records 
+    #   - number of failed records
+    # That leaves us with no way to determine what actually went wrong
+    # /jobs/ingest/JOBID/successfulResults is supposed to return a CSV of the actual results of each record
+    #   However, it does not return anything. (same with /jobs/ingest/JOBID/failedResults)
     def log_jobs(self):
 
 
-        # NOTE: this query can get the status, but not results
+        # NOTE: this query can get the status, but not results (i.e. if the job is finished)
         # job_id_string = [job['job_id'] for job in self.jobs]
         # sf_data = self.sf.query_all(f"SELECT Id, Status, JobType, CreatedBy.Name, CreatedDate, CompletedDate, NumberOfErrors FROM AsyncApexJob WHERE Id IN({job_id_string})")
-            
         
 
         for job in self.jobs:
@@ -124,43 +131,15 @@ class HarvardSalesforce:
             logger.info(f"numberRecordsProcessed: {response['numberRecordsProcessed']}")
             if int(response['numberRecordsProcessed']) > 0:
                 success_endpoint = f"{endpoint}/successfulResults/"
+                # NOTE: sf.restful() will not work on this endpoint
+                #       sf.restful() is not documented well (at all??)
+                #       but through trial/error, it's apparent it tries to do a json.dumps() and will fail on a payload that isn't json
+                #       you need to use requests and add the session_id from the sf object to the Auth bearer token
                 response = self.sf.restful(success_endpoint)
             logger.info(f"numberRecordsFailed: {response['numberRecordsFailed']}")
             if response['numberRecordsFailed'] > 0:
                 success_endpoint = f"{endpoint}/failedResults/"
                 response = self.sf.restful(success_endpoint)
-
-
-        # created_count = 0
-        # updated_count = 0
-        # error_count = 0
-        # for index, response in enumerate(responses):
-        #     if response['success'] != True: 
-                
-        #         errored_data = data[index]
-        #         logger.error(f"Error in bulk data load: {response['errors']} ({errored_data})")
-
-        #         if response['errors'][0]['statusCode'] == 'DUPLICATES_DETECTED':
-
-        #             if dupe:
-        #                 logger.error(f"Error: DUPLICATE DETECTED (unresoved): {errored_data}")
-        #             else:
-        #                 logger.error(f"Error: DUPLICATE DETECTED -- Errored Data: {errored_data}")
-        #                 if self.check_duplicate(object, errored_data):
-        #                     error_count -= 1
-        #         error_count += 1
-        #     else:
-        #         if response['created']:
-        #             created_count += 1
-        #         else:
-        #             updated_count += 1
-        #         logger.debug(response)
-        # if updated_count > 0:
-        #     logger.info(f"Updated {object} Records: {updated_count}")
-        # if created_count > 0:
-        #     logger.info(f"Created {object} Records: {created_count}")
-        # if error_count > 0:
-        #     logger.info(f"Errored {object} Records: {error_count}")
 
 
     # this function will return a map of the contact ids to huid
