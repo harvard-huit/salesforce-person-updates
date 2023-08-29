@@ -26,6 +26,10 @@ class SalesforceTransformer:
 
         return split_config
 
+    # source_name is to be used when you want to parse the config based on the top level source (i.e. departments or pds)
+    # target_object is used to filter down to a single target object in the config (ex: Contact)
+    # exlude_target_objects is a list of Objects you want to specifically ignore on this run 
+    #   For example, if you ran the Contacts a minute ago (to get ids), you may not want to run them again
     def transform(self, source_data, source_name=None, target_object=None, exclude_target_objects=[]):
 
         start_time = datetime.now().strftime('%H:%M:%S')
