@@ -250,9 +250,13 @@ The way the Bulk functions work in simple-salesforce (by default) is they abstra
 
 This makes some of the logic easier, but it could lead to issues with performance unless we wrap the bulk calls in asyncio so we can be waiting on multiple jobs. 
 
-NOTE: setting a value to `null` requires setting it to `#N/A`. (This is not easy to find in SF documentation.)
+**NOTE:** In earlier versions of the API, setting a value to `null` required setting it to `#N/A`. (This might show up in different places and is not easy to find in SF documentation.)
 
 #### Examples
+
+##### Synchronous 
+
+A synchronous call will be a blocking call, but it will return with the data of which records failed and with what error.
 
 ```py
 data = [
@@ -263,6 +267,44 @@ data = [
 ]
 sf.bulk.__getattr__('HUDA__hud_Name__c').upsert(data, external_id_field='Id')
 ```
+
+##### Asynchronous 
+
+This call will return with a `jobId`. That `jobId` can be used to get some of the results, but getting those results is a pain.
+
+```py
+data = [
+    {
+        'Id': 'aDm1R000000PLDgSAO',
+        'HUDA__NAME_MIDDLE__c': 'test'
+    }
+]
+sf.bulk.__getattr__('HUDA__hud_Name__c').upsert(data, external_id_field='Id', bypass_results=True)
+```
+
+You can use the `jobId` in a call directly to the API like this:
+
+```py
+endpoint = "jobs/ingest/" + job['job_id']
+response = sf.restful(endpoint)
+```
+
+This will return the number of records processed as well as the number of failed records, but you will not get the error messages. 
+
+In order to get the error messages, you need to (in theory) do this:
+```py
+session_id = sf.session_id
+headers = {
+  'Authorization': 'Bearer ' + session_id,
+  'Content-Type': 'text/csv'
+}
+base_url = sf.url
+successful_url = base_url + "jobs/ingest/" + job['job_id'] + "/successfulResults"
+failures_url = base_url + "jobs/ingest/" + job['job_id'] + "/failedResults"
+requests.get(successful_url, headers=headers)
+```
+
+However, at the time of this documentation, the detail requests return No Content (http code `204`). This happens in curl/postman/requests, so it appears to be a problem with the Salesforce API. We are not using this method as a result. 
 
 ### Getting data
 
@@ -279,6 +321,17 @@ sf_data = self.sf.query_all(f"SELECT Contact.id, HUDA__hud_UNIV_ID__c FROM Conta
 SOQL is a SQL-like syntax, but anytime you want to use something from SQL beyond `select blah from blah where blah`, you'll need to look it up. Also it doesn't join anything, so GL with that. 
 
 ## Other stuff
+
+
+### EDA Trigger Conflicts
+
+While this project does not rely on EDA, at the current time, most users are pushing Roles in to `hed__Affiliations`. Whenever EDA does a new release, it enables all triggers, this causes a bug in how the bulk upsert works in conjunction with one of the triggers. `AFFL_ContactChange_TDTM` will cause the following error to throw on bulk upserts that contain multiple Affiliations that map to the same Contact. 
+
+```
+{'statusCode': 'CANNOT_INSERT_UPDATE_ACTIVATE_ENTITY', 'message': "hed.TDTM_Affiliation: execution of AfterUpdate\n\ncaused by: System.QueryException: unexpected token: ','\n\n(System Code)", 'fields': []}
+```
+
+In order to mitigate this, we are checking for that trigger and automatically disabling it with every run if it's found. Please see [this EDA documentation](https://help.salesforce.com/s/articleView?id=sfdo.EDA_Disable_Trigger_Handlers.htm&type=5) for more information.
 
 ### Relationships
 
