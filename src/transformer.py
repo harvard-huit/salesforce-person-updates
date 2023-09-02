@@ -112,7 +112,8 @@ class SalesforceTransformer:
                     when = None
                     # logger.debug(f"  source_object: {source_object}")
 
-                    
+                    value_references = []
+
                     if isinstance(source_object, list): 
                         value_references = source_object
                     else: 
@@ -132,6 +133,8 @@ class SalesforceTransformer:
                                     continue
                         elif isinstance(source_object, (str)):
                             value_references = [source_object]
+                        else:
+                            logger.warning(f"Unhandled source_object data type: {type(source_object)} ({source_object})")
 
                     for value_reference in value_references:
 
