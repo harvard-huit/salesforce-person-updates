@@ -1,0 +1,64 @@
+name: Build Image
+run-name: Build Image (${{ github.event.inputs.version }})
+
+on:
+  push:
+    branches: [ dev ]
+    paths: 
+        - 'src/**'
+        - 'config.schema.json'
+        - 'Dockerfile'
+        - 'gunicorn.sh'
+        - 'requirements.txt'
+        - '.github/workflows/build.yml'
+  workflow_dispatch:
+    inputs:
+      version:
+        type: string
+        required: true
+
+env:
+  version: ${{ github.event.inputs.version }}
+  branch: ${{ github.ref_name }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build Code ${{ github.event.inputs.version }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with: 
+          path: ./salesforce
+      
+        # Note: this will get the version from the ansible vars
+      - name: Get Version
+        if: ${{ !github.event.inputs.version }}
+        run: |
+          cd salesforce
+          while read -r line; do
+            if [[ $line =~ "target_app_version" ]] && ! [[ $line =~ ^#.* ]]; then
+              # delete everything up to the opening double quote
+              version="${line#*\"}"
+              # delete everything after the next double quote
+              version="${version%%\"*}"
+            fi
+          done < ./ansible_vars/dev_ansible_vars.yml
+          echo "version=$version" >> $GITHUB_ENV
+            
+      - name: Build
+        run: |
+          cd salesforce
+          docker build -t artifactory.huit.harvard.edu/ats-docker/salesforce-person-updates:${{ env.version }} .
+
+      - name: Push to Artifactory
+        run: |
+          docker login artifactory.huit.harvard.edu --username "${{ secrets.ARTIFACTORY_USER }}" --password "${{ secrets.ARTIFACTORY_PWD }}"
+          docker push artifactory.huit.harvard.edu/ats-docker/salesforce-person-updates:${{ env.version }}
+
+

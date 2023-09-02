@@ -1,0 +1,268 @@
+{
+    "Account": {
+        "source": "departments",
+        "flat": false,
+        "Id": {
+            "departments": "hrDeptId",
+            "salesforce": "HUDA__hud_DEPT_ID__c"
+        },
+        "fields": {
+            "HUDA__hud_DEPT_ID__c": "hrDeptId",
+            "Name": "hrDeptDesc",
+            "HUDA__hud_DEPT_LONG_DESC__c": "hrDeptLongDesc",
+            "HUDA__hud_DEPT_OFFICIAL_DESC__c": "hrDeptOfficialDesc",
+            "HUDA__hud_DEPT_SHORT_DESC__c": "hrDeptShortDesc",
+            "HUDA__hud_EFF_STATUS__c": "effectiveStatus.code",
+            "HUDA__hud_EFFDT__c": "effectiveDate",
+            "HUDA__hud_ESTAB_ID__c": "estabId",
+            "HUDA__hud_FACULTY_CD__c": "facultyCode",
+            "HUDA__hud_MAJ_AFFILIATION_CD__c": "majAffiliation.code",
+            "HUDA__hud_MAJ_AFFILIATION_DESC__c": "majAffiliation.description",
+            "HUDA__hud_SUB_AFFILIATION_CD__c": "subAffiliation.code",
+            "HUDA__hud_SUB_AFFILIATION_DESC__c": "subAffiliation.description",
+            "HUDA__hud_UPDATE_SOURCE__c": "updateSource",
+            "HUDA__hud_UPDATE_DT__c": "updateDate"
+        }
+    },
+    "Contact": {
+        "flat": true,
+        "source": "pds",
+        "Id": {
+            "pds": "personKey",
+            "salesforce": "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c"
+        },
+        "updatedFlag": "huit__Updated__c",
+        "fields": {
+            "huit__Updated__c": {
+                "value": true,
+                "static": true
+            },
+            "HUDA__hud_EFF_STATUS__c": "effectiveStatus.code",
+            "HUDA__hud_DECEASED_FLAG__c": "deceasedFlag",
+            "HUDA__hud_EPPN__c": "eppn",
+            "HUDA__hud_UNIV_ID__c": "univid",
+            "FirstName": {
+                "value": "names.firstName",
+                "when": {
+                    "names.personNameType.code": ["LISTING", "OFFICIAL"]
+                }
+            },
+            "LastName": {
+                "value": "names.lastName",
+                "when": {
+                    "names.personNameType.code": ["LISTING", "OFFICIAL"]
+                }
+            },
+            "Email": {
+                "value": "emails.email",
+                "when": {
+                    "emails.officialEmailIndicator": true,
+                    "emails.effectiveStatus.code": "A"
+                }
+            },
+            "HUDA__hud_ADID__c": "netid",
+            "HUDA__hud_EFFDT__c": "effectiveDate",
+            "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c": "personKey",
+            "HUDA__hud_UUID__c": "uuid",
+            "Department": {
+                "value": "employeeRoles.hrDeptOfficialDesc",
+                "when": {
+                    "employeeRoles.primeRoleIndicator": true,
+                    "employeeRoles.employmentStatus.code": "A"
+                }
+            },
+            "HUDA__hud_PRIVACY_FERPA_STATUS__c": "privacyFerpaStatus.code",
+            "HUDA__hud_PRIVACY_FERPA_PAST_STU__c": "privacyFerpaPastStudent.code",
+            "HUDA__hud_PRIVACY_VALUE__c": "privacyValue.code",
+            "huit__Pronouns__c": "pronouns.pronouns"
+        }
+    },
+    "HUDA__hud_Name__c": {
+        "flat": false,
+        "source": "pds",
+        "Id": {
+            "pds": "names.personNameKey",
+            "salesforce": "HUDA__PERSON_NAMES_KEY__c"
+        },
+        "fields": {
+            "HUDA__Name_Contact__c": "sf.contact.id",
+            "HUDA__EFF_STATUS__c": "names.effectiveStatus.code",
+            "HUDA__EFFDT__c": "names.effectiveDate",
+            "HUDA__NAME_FIRST__c": "names.firstName",
+            "HUDA__UNIV_ID__c": "univid",
+            "HUDA__NAME_LAST__c": "names.lastName",
+            "HUDA__NAME_MIDDLE__c": "names.middleName",
+            "HUDA__MULE_UNIQUE_PERSON_KEY__c": "personKey",
+            "HUDA__NAME_TYPE__c": "names.personNameType.code",
+            "HUDA__PERSON_NAMES_KEY__c": "names.personNameKey",
+            "HUDA__NAME_PREFIX__c": "names.prefix",
+            "HUDA__NAME_SUFFIX__c": "names.suffix",
+            "HUDA__UPDATE_SOURCE__c": "",
+            "HUDA__UPDATE_DT__c": "names.updateDate"
+        }
+    },
+    "HUDA__hud_Email__c": {
+        "flat": false,
+        "source": "pds",
+        "Id": {
+            "pds": "emails.personEmailKey",
+            "salesforce": "HUDA__CONTACT_EMAIL_ADDRESS_KEY__c"
+        },
+        "fields": {
+            "HUDA__Email_Contact__c": "sf.contact.id",
+            "HUDA__CONTACT_EMAIL_ADDRESS_KEY__c": "emails.personEmailKey",
+            "HUDA__EFF_STATUS__c": "emails.effectiveStatus.code",
+            "HUDA__EFFDT__c": "emails.effectiveDate",
+            "HUDA__EMAIL_ADDR_SOURCE__c": "emails.emailAddressSource",
+            "HUDA__EMAIL_ADDR_TYPE__c": "emails.emailAddressType",
+            "HUDA__EMAIL_ADDRESS__c": "emails.email",
+            "HUDA__EMAIL_DOMAIN_NAME__c": "emails.emailDomainName",
+            "HUDA__EMAIL_USER_NAME__c": "emails.emailUserName",
+            "HUDA__MULE_UNIQUE_PERSON_KEY__c": "personKey",
+            "HUDA__OFFICIAL_EMAIL_INDICATOR__c": "emails.officialEmailIndicator",
+            "HUDA__PRIVACY_VALUE__c": "emails.privacyValue.code",
+            "HUDA__UNIV_ID__c": "univid",
+            "HUDA__UPDATE_DT__c": "emails.updateDate"     
+        }
+    },
+    "HUDA__hud_Address__c": {
+        "flat": false,
+        "source": "pds",
+        "Id": {
+            "pds": "addresses.addressKey",
+            "salesforce": "HUDA__CONTACT_ADDRESS_KEY__c"
+        },
+        "fields": {
+            "HUDA__Address_Contact__c": "sf.contact.id",
+            "HUDA__CONTACT_ADDRESS_KEY__c": "addresses.addressKey",
+            "HUDA__ADDR_CATEGORY_CD__c": "addresses.addressCategory.code",
+            "HUDA__ADDR_CITY__c": "addresses.addressCity",
+            "HUDA__ADDR_ISO_COUNTRY_CD__c": "addresses.addressCountry.code",
+            "HUDA__EFF_STATUS__c": "addresses.effectiveStatus.code",
+            "HUDA__EFFDT__c": "addresses.effectiveDate",
+            "HUDA__UNIV_ID__c": "univid",
+            "HUDA__ADDR_PS_LOCATION_CD__c": "addresses.psLocation.code",
+            "HUDA__MULE_UNIQUE_PERSON_KEY__c": "personKey",
+            "HUDA__ADDR_POSTAL_CD__c": "addresses.addressPostalCode",
+            "HUDA__PRIVACY_VALUE__c": "addresses.privacyValue.code",
+            "HUDA__ADDR_SOURCE__c": "addresses.source",
+            "HUDA__ADDR_STATE__c": "addresses.addressState",
+            "HUDA__ADDR_LINE1__c": "addresses.addressStreet1",
+            "HUDA__ADDR_LINE2__c": "addresses.addressStreet2",
+            "HUDA__ADDR_LINE3__c": "addresses.addressStreet3",
+            "HUDA__UPDATE_DT__c": "addresses.updateDate"        
+        }
+    },
+    "HUDA__hud_Phone__c": {
+        "flat": false,
+        "source": "pds",
+        "Id": {
+            "pds": "phones.phoneKey",
+            "salesforce": "HUDA__CONTACT_DATA_KEY__c"
+        },
+        "fields": {
+            "HUDA__Phone_Contact__c": "sf.contact.id",
+            "HUDA__CONTACT_DATA_KEY__c": "phones.phoneKey",
+            "HUDA__CONTACT_DATA__c": "phones.dataValue",
+            "HUDA__CONTACT_DATA_EXT__c": "phones.dataExtension",
+            "HUDA__CONTACT_DATA_SUBTYPE_CD__c": "phones.dataSubtype",
+            "HUDA__CONTACT_DATA_TYPE_CD__c": "phones.dataType",
+            "HUDA__EFF_STATUS__c": "phones.effectiveStatus.code",
+            "HUDA__LISTING_CATEGORY__c": "phones.listingCategory",
+            "HUDA__LISTING_ID__c": "phones.listingId",
+            "HUDA__MULE_UNIQUE_PERSON_KEY__c": "personKey",
+            "HUDA__PRIVACY_VALUE__c": "phones.privacyValue.code",
+            "HUDA__UPDATE_DT__c": "phones.updateDate"    
+        }
+    },
+    "HUDA__hud_Location__c": {
+        "flat": false,
+        "source": "pds",
+        "Id": {
+            "pds": "locations.personLocationKey",
+            "salesforce": "HUDA__CONTACT_LOCATION_KEY__c"
+        },
+        "fields": {
+            "HUDA__Location_Contact__c": "sf.contact.id",
+            "HUDA__CONTACT_LOCATION_KEY__c": "locations.personLocationKey",
+            "HUDA__BLDG_LOC__c": "locations.location",
+            "HUDA__BLDG_LOC_IDENTIFIER__c": "locations.locationIdentifier",
+            "HUDA__EFF_STATUS__c": "locations.effectiveStatus.code",
+            "HUDA__EFFDT__c": "locations.effectiveDate",
+            "HUDA__LISTING_CATEGORY__c": "locations.listingCategory",
+            "HUDA__LISTING_ID__c": "locations.listingId",
+            "HUDA__LOC_TYPE_CD__c": "locations.locationType.code",
+            "HUDA__MULE_UNIQUE_PERSON_KEY__c": "personKey",
+            "HUDA__PRIVACY_VALUE__c": "locations.privacyValue.code",
+            "HUDA__UPDATE_DT__c": "locations.updateDate" 
+        }
+    },
+    "hed__Affiliation__c": {
+        "flat": false,
+        "source": "pds",
+        "Id": {
+            "pds": ["employeeRoles.personRoleKey", "poiRoles.personRoleKey", "studentRoles.personRoleKey"],
+            "salesforce": "HUDA__hud_PERSON_ROLES_KEY__c"
+        },
+        "fields": {
+            "hed__Contact__c": "sf.contact.id",
+            "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c": "personKey",
+            "HUDA__hud_PERSON_ROLES_KEY__c": ["employeeRoles.personRoleKey", "poiRoles.personRoleKey", "studentRoles.personRoleKey"],
+            "HUDA__hud_EFF_STATUS__c": ["employeeRoles.effectiveStatus.code", "poiRoles.effectiveStatus.code", "studentRoles.effectiveStatus.code"],
+            "HUDA__hud_EFFDT__c": ["employeeRoles.effectiveDate", "poiRoles.effectiveDate", "studentRoles.effectiveDate"],
+            "HUDA__hud_UPDATE_DT__c": ["employeeRoles.updateDate", "poiRoles.updateDate", "studentRoles.updateDate"],
+            "HUDA__hud_PRIVACY_VALUE__c": ["employeeRoles.privacyValue.code", "poiRoles.privacyValue.code", "studentRoles.privacyValue.code"],
+            "HUDA__hud_PRIME_ROLE_INDICATOR__c": ["employeeRoles.primeRoleIndicator", "poiRoles.primeRoleIndicator", "studentRoles.primeRoleIndicator"],
+            "HUDA__hud_ROLE_END_DT__c": ["employeeRoles.roleEndDate", "poiRoles.roleEndDate", "studentRoles.roleEndDate"],
+            "HUDA__hud_ROLE_ID__c": ["employeeRoles.roleId", "poiRoles.roleId", "studentRoles.roleId"],
+            "HUDA__hud_ROLE_SOURCE__c": ["employeeRoles.source", "poiRoles.source", "studentRoles.source"],
+            "HUDA__hud_ROLE_START_DT__c": ["employeeRoles.roleStartDate", "poiRoles.roleStartDate", "studentRoles.roleStartDate"],
+            "HUDA__hud_ROLE_TITLE__c": ["employeeRoles.roleTitle", "poiRoles.roleTitle", "studentRoles.roleTitle"],
+            "HUDA__hud_ROLE_TYPE_CD__c": ["employeeRoles.roleType.code", "poiRoles.roleType.code", "studentRoles.roleType.code"],
+
+            "HUDA__hud_DEPT_ID__c": "employeeRoles.hrDeptId",
+            "HUDA__hud_ACADEMIC_PRIME_ROLE_INDICATOR__c": "employeeRoles.academicPrimeRoleIndicator",
+
+            "HUDA__hud_SUPERVISOR_ID__c": "employeeRoles.supervisorId",
+            "HUDA__hud_EMP_APPOINT_END_DT__c": "employeeRoles.appointmentEndDate",
+            "HUDA__hud_EMP_DEPT_ENTRY_DT__c": "employeeRoles.departmentEntryDate",
+            "HUDA__hud_EMP_EMPL_CLASS__c": "employeeRoles.employmentClass.code",
+            "HUDA__hud_EMP_EMPLOYMENT_STATUS__c": "employeeRoles.employmentStatus.code",
+            "HUDA__hud_EMP_HIRE_DT__c": "employeeRoles.hireDate",
+            "HUDA__hud_EMP_JOBCODE__c": "employeeRoles.jobCode.code",
+            "HUDA__hud_EMP_ADDR_PS_LOCATION_CD__c": "employeeRoles.addressPeoplesoftLocation.code",
+            "HUDA__hud_EMP_PAYGROUP__c": "employeeRoles.payGroup.code",
+            "HUDA__hud_EMP_REHIRE_DT__c": "employeeRoles.rehireDate",
+            "HUDA__hud_EMP_TERMINATION_DT__c": "employeeRoles.terminationDate",
+            "HUDA__hud_EMP_UNION_CD__c": "employeeRoles.unionCode",
+            "HUDA__hud_EMP_FACULTY_CD__c": "employeeRoles.faculty.code",
+            "HUDA__hud_EMP_FULLTIME_FLAG__c": "employeeRoles.fulltimeFlag",
+            "HUDA__hud_EMP_MAJ_AFFILIATION_CD__c": "employeeRoles.majAffiliation.code",
+            "HUDA__hud_EMP_MAJ_AFFILIATION_DESC__c": "employeeRoles.majAffiliation.description",
+            "HUDA__hud_EMP_PAID_FLAG__c": "employeeRoles.paidFlag",
+            "HUDA__hud_EMP_SUB_AFFILIATION_CD__c": "employeeRoles.subAffiliation.code",
+            "HUDA__hud_EMP_SUB_AFFILIATION_DESC__c": "employeeRoles.subAffiliation.description",
+
+            "HUDA__hud_STU_STU_DEPT__c": "studentRoles.studentDepartment.code",
+            "HUDA__hud_STU_BOARD_LOCATION_HOUSE_CD__c": "studentRoles.boardLocationHouse.code",
+            "HUDA__hud_STU_BOARD_STATUS__c": "studentRoles.boardStatus.code",
+            "HUDA__hud_STU_DEGREE__c": "studentRoles.degree.code",
+            "HUDA__hud_STU_GRADUATION_DT__c": "studentRoles.graduationDate",
+            "HUDA__hud_STU_LAST_ATTENDANCE_DT__c": "studentRoles.lastAttendanceDate",
+            "HUDA__hud_STU_SPEC_PROG__c": "studentRoles.specialProgram.code",
+            "HUDA__hud_STU_RES_HOUSE_CD__c": "studentRoles.residentialHouse.code",
+            "HUDA__hud_STU_SCHOOL_CD__c": "studentRoles.school.code",
+            "HUDA__hud_STU_STU_STAT_CD__c": "studentRoles.studentStatus.code",
+            "HUDA__hud_STU_TIME_STATUS__c": "studentRoles.studentTimeStatus.code",
+            "HUDA__hud_STU_STU_YEAR_CD__c": "studentRoles.studentYear.code",
+
+            "HUDA__hud_POI_COMMENTS__c": "poiRoles.comments",
+            "HUDA__hud_POI_COMPANY__c": "poiRoles.poiCompany",
+            "HUDA__hud_POI_FACULTY_CD__c": "poiRoles.faculty.code",
+            "HUDA__hud_POI_SHORT_DESC_LINE1__c": "poiRoles.shortDescriptionLine1",
+            "HUDA__hud_POI_SHORT_DESC_LINE2__c": "poiRoles.shortDescriptionLine2"
+                        
+
+        }
+    }
+}

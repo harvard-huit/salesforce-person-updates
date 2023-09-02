@@ -1,0 +1,96 @@
+name: Deploy Task Definition
+run-name: Deploying ${{ github.event.inputs.version }} to ${{ github.event.inputs.environment }}
+
+on:
+  # push:
+  #   branches: [ dev ]
+  workflow_dispatch:
+    inputs:
+      version:
+        type: string
+        required: true
+      environment:
+        type: choice
+        default: 'dev'
+        options: 
+          - 'dev'
+          - 'test'
+          - 'stage'
+          - 'prod'
+        required: true
+
+env:
+  version: ${{ github.event.inputs.version }}
+  AWS_REGION: us-east-1
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  deploy:
+    name: Deploy ${{ github.event.inputs.version }} to ${{ github.event.inputs.environment }}
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Login to AWS with a service account / iam user
+        # uses: aws-actions/configure-aws-credentials@13d241b293754004c80624b5567555c4a39ffbe3
+        uses: HUIT/configure-aws-credentials@13d241b293754004c80624b5567555c4a39ffbe3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_NONPROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_NONPROD }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          path: ./salesforce
+
+      # Checking out the cluster config to provide it for the Deploy Action
+      - name: Checkout cluster config
+        uses: actions/checkout@v3
+        with:
+          repository: HUIT/aais-services-config
+          path: ./aais-services-config
+
+      - name: Login to artifactory
+        run: |
+          docker login artifactory.huit.harvard.edu --username "${{ secrets.ARTIFACTORY_USER }}" --password "${{ secrets.ARTIFACTORY_PWD }}"
+  
+      # Note: this will get the version from the ansible vars
+      - name: Get Version from ansible_vars
+        run: |
+          cd salesforce
+          while read -r line; do
+            if [[ $line =~ "target_app_version" ]] && ! [[ $line =~ ^#.* ]]; then
+            # delete everything up to the opening double quote
+            version="${line#*\"}"
+            # delete everything after the next double quote
+            version="${version%%\"*}"
+          fi
+          done < ./ansible_vars/${{ github.event.inputs.environment }}_ansible_vars.yml
+
+          if [[ $version -ne ${{ env.version }} ]]; then
+            echo "Error: version does not match in ansible_vars"
+            exit 1
+          fi
+
+
+      # this will fail if the manifest doesn't exist
+      - name: Check if image exists
+        run: |          
+          docker manifest inspect artifactory.huit.harvard.edu/ats-docker/salesforce-person-updates:$version
+          
+      - name: Run AAIS Deploy Container Action
+        uses: HUIT/aais-ecs-deploy-action@v1.0.1
+        with:
+          # Required
+          common_config: aais-services-config/aais_services_${{ github.event.inputs.environment }}.yml
+          # Required -- this token is linked to the user associated with the run
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Optional
+          #   this needs to match the directory the main repository was checked out into
+          #   if the checkout was done without a path, this is not needed
+          app_root: salesforce
+     
