@@ -41,7 +41,7 @@ class HarvardSalesforce:
 
         # this should be set once we have a list of objects to query
         # through self.getTypeMap()
-        self.type_data = {}      
+        self.type_data = {}
 
     # NOTE: this uses the Salesforce Bulk API
     # this API is generally async, but the way I'm using it, it will wait (synchronously) for the job to finish 
@@ -52,6 +52,9 @@ class HarvardSalesforce:
     # a single record will take anywhere from 2-50 seconds
     # dupe: this makes sure we don't keep retrying a dupe check
     def pushBulk(self, object, data, dupe=False, id_name='Id'):
+        if data is None or len(data) == 0:
+            logger.warn(f"No data to push to {object}")
+            return True
         logger.debug(f"upsert to {object} with {len(data)} records")
 
         # This will send the upsert as async, the results will just be a jobId that you can query for results later (in theory)
@@ -215,7 +218,7 @@ class HarvardSalesforce:
 
     # this is intended to compare record sets (coming from a get_data_object or other soql result set)
     def compare_records(self, object_name, ref_field, dataset1, dataset2, all=True):
-        logger.info(f"Comparing {object_name} Records:")
+        logger.debug(f"Comparing {object_name} Records:")
 
         # we want to skip these fields, they'll always be different
         ignore_fields = ['Id', 'attributes', 'OwnerId', 'Name', 'CreatedDate', 'CreatedById', 'LastModifiedDate', 
