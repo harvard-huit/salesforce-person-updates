@@ -32,17 +32,18 @@ if stack == 'developer':
 
 
 #### Collect action directive ######
-action = os.getenv("action") or None
+action = os.getenv("action", "undefined")
 if os.getenv("person_ids"):
     person_ids = json.loads(os.getenv("person_ids"))
 else:
     person_ids = []
 
 batch_size_override = os.getenv("BATCH_SIZE") or None
+LOCAL = os.getenv("LOCAL") or False
 ####################################
 
 class SalesforcePersonUpdates:
-    def __init__(self):
+    def __init__(self, local=False):
         try:
             if(stack != "developer" and False):
                 # NOTE: this doesn't work / make sense as is
@@ -55,11 +56,13 @@ class SalesforcePersonUpdates:
             self.salesforce_instance_id = os.getenv("SALESFORCE_INSTANCE_ID", None)
             self.table_name = os.getenv("TABLE_NAME", None)
 
+            self.action = os.getenv("action", None)
+
             current_time_mash = datetime.now().strftime('%Y%m%d%H%M')
-            self.run_id = f"{self.salesforce_instance_id}_{current_time_mash}"
+            self.run_id = f"{self.action}_{current_time_mash}"
 
 
-            if os.getenv("LOCAL") == "True":
+            if local == "True":
                 self.app_config = AppConfig(id=None, table_name=None, local=True)
             else:
                 if self.salesforce_instance_id is None or self.table_name is None:
@@ -172,7 +175,7 @@ class SalesforcePersonUpdates:
     # valid types are "full" and "update"
     def departments_data_load(self, type="full"):
         logger.info(f"Starting a department {type} load")
-        self.departments = Departments(apikey=os.getenv("DEPT_APIKEY"))
+        self.departments = Departments(apikey=self.app_config.dept_apikey)
 
         hashed_departments = self.departments.departments
         logger.debug(f"Successfully got {len(self.departments.results)} departments")
@@ -231,7 +234,7 @@ class SalesforcePersonUpdates:
 
 
         for object, object_data in data.items():
-            logger.info(f"Upserting to {object} with {len(object_data)} records")
+            logger.debug(f"Upserting to {object} with {len(object_data)} records")
             self.hsf.pushBulk(object, object_data)
 
         self.transformer.hashed_ids = self.hsf.getUniqueIds(
@@ -257,7 +260,7 @@ class SalesforcePersonUpdates:
         branch_threads = []
 
         for object, object_data in data.items():
-            logger.info(f"Upserting to {object} with {len(object_data)} records")
+            logger.debug(f"Upserting to {object} with {len(object_data)} records")
 
             # unthreaded:
             # self.hsf.pushBulk(object, object_data)    
@@ -266,6 +269,8 @@ class SalesforcePersonUpdates:
             thread.start()
             branch_threads.append(thread)
         
+        # it's okat to join them all here as this will generally be done in a sub-thread, 
+        #   so they won't block the main thread
         for thread in branch_threads:
             thread.join()
 
@@ -274,9 +279,6 @@ class SalesforcePersonUpdates:
         #         self.threads.remove(thread)
 
 
-        # NOTE: see notes on this function
-        # hsf.setDeleteds(object='Contact', id_type='HUDA__hud_UNIV_ID__c', deleted_flag='lastName', ids=['31598567'])
-
     def update_single_person(self, huids):
         pds_query = self.app_config.pds_query
         if 'conditions' not in pds_query:
@@ -284,21 +286,19 @@ class SalesforcePersonUpdates:
         pds_query['conditions']['univid'] = huids
         # people = self.pds.get_people(pds_query)
 
-
         # self.process_people_batch(people=people)
-
 
         self.people_data_load(pds_query=pds_query)
 
-        logger.info(f"Finished spot data load. Waiting for batch jobs to finish. ")
+        logger.debug(f"Waiting for batch jobs to finish.")
         while(self.batch_threads):
-            #  logger.info(f"{len(self.batch_threads)} remaining threads")
             for thread in self.batch_threads.copy():
                 if not thread.is_alive():
                     self.batch_threads.remove(thread)
-
+        logger.info(f"Finished spot data load: {self.run_id}")
 
     def update_people_data_load(self, watermark: datetime=None):
+        logger.info(f"Processing updates since {watermark}")
         if not watermark:
             watermark = self.app_config.watermarks['person']
 
@@ -309,10 +309,10 @@ class SalesforcePersonUpdates:
         self.app_config.update_watermark("person")
 
     def full_people_data_load(self, dry_run=False):
-        logger.info(f"Processing a full data load!")
+        logger.info(f"Processing full data load")
         self.people_data_load(dry_run=dry_run)
 
-        logger.info(f"Finished full data load. Waiting for batch jobs to finish. ")
+        logger.debug(f"Waiting for batch jobs to finish.")
         while(self.batch_threads):
             #  logger.info(f"{len(self.batch_threads)} remaining threads")
             for thread in self.batch_threads.copy():
@@ -320,7 +320,7 @@ class SalesforcePersonUpdates:
                     self.batch_threads.remove(thread)
 
         self.app_config.update_watermark("person")
-
+        logger.info(f"Finished full data load: {self.run_id}")
 
     # This method creates a thread for each batch, this may seem like a lot, but it is necessitated by the following factors:
     #   1. If we rely on the async of a bulk push, we cannot get the results (created/updated/error results)
@@ -332,7 +332,7 @@ class SalesforcePersonUpdates:
     #       and the max bulk load jobs Salesforce will handle at once is 5.
     #       Some batch jobs will take an excessively long time (20 minutes) most will take 30 seconds.
     def people_data_load(self, dry_run=False, pds_query=None):
-        logger.info(f"Starting data load")
+        logger.debug(f"Starting data load")
 
         # without the pds_query, it uses the "full" configured query
         if pds_query is None:
@@ -356,7 +356,7 @@ class SalesforcePersonUpdates:
             self.batch_threads.append(thread)
 
         
-        logger.info(f"Finished batch {count}: {tally_count} of {total_count}")
+        logger.debug(f"Finished batch {count}: {tally_count} of {total_count}")
 
         max_count = (total_count / size)
 
@@ -384,7 +384,7 @@ class SalesforcePersonUpdates:
                 raise
 
             current_time = datetime.now().strftime('%H:%M:%S')
-            logger.info(f"Starting batch {count} with {len(self.batch_threads)} threads in process.")
+            logger.debug(f"Starting batch {count} with {len(self.batch_threads)} threads in process.")
 
             results = response['results']
             people = self.pds.make_people(results)
@@ -414,7 +414,7 @@ class SalesforcePersonUpdates:
             logger.error(f"PDS failed to retrieve all records ({tally_count} != {total_count})")
             raise Exception(f"Error: PDS failed to retrieve all records")
         else:
-            logger.info(f"Successfully finished data load: {self.run_id}")
+            logger.debug(f"Successfully finished data load: {self.run_id}")
 
     # This is intended for debug use only.
     # We should not be deleting any records.
@@ -442,9 +442,11 @@ class SalesforcePersonUpdates:
             if not dry_run:
                 self.hsf.delete_records(object_name=object_name, ids=ids)
 
-        logger.info(f"Delete Done, I hope you meant to do that.")
+        logger.warning(f"Delete Done, I hope you meant to do that.")
 
     def check_updateds(self):
+
+        logger.info(f"Checking PDS for records that are no longer being updated")
 
         # 1. Get all (external) IDs from Salesforce
         object_name = 'Contact'
@@ -485,6 +487,7 @@ class SalesforcePersonUpdates:
     # it isn't well fleshed out, but it works
     # What makes it helpful for testers is to have the output_folder set to something that is mapped to Sharepoint
     def compare_records(self):
+        logger.info(f"Comparing records: {person_ids}")
         output_folder = os.getenv("output_folder", "../test_output/")
 
         from openpyxl import Workbook
@@ -544,7 +547,7 @@ class SalesforcePersonUpdates:
 
     
 
-sfpu = SalesforcePersonUpdates()
+sfpu = SalesforcePersonUpdates(local=LOCAL)
 
 # We don't need to set up the logging to salesforce if we're running locally
 #  unless we're testing that
@@ -567,14 +570,27 @@ elif action == 'mark-not-updated':
     sfpu.check_updateds()
 elif action == 'compare':
     sfpu.compare_records()
+
+elif action == 'remove-unaffiliated-affiliations':
+    logger.info("remove-unaffiliated-affiliations action called")
+
+    # get all unaffiliated Affiliation records
+    result = sfpu.hsf.sf.query_all("SELECT Id FROM hed__Affiliation__c WHERE hed__Contact__c = null and HUDA__hud_PERSON_ROLES_KEY__c != null")
+    logger.info(f"Found {len(result['records'])} unaffiliated Affiliation records")
+
+    # delete them
+    ids = [{'Id': record['Id']} for record in result['records']]
+    sfpu.hsf.sf.bulk.hed__Affiliation__c.delete(ids)
+
+    if len(ids) > 0:
+        logger.warning(f"Deleted {len(ids)} unaffiliated Affiliation records")
+
 elif action == 'test':
-    # this action is for testing
     logger.info("test action called")
 
-    logger.info("done test action")
-
+    logger.info("test action finished")
 else: 
-    logger.warning(f"Warning: app triggered without a valid action: {action}, please see documentation for more information.")
+    logger.warning(f"App triggered without a valid action: {action}, please see documentation for more information.")
 
 
 

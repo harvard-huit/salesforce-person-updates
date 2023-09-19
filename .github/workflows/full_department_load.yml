@@ -1,5 +1,5 @@
-name: Full Person Data Load
-run-name: Full data load on ${{ github.event.inputs.environment }} for ${{ github.event.inputs.salesforce_instance_id }}
+name: Full Department Load
+run-name: Full Department Load on ${{ github.event.inputs.environment }} for ${{ github.event.inputs.salesforce_instance_id }}
 
 on:
   workflow_dispatch:
@@ -18,10 +18,6 @@ on:
         type: string
         required: true
         default: 'huit-full-sandbox'
-      batch_size:
-        type: number
-        required: false
-        default: 500
               
 
 env:
@@ -33,19 +29,10 @@ defaults:
 
 jobs:
   data_load: 
-    name: Full data load on ${{ github.event.inputs.environment }} for ${{ github.event.inputs.salesforce_instance_id }}
+    name: Full department load on ${{ github.event.inputs.environment }} for ${{ github.event.inputs.salesforce_instance_id }}
     runs-on: [ ubuntu-latest ]
 
     steps:
-    #   - name: test task_version value
-    #     run: |
-    #       echo "\"${{ github.event.inputs.task_version }}\""
-
-    #   - name: Set task version format
-    #     if: ${{ github.event.inputs.task_version != '' }}
-    #     run: |
-    #       echo "task_version=:${{ github.event.inputs.task_version }}" >> $GITHUB_ENV
-
 
       - name: Set admints-dev environment vars
         if: ${{ github.event.inputs.environment == 'dev' || github.event.inputs.environment == 'test' }}
@@ -79,8 +66,7 @@ jobs:
           role-external-id: ${{ secrets.EXTERNAL_ID }}
 
 
-
-      - name: get current identity again
+      - name: get current identity
         run: aws sts get-caller-identity
 
       - name: Create Overrides
@@ -99,10 +85,7 @@ jobs:
                   "value": "${{ env.TABLE_NAME }}"
                 }, {
                   "name": "action", 
-                  "value": "full-person-load"
-                }, {
-                  "name": "batch_size", 
-                  "value": "${{ github.event.inputs.batch_size }}"
+                  "value": "full-department-load"
                 }
               ]
             } 
