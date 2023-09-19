@@ -175,7 +175,7 @@ class SalesforcePersonUpdates:
     # valid types are "full" and "update"
     def departments_data_load(self, type="full"):
         logger.info(f"Starting a department {type} load")
-        self.departments = Departments(apikey=os.getenv("DEPT_APIKEY"))
+        self.departments = Departments(apikey=self.app_config.dept_apikey)
 
         hashed_departments = self.departments.departments
         logger.debug(f"Successfully got {len(self.departments.results)} departments")
