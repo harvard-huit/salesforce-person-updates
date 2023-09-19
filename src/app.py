@@ -133,6 +133,7 @@ class SalesforcePersonUpdates:
             # NOTE: do not add a logger statement in this function, it will cause an infinite loop
             def format(self, record: LogRecord) -> str:
                 log_data = {
+                    'salesforce_instance_id': self.salesforce_instance_id,
                     'run_id': self.run_id,
                     'timestamp': self.formatTime(record),
                     'level': record.levelname,
