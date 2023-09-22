@@ -273,6 +273,7 @@ class SalesforceTransformer:
                 for pds_branch_id, branch in best_branches.items():
                     
                     current_record[object_name] = {}
+                    
                     branch_name = branch['branch_name']
                     
                     # if this id is in the hashed_ids, that means it'll be an update and we need to add the Object Id
@@ -298,9 +299,9 @@ class SalesforceTransformer:
                             value = None
                             source_pieces = source.split(".")
 
-                            # this might be needed for affiliations? (removing temporarily to get non-branch values in)
-                            if source_pieces[0] not in [branch_name, 'sf']:
-                                continue
+                            # this might be needed for affiliations
+                            # if source_pieces[0] not in [branch_name, 'sf']:
+                            #     continue
                             
                             branch_temp = branch
                             if source_pieces[0] in source_data_object:

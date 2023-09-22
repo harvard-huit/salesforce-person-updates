@@ -1,5 +1,5 @@
 name: Build Image
-run-name: Build Image (${{ github.event.inputs.version }})
+run-name: Build Image ${{ github.event.inputs.version }}
 
 on:
   push:
