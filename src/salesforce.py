@@ -232,13 +232,13 @@ class HarvardSalesforce:
         result = {}
 
         if len(dataset1['records']) != len(dataset2['records']):
-            logger.error(f"Error: not correct number of records")
-            logger.error(f"Sand has:")
+            logger.warning(f"{object_name}: not correct number of records")
+            logger.info(f"Sand has:")
             for record in dataset1['records']:
-                logger.error(f"{record[ref_field]}")
-            logger.error(f"Prod has:")
+                logger.info(f"{record[ref_field]}")
+            logger.info(f"Prod has:")
             for record in dataset2['records']:
-                logger.error(f"{record[ref_field]}")
+                logger.info(f"{record[ref_field]}")
             result['ids'] = {
                 "sand": [record[ref_field] for record in dataset1['records']],
                 "prod": [record[ref_field] for record in dataset2['records']]
@@ -287,7 +287,7 @@ class HarvardSalesforce:
     # this function soft-deletes the records included in the list argument
     # WARNING: this currently has no real world use, it's just being used for debugging purposes
     def delete_records(self, object_name: dict, ids: list):
-        logger.warn(f"WARNING: bulk soft DELETE to {object} with {ids}")
+        logger.warn(f"WARNING: bulk soft DELETE to {object_name} with {ids}")
         logger.warn(f"WARNING: this operation has no real world use and should only be used for debugging purposes in test orgs")
 
         data = []
@@ -295,8 +295,9 @@ class HarvardSalesforce:
             data.append({
                 'Id': id
             })
-        responses = self.sf.bulk.__getattr__(object_name).delete(data,batch_size=10000,use_serial=True)
-        logger.warn(f"WARNING: DELETED ids from {object_name} with response: {responses}")
+        if data:
+            responses = self.sf.bulk.__getattr__(object_name).delete(data,batch_size=10000,use_serial=True)
+            logger.warn(f"WARNING: DELETED ids from {object_name} with response: {responses}")
         return True
 
     # NOTE: the integration user I'm using seems to only have GET/POST/HEAD permissions (on standard objects at least)

@@ -300,8 +300,8 @@ class SalesforceTransformer:
                             source_pieces = source.split(".")
 
                             # this might be needed for affiliations
-                            # if source_pieces[0] not in [branch_name, 'sf']:
-                            #     continue
+                            if (source_pieces[0] not in [branch_name, 'sf']) and isinstance(source_value, list)):
+                                continue
                             
                             branch_temp = branch
                             if source_pieces[0] in source_data_object:

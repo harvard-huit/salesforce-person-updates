@@ -586,6 +586,21 @@ elif action == 'remove-unaffiliated-affiliations':
     if len(ids) > 0:
         logger.warning(f"Deleted {len(ids)} unaffiliated Affiliation records")
 
+elif action == 'remove-all-contacts':
+    logger.info("remove-all-contacts")
+
+    # get all unaffiliated Affiliation records
+    result = sfpu.hsf.sf.query_all("SELECT Id, HUDA__hud_UNIV_ID__c FROM Contact LIMIT 10000")
+    logger.info(f"Found {len(result['records'])} Contact records")
+
+    # if len(ids) > 0:
+    #     logger.warning(f"Deleted {len(ids)} Contact records")
+
+    # delete them
+    ids = [record['HUDA__hud_UNIV_ID__c'] for record in result['records']]
+    sfpu.delete_people(dry_run=False, huids=ids)    
+
+
 elif action == 'test':
     logger.info("test action called")
 
