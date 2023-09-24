@@ -57,6 +57,7 @@ class SalesforceTransformerTest(unittest.TestCase):
                 },
                 "fields": {
                     "salesforceId": "names.personNameKey",
+                    "rootId": "personKey",
                     "FirstName__c": "names.firstName",
                     "LastName__c": "names.lastName",
                     "Name_Contact__c": "sf.contact.id",
@@ -274,6 +275,7 @@ class SalesforceTransformerTest(unittest.TestCase):
                 {
                     "Id": "N11",
                     "salesforceId": "11",
+                    "rootId": "1",
                     "FirstName__c": "Happy",
                     "LastName__c": "Gilmore",
                     "Name_Contact__c": "A1",
@@ -282,6 +284,7 @@ class SalesforceTransformerTest(unittest.TestCase):
                 {
                     "Id": "N22",
                     "salesforceId": "22",
+                    "rootId": "2",
                     "FirstName__c": "Nana",
                     "LastName__c": "Visitor",
                     "Name_Contact__c": "A2",
@@ -290,6 +293,7 @@ class SalesforceTransformerTest(unittest.TestCase):
                 {
                     "Id": "N21",
                     "salesforceId": "21",
+                    "rootId": "2",
                     "FirstName__c": "Nana",
                     "LastName__c": "Tucker",
                     "Name_Contact__c": "A2",
@@ -298,6 +302,7 @@ class SalesforceTransformerTest(unittest.TestCase):
                 {
                     "Id": "N32",
                     "salesforceId": "32",
+                    "rootId": "3",
                     "FirstName__c": "JaZahn",
                     "LastName__c": "Clevenger",
                     "Name_Contact__c": "A3",
@@ -306,6 +311,7 @@ class SalesforceTransformerTest(unittest.TestCase):
                 {
                     "Id": "N31",
                     "salesforceId": "31",
+                    "rootId": "3",
                     "FirstName__c": "Jazahn",
                     "LastName__c": "Clevenger",
                     "Name_Contact__c": "A3",
@@ -475,6 +481,11 @@ class SalesforceTransformerTest(unittest.TestCase):
                     "length": 100
                 },
                 "salesforceId": {
+                    "type": "string",
+                    "updateable": True,
+                    "length": 100
+                },
+                "rootId": {
                     "type": "string",
                     "updateable": True,
                     "length": 100
