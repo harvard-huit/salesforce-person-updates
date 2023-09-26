@@ -2,10 +2,10 @@ name: Mirror Repository
 run-name: Mirror Repository
 
 on:
-#   push:
-#     branches: 
-#         - main
-#         - dev
+  push:
+    branches: 
+        - main
+        # - dev
   workflow_dispatch:
 
 env:
