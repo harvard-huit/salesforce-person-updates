@@ -223,7 +223,7 @@ class HarvardSalesforce:
         # we want to skip these fields, they'll always be different
         ignore_fields = ['Id', 'attributes', 'OwnerId', 'Name', 'CreatedDate', 'CreatedById', 'LastModifiedDate', 
                          'LastModifiedById', 'SystemModstamp', 'AccountId', 'LastActivityDate', 'LastViewedDate', 
-                         'LastReferenceDated', 'IAM_Grouper_WS_Customers__c', 'IAM_Grouper_App_Customers__c', 
+                         'LastReferencedDated', 'IAM_Grouper_WS_Customers__c', 'IAM_Grouper_App_Customers__c', 
                          'PAM__Partner_Server_URL_80__c', 'IAM_Harvard_Key_Auth_CAS_Owners__c', 'IAM_Midas_Customers__c',
                          'CloudAware_Application__c', 'PAM__Contact_Score_Rating__c', 'PAM__Contact_Score__c',
                          'IAM_IDP_Customers__c', 'IAM_IIQ_Customers__c'
