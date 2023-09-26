@@ -29,6 +29,6 @@ jobs:
           local_repository: github.huit.harvard.edu/HUIT/salesforce-person-updates
           local_github_user: ${{ github.actor }} # from the event context
           local_github_token: ${{ github.token }} # from the event context
-          remote_repository: ${{ github.env.public_repository }}
+          remote_repository: ${{ env.public_repository }}
           remote_github_user: jazahn
           remote_github_token: ${{ secrets.PUBLIC_GITHUB_TOKEN }} 
