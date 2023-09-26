@@ -1,0 +1,34 @@
+name: Mirror Repository
+run-name: Mirror Repository
+
+on:
+#   push:
+#     branches: 
+#         - main
+#         - dev
+  workflow_dispatch:
+
+env:
+  public_repository: "github.com/harvard-huit/salesforce-person-updates"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  mirror:
+    name: Mirror Repository
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Mirror Action
+        uses: HUIT/github-mirror-action@main
+        with:
+          # Required
+          local_repository: github.huit.harvard.edy/HUIT/salesforce-person-updates
+          local_github_user: ${{ github.actor }} # from the event context
+          local_github_token: ${{ github.token }} # from the event context
+          remote_repository: ${{ github.env.public_repository }}
+          remote_github_user: "jazahn"
+          remote_github_token: ${{ secrets.PUBLIC_GITHUB_TOKEN }} 
