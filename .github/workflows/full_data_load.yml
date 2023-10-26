@@ -134,7 +134,7 @@ jobs:
         run: |
           aws ecs run-task \
             --cluster aais-services-${{ github.event.inputs.environment }}-cluster \
-            --overrides '{"containerOverrides": ${{ env.CONTAINER_OVERRIDES }} }' \
+            --overrides '{"cpu": ${{ github.event.inputs.cpu }}, "memory": ${{ github.event.inputs.memory }}, "containerOverrides": ${{ env.CONTAINER_OVERRIDES }} }' \
             --task-definition arn:aws:ecs:us-east-1:${{ env.account }}:task-definition/aais-services-${{ github.event.inputs.environment }}-feed-salesforce-person-updates${{ env.task_version }} \
             --network-configuration '{ "awsvpcConfiguration": { "assignPublicIp":"DISABLED", "securityGroups": ["${{ env.security_group }}"], "subnets": ["${{ env.subnet }}"]}}' \
             --launch-type FARGATE
