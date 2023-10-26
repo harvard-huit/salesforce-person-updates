@@ -22,7 +22,27 @@ on:
         type: number
         required: false
         default: 500
-              
+      # 
+      cpu:
+        type: choice
+        required: false
+        default: '1024'
+        options:
+          - '1024'
+      memory:
+        type: choice
+        required: false
+        default: '2048'
+        options:
+          - '2048'
+          - '3072'
+          - '4096'
+          - '5120'
+          - '6144'
+          - '7168'
+          - '8192'
+          
+                  
 
 env:
   AWS_REGION: us-east-1
@@ -88,8 +108,8 @@ jobs:
           CONTAINER_OVERRIDES='[ 
             {
               "name": "aais-services-${{ github.event.inputs.environment }}-feed-salesforce-person-updates", 
-              "cpu": 1024,
-              "memory": 2048,
+              "cpu": $((${{ github.event.inputs.cpu }} + 0)),
+              "memory": $((${{ github.event.inputs.memory }} + 0)),
               "environment": [ 
                 {
                   "name": "SALESFORCE_INSTANCE_ID", 

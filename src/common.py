@@ -239,6 +239,7 @@ class AppConfig():
             except Exception as e:
                 logger.error(f"Error: failiure to update dynamo table {self.table_name} with watermarks {string_watermarks}")
                 raise e
+
 #============================================================================================
 # Other
 #============================================================================================
@@ -262,6 +263,8 @@ def isTaskRunning():
         cluster=cluster_name,
         family=task_family,
     )['taskArns']
+
+    logger.info(mylist)
 
     # note that it will retrieve itself, so we need to make sure more than one is running
     # to determine if it's "already" running

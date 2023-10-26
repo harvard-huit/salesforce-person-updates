@@ -604,6 +604,8 @@ elif action == 'remove-all-contacts':
 elif action == 'test':
     logger.info("test action called")
 
+    isTaskRunning()
+
     logger.info("test action finished")
 else: 
     logger.warning(f"App triggered without a valid action: {action}, please see documentation for more information.")
