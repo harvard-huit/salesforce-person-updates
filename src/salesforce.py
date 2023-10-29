@@ -78,6 +78,7 @@ class HarvardSalesforce:
             created_count = 0
             updated_count = 0
             error_count = 0
+            errored_data_batch = []
             for index, response in enumerate(responses):
                 if response['success'] != True: 
                     
@@ -90,21 +91,29 @@ class HarvardSalesforce:
                             logger.error(f"Error: DUPLICATE DETECTED (unresoved): {errored_data}")
                         else:
                             logger.error(f"Error: DUPLICATE DETECTED -- Errored Data: {errored_data}")
-                            if self.check_duplicate(object, errored_data):
-                                error_count -= 1
+                            errored_data_batch.append(errored_data)
 
-                    if response['errors'][0]['statusCode'] == 'CANNOT_INSERT_UPDATE_ACTIVATE_ENTITY':
-                        # get errored ids
-                        pass
-                        # self.pushBulk(object_name, [errored_data_object], retry=True)
+                    else: 
+                        error_count += 1
+
+                    # if response['errors'][0]['statusCode'] == 'CANNOT_INSERT_UPDATE_ACTIVATE_ENTITY':
+                    #     # get errored ids
+                    #     pass
+                    #     # self.pushBulk(object_name, [errored_data_object], retry=True)
                         
-                    error_count += 1
                 else:
                     if response['created']:
                         created_count += 1
                     else:
                         updated_count += 1
                     logger.debug(response)
+
+            if len(errored_data_batch) > 0:
+                dupe_errors = self.check_duplicate(object, errored_data_batch)
+                error_count += dupe_errors
+
+
+
             if updated_count > 0:
                 logger.info(f"Updated {object} Records: {updated_count}")
             if created_count > 0:
@@ -680,7 +689,10 @@ class HarvardSalesforce:
 
     # this method is trying to find an Id for a record that failed as a dupe
     # the `errored_data_object` should be of the same record that triggered the error
-    def check_duplicate(self, object_name, errored_data_object, dry_run=False):
+    def check_duplicate(self, object_name, errored_data_objects, dry_run=False):
+
+
+        error_count = len(errored_data_objects)
 
         try:
 
@@ -690,49 +702,55 @@ class HarvardSalesforce:
             # build the where clause
             whereses = []
             where_clause = ""
-            for field in unique_object_fields:
-                if field in errored_data_object:
-                    field_value = errored_data_object[field]
-                    whereses.append(f"{field} = '{field_value}'")
 
-            # this is to handle the standard contact duplicate matching rule, or at least the most common breaking of it
-            # see: https://help.salesforce.com/s/articleView?language=en_US&id=sf.matching_rules_standard_contact_rule.htm&type=5
-            if object_name == 'Contact':
-                standard_contact_rule_string = ''
-                email = None
-                first_name = None
-                last_name = None
-                if 'Email' in errored_data_object and 'FirstName' in errored_data_object and 'LastName' in errored_data_object:
-                    email = errored_data_object['Email']
-                    first_name = errored_data_object['FirstName']
-                    last_name = errored_data_object['LastName']
-                    standard_contact_rule_string = f"(Email = '{email}' and LastName = '{last_name}' and FirstName = '{first_name}')"
-                    
-                    whereses.append(f"{standard_contact_rule_string}")
-            
-            where_clause = " or ".join(whereses)
+            for errored_data_object in errored_data_objects:
 
-            select_string = f"SELECT {object_name}.Id FROM {object_name} WHERE {where_clause}"
-            logger.debug(select_string)
-            sf_data = self.sf.query_all(select_string)
-            logger.debug(f"got this data from salesforce: {sf_data['records']}")
+                for field in unique_object_fields:
+                    if field in errored_data_object:
+                        field_value = errored_data_object[field]
+                        whereses.append(f"{field} = '{field_value}'")
 
-            # go through each record 
-            if len(sf_data['records']) > 1:
-                logger.error(f"Error: too many records found on object {object_name} with this data: {errored_data_object} -- Ids: {sf_data}")
-            elif len(sf_data['records']) < 1:
-                logger.error(f"Error: no records found on object {object_name} with this data: {errored_data_object}")
-            else:
-                found_id = sf_data['records'][0]['Id']
-                logger.info(f"Success resolving duplicate! id: {found_id} trying to re-push record")
-                errored_data_object['Id'] = found_id
-                if not dry_run:
-                    self.pushBulk(object_name, [errored_data_object], dupe=True)
-                return True
+                # this is to handle the standard contact duplicate matching rule, or at least the most common breaking of it
+                # see: https://help.salesforce.com/s/articleView?language=en_US&id=sf.matching_rules_standard_contact_rule.htm&type=5
+                if object_name == 'Contact':
+                    standard_contact_rule_string = ''
+                    email = None
+                    first_name = None
+                    last_name = None
+                    if 'Email' in errored_data_object and 'FirstName' in errored_data_object and 'LastName' in errored_data_object:
+                        email = errored_data_object['Email']
+                        first_name = errored_data_object['FirstName']
+                        last_name = errored_data_object['LastName']
+                        standard_contact_rule_string = f"(Email = '{email}' and LastName = '{last_name}' and FirstName = '{first_name}')"
+                        
+                        whereses.append(f"{standard_contact_rule_string}")
+                
+                where_clause = " or ".join(whereses)
+
+                select_string = f"SELECT {object_name}.Id FROM {object_name} WHERE {where_clause}"
+                logger.debug(select_string)
+                sf_data = self.sf.query_all(select_string)
+                logger.debug(f"got this data from salesforce: {sf_data['records']}")
+
+                # go through each record 
+                if len(sf_data['records']) > 1:
+                    logger.error(f"Error: too many records found on object {object_name} with this data: {errored_data_object} -- Ids: {sf_data}")
+                elif len(sf_data['records']) < 1:
+                    logger.error(f"Error: no records found on object {object_name} with this data: {errored_data_object}")
+                else:
+                    found_id = sf_data['records'][0]['Id']
+                    logger.info(f"Success resolving duplicate! id: {found_id} trying to re-push record")
+                    error_count -= 1
+                    errored_data_object['Id'] = found_id
+                    errored_data_objects.append(errored_data_object)
+
+            if not dry_run:
+                self.pushBulk(object_name, errored_data_objects, dupe=True)
+            return error_count
 
         except Exception as e:
             logger.error(f"Error with duplicate resolution: {e}")
-            return False
+            return error_count
 
 
 
