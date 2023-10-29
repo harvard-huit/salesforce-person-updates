@@ -143,7 +143,10 @@ class SalesforcePersonUpdates:
                     'lineno': record.lineno
                 }
 
-                self.sfpu.push_log(message=record.getMessage(), levelname=record.levelname, datetime=None, run_id=sfpu.run_id)
+                try: 
+                    self.sfpu.push_log(message=record.getMessage(), levelname=record.levelname, datetime=None, run_id=sfpu.run_id)
+                except Exception as e:
+                    log_data['log_error'] = str(e)
 
                 # return super().format(record)
                 return json.dumps(log_data)
@@ -170,7 +173,7 @@ class SalesforcePersonUpdates:
         }
         try:
             response = self.hsf.sf.__getattr__(log_object).create(data)
-        except Exception as e:
+        except Exception as e: 
             raise Exception(f"Logging failed: {data} :: {e}")
 
     # valid types are "full" and "update"

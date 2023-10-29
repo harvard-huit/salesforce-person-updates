@@ -51,7 +51,7 @@ class HarvardSalesforce:
     # NOTE: the Bulk API can take a max of 10000 records at a time
     # a single record will take anywhere from 2-50 seconds
     # dupe: this makes sure we don't keep retrying a dupe check
-    def pushBulk(self, object, data, dupe=False, id_name='Id'):
+    def pushBulk(self, object, data, dupe=False, id_name='Id', retry=False):
         if data is None or len(data) == 0:
             logger.warn(f"No data to push to {object}")
             return True
@@ -92,6 +92,12 @@ class HarvardSalesforce:
                             logger.error(f"Error: DUPLICATE DETECTED -- Errored Data: {errored_data}")
                             if self.check_duplicate(object, errored_data):
                                 error_count -= 1
+
+                    if response['errors'][0]['statusCode'] == 'CANNOT_INSERT_UPDATE_ACTIVATE_ENTITY':
+                        # get errored ids
+                        pass
+                        # self.pushBulk(object_name, [errored_data_object], retry=True)
+                        
                     error_count += 1
                 else:
                     if response['created']:
@@ -404,7 +410,7 @@ class HarvardSalesforce:
     
     # this will try to make sure the data going to the sf object is the right type
     def validate(self, object, field, value, identifier):
-        logger.debug(f"validating the value ({value}) for the field: {object}.{field} from {identifier}")
+        # logger.debug(f"validating the value ({value}) for the field: {object}.{field} from {identifier}")
         if object not in self.type_data:
             logger.warn("Warning: no type data found, run getTypeMap() first for better performance")
             self.type_data([object])
