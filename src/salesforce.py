@@ -61,51 +61,54 @@ class HarvardSalesforce:
         # responses = self.sf.bulk.__getattr__(object).upsert(data, external_id_field=id_name, batch_size=5000, use_serial=True, bypass_results=True)
 
         # This is the sync/blocking version of the upsert, it will return with the results of each record
-        responses = self.sf.bulk.__getattr__(object).upsert(data, external_id_field=id_name)
-        
-        
-        # Keeping this in here as a way to work with async pushes in the future
-        # logger.info(f"{responses}")
-        # for response in responses:
-        #     if 'job_id' in response:
-        #         self.jobs.append(response['job_id'])
-        #     elif 'bypass_results' not in response:
-        #         logger.warning(f"Bulk response with no job id: {response}")
-        # self.log_jobs()
+        try: 
+            responses = self.sf.bulk.__getattr__(object).upsert(data, external_id_field=id_name)
+            
+            
+            # Keeping this in here as a way to work with async pushes in the future
+            # logger.info(f"{responses}")
+            # for response in responses:
+            #     if 'job_id' in response:
+            #         self.jobs.append(response['job_id'])
+            #     elif 'bypass_results' not in response:
+            #         logger.warning(f"Bulk response with no job id: {response}")
+            # self.log_jobs()
 
 
-        created_count = 0
-        updated_count = 0
-        error_count = 0
-        for index, response in enumerate(responses):
-            if response['success'] != True: 
-                
-                errored_data = data[index]
-                logger.error(f"Error in bulk data load: {response['errors']} ({errored_data})")
+            created_count = 0
+            updated_count = 0
+            error_count = 0
+            for index, response in enumerate(responses):
+                if response['success'] != True: 
+                    
+                    errored_data = data[index]
+                    logger.error(f"Error in bulk data load: {response['errors']} ({errored_data})")
 
-                if response['errors'][0]['statusCode'] == 'DUPLICATES_DETECTED':
+                    if response['errors'][0]['statusCode'] == 'DUPLICATES_DETECTED':
 
-                    if dupe:
-                        logger.error(f"Error: DUPLICATE DETECTED (unresoved): {errored_data}")
-                    else:
-                        logger.error(f"Error: DUPLICATE DETECTED -- Errored Data: {errored_data}")
-                        if self.check_duplicate(object, errored_data):
-                            error_count -= 1
-                error_count += 1
-            else:
-                if response['created']:
-                    created_count += 1
+                        if dupe:
+                            logger.error(f"Error: DUPLICATE DETECTED (unresoved): {errored_data}")
+                        else:
+                            logger.error(f"Error: DUPLICATE DETECTED -- Errored Data: {errored_data}")
+                            if self.check_duplicate(object, errored_data):
+                                error_count -= 1
+                    error_count += 1
                 else:
-                    updated_count += 1
-                logger.debug(response)
-        if updated_count > 0:
-            logger.info(f"Updated {object} Records: {updated_count}")
-        if created_count > 0:
-            logger.info(f"Created {object} Records: {created_count}")
-        if error_count > 0:
-            logger.info(f"Errored {object} Records: {error_count}")
+                    if response['created']:
+                        created_count += 1
+                    else:
+                        updated_count += 1
+                    logger.debug(response)
+            if updated_count > 0:
+                logger.info(f"Updated {object} Records: {updated_count}")
+            if created_count > 0:
+                logger.info(f"Created {object} Records: {created_count}")
+            if error_count > 0:
+                logger.info(f"Errored {object} Records: {error_count}")
 
-
+        except Exception as e:
+            logger.error(f"Error with data push: {e}")
+            raise e
 
         return True
     
@@ -673,58 +676,62 @@ class HarvardSalesforce:
     # the `errored_data_object` should be of the same record that triggered the error
     def check_duplicate(self, object_name, errored_data_object, dry_run=False):
 
-        # first we get all of the externalids/uniques for the object that we collected in type data
-        unique_object_fields = [i for i, obj in self.type_data[object_name].items() if obj['unique'] or obj['externalId']]
+        try:
 
-        # build the where clause
-        whereses = []
-        where_clause = ""
-        for field in unique_object_fields:
-            if field in errored_data_object:
-                field_value = errored_data_object[field]
-                whereses.append(f"{field} = '{field_value}'")
+            # first we get all of the externalids/uniques for the object that we collected in type data
+            unique_object_fields = [i for i, obj in self.type_data[object_name].items() if obj['unique'] or obj['externalId']]
 
-        # this is to handle the standard contact duplicate matching rule, or at least the most common breaking of it
-        # see: https://help.salesforce.com/s/articleView?language=en_US&id=sf.matching_rules_standard_contact_rule.htm&type=5
-        if object_name == 'Contact':
-            standard_contact_rule_string = ''
-            email = None
-            first_name = None
-            last_name = None
-            if 'Email' in errored_data_object and 'FirstName' in errored_data_object and 'LastName' in errored_data_object:
-                email = errored_data_object['Email']
-                first_name = errored_data_object['FirstName']
-                last_name = errored_data_object['LastName']
-                standard_contact_rule_string = f"(Email = '{email}' and LastName = '{last_name}' and FirstName = '{first_name}')"
-                
-                whereses.append(f"{standard_contact_rule_string}")
-        
-        where_clause = " or ".join(whereses)
+            # build the where clause
+            whereses = []
+            where_clause = ""
+            for field in unique_object_fields:
+                if field in errored_data_object:
+                    field_value = errored_data_object[field]
+                    whereses.append(f"{field} = '{field_value}'")
 
-        select_string = f"SELECT {object_name}.Id FROM {object_name} WHERE {where_clause}"
-        logger.debug(select_string)
-        sf_data = self.sf.query_all(select_string)
-        logger.debug(f"got this data from salesforce: {sf_data['records']}")
+            # this is to handle the standard contact duplicate matching rule, or at least the most common breaking of it
+            # see: https://help.salesforce.com/s/articleView?language=en_US&id=sf.matching_rules_standard_contact_rule.htm&type=5
+            if object_name == 'Contact':
+                standard_contact_rule_string = ''
+                email = None
+                first_name = None
+                last_name = None
+                if 'Email' in errored_data_object and 'FirstName' in errored_data_object and 'LastName' in errored_data_object:
+                    email = errored_data_object['Email']
+                    first_name = errored_data_object['FirstName']
+                    last_name = errored_data_object['LastName']
+                    standard_contact_rule_string = f"(Email = '{email}' and LastName = '{last_name}' and FirstName = '{first_name}')"
+                    
+                    whereses.append(f"{standard_contact_rule_string}")
+            
+            where_clause = " or ".join(whereses)
 
-        # go through each record 
-        if len(sf_data['records']) > 1:
-            logger.error(f"Error: too many records found on object {object_name} with this data: {errored_data_object} -- Ids: {sf_data}")
-        elif len(sf_data['records']) < 1:
-            logger.error(f"Error: no records found on object {object_name} with this data: {errored_data_object}")
-        else:
-            found_id = sf_data['records'][0]['Id']
-            logger.debug(f"Success resolving duplicate! id: {found_id} trying to re-push record")
-            errored_data_object['Id'] = found_id
-            if not dry_run:
-                self.pushBulk(object_name, [errored_data_object], dupe=True)
-            return True
+            select_string = f"SELECT {object_name}.Id FROM {object_name} WHERE {where_clause}"
+            logger.debug(select_string)
+            sf_data = self.sf.query_all(select_string)
+            logger.debug(f"got this data from salesforce: {sf_data['records']}")
+
+            # go through each record 
+            if len(sf_data['records']) > 1:
+                logger.error(f"Error: too many records found on object {object_name} with this data: {errored_data_object} -- Ids: {sf_data}")
+            elif len(sf_data['records']) < 1:
+                logger.error(f"Error: no records found on object {object_name} with this data: {errored_data_object}")
+            else:
+                found_id = sf_data['records'][0]['Id']
+                logger.info(f"Success resolving duplicate! id: {found_id} trying to re-push record")
+                errored_data_object['Id'] = found_id
+                if not dry_run:
+                    self.pushBulk(object_name, [errored_data_object], dupe=True)
+                return True
+
+        except Exception as e:
+            logger.error(f"Error with duplicate resolution: {e}")
+            return False
 
 
 
-
-
-        # then we use those ids to see if there's an Id for the record we're looking for
-        # we can do that in a single soql call
-        #   select Id from object_name where externalid1 = X || externalid2 = Y || email = Z and firstname and lastname ....
+            # then we use those ids to see if there's an Id for the record we're looking for
+            # we can do that in a single soql call
+            #   select Id from object_name where externalid1 = X || externalid2 = Y || email = Z and firstname and lastname ....
         
 

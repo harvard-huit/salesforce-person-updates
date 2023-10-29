@@ -311,17 +311,22 @@ class SalesforcePersonUpdates:
 
     def full_people_data_load(self, dry_run=False):
         logger.info(f"Processing full data load")
-        self.people_data_load(dry_run=dry_run)
 
-        logger.debug(f"Waiting for batch jobs to finish.")
-        while(self.batch_threads):
-            #  logger.info(f"{len(self.batch_threads)} remaining threads")
-            for thread in self.batch_threads.copy():
-                if not thread.is_alive():
-                    self.batch_threads.remove(thread)
+        try:
+            self.people_data_load(dry_run=dry_run)
 
-        self.app_config.update_watermark("person")
-        logger.info(f"Finished full data load: {self.run_id}")
+            logger.debug(f"Waiting for batch jobs to finish.")
+            while(self.batch_threads):
+                #  logger.info(f"{len(self.batch_threads)} remaining threads")
+                for thread in self.batch_threads.copy():
+                    if not thread.is_alive():
+                        self.batch_threads.remove(thread)
+
+            self.app_config.update_watermark("person")
+            logger.info(f"Finished full data load: {self.run_id}")
+        except Exception as e:
+            logger.error(f"Error with full data load")
+            raise e
 
     # This method creates a thread for each batch, this may seem like a lot, but it is necessitated by the following factors:
     #   1. If we rely on the async of a bulk push, we cannot get the results (created/updated/error results)
@@ -347,8 +352,7 @@ class SalesforcePersonUpdates:
         people = self.pds.make_people(results)
 
         count = 1
-        current_time = datetime.now().strftime('%H:%M:%S')
-        logger.debug(f"Starting batch {count}: {current_time}")
+        logger.info(f"Starting batch {count}: {tally_count} of {total_count}")
 
         if not dry_run:
             # self.process_people_batch(people)
@@ -357,7 +361,7 @@ class SalesforcePersonUpdates:
             self.batch_threads.append(thread)
 
         
-        logger.debug(f"Finished batch {count}: {tally_count} of {total_count}")
+        logger.info(f"Finished batch {count}: {tally_count} of {total_count}")
 
         max_count = (total_count / size)
 
@@ -385,7 +389,7 @@ class SalesforcePersonUpdates:
                 raise
 
             current_time = datetime.now().strftime('%H:%M:%S')
-            logger.debug(f"Starting batch {count} with {len(self.batch_threads)} threads in process.")
+            logger.info(f"Starting batch {count}: {tally_count} of {total_count} ({len(self.batch_threads)} threads in process).")
 
             results = response['results']
             people = self.pds.make_people(results)
@@ -397,7 +401,7 @@ class SalesforcePersonUpdates:
 
             current_count = response['count']
 
-            # logger.info(f"Finished batch {count}: {tally_count} of {total_count}")
+            logger.info(f"Finished batch {count}: {tally_count} of {total_count}")
             tally_count += current_count
 
             if count > (max_count + 5):
