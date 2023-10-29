@@ -22,7 +22,13 @@ on:
         type: number
         required: false
         default: 500
-      # 
+      debug:
+        type: choice
+        required: false
+        default: 'False'
+        options:
+          - 'True'
+          - 'False'
       cpu:
         type: choice
         required: false
@@ -123,6 +129,9 @@ jobs:
                 }, {
                   "name": "batch_size", 
                   "value": "${{ github.event.inputs.batch_size }}"
+                }, {
+                  "name": "DEBUG", 
+                  "value": "${{ github.event.inputs.debug }}"
                 }
               ]
             } 
