@@ -51,10 +51,13 @@ class HarvardSalesforce:
     # NOTE: the Bulk API can take a max of 10000 records at a time
     # a single record will take anywhere from 2-50 seconds
     # dupe: this makes sure we don't keep retrying a dupe check
-    def pushBulk(self, object, data, dupe=False, id_name='Id', retry=False):
+    def pushBulk(self, object, data, dupe=False, id_name='Id', retries=3):
         if data is None or len(data) == 0:
             logger.warn(f"No data to push to {object}")
             return True
+        if retries < 1:
+            logger.error(f"Error processing data, retries exhausted: {object}: {data}")
+            return len(data)
         logger.debug(f"upsert to {object} with {len(data)} records")
 
         # This will send the upsert as async, the results will just be a jobId that you can query for results later (in theory)
@@ -78,6 +81,7 @@ class HarvardSalesforce:
             created_count = 0
             updated_count = 0
             error_count = 0
+            dupe_data_batch = []
             errored_data_batch = []
             for index, response in enumerate(responses):
                 if response['success'] != True: 
@@ -91,10 +95,11 @@ class HarvardSalesforce:
                             logger.error(f"Error: DUPLICATE DETECTED (unresoved): {errored_data}")
                         else:
                             logger.error(f"Error: DUPLICATE DETECTED -- Errored Data: {errored_data}")
-                            errored_data_batch.append(errored_data)
+                            dupe_data_batch.append(errored_data)
 
                     else: 
-                        error_count += 1
+                        logger.error(f"Error: {response['errors'][0]['statusCode']}: {errored_data}")
+                        errored_data_batch.append(errored_data)
 
                     # if response['errors'][0]['statusCode'] == 'CANNOT_INSERT_UPDATE_ACTIVATE_ENTITY':
                     #     # get errored ids
@@ -108,9 +113,20 @@ class HarvardSalesforce:
                         updated_count += 1
                     logger.debug(response)
 
-            if len(errored_data_batch) > 0:
+            if len(dupe_data_batch) > 0:
                 dupe_errors = self.check_duplicate(object, errored_data_batch)
                 error_count += dupe_errors
+
+            if len(errored_data_batch) > 0:
+
+                logger.info(f"Trying errored records again {retries} more times")
+                retries -= 1
+                retry_response = self.pushBulk(object, errored_data_batch, retries=retries)
+
+                if isinstance(retry_response, int):
+                    error_count += retry_response
+                else:
+                    logger.info(f"Retry successful")
 
 
 
