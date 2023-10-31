@@ -388,8 +388,9 @@ class SalesforcePersonUpdates:
                 break
 
             if response['total_count'] != total_count:
-                logger.error(f"Something went wrong with PDS pagination. Total counts changed from {total_count} to {response['total_count']}")
-                raise
+                error_msg = f"Something went wrong with PDS pagination. Total counts changed from {total_count} to {response['total_count']}"
+                logger.error(response)
+                raise Exception(error_msg)
 
             current_time = datetime.now().strftime('%H:%M:%S')
             logger.info(f"Starting batch {count}: {tally_count} of {total_count} ({len(self.batch_threads)} threads in process).")
