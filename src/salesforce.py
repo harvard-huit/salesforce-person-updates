@@ -65,77 +65,89 @@ class HarvardSalesforce:
 
         # This is the sync/blocking version of the upsert, it will return with the results of each record
         try: 
-            responses = self.sf.bulk.__getattr__(object).upsert(data, external_id_field=id_name)
-            
-            
-            # Keeping this in here as a way to work with async pushes in the future
-            # logger.info(f"{responses}")
-            # for response in responses:
-            #     if 'job_id' in response:
-            #         self.jobs.append(response['job_id'])
-            #     elif 'bypass_results' not in response:
-            #         logger.warning(f"Bulk response with no job id: {response}")
-            # self.log_jobs()
+
+            while(retries > 0):
+
+                responses = self.sf.bulk.__getattr__(object).upsert(data, external_id_field=id_name)
+
+                # Keeping this in here as a way to work with async pushes in the future
+                # logger.info(f"{responses}")
+                # for response in responses:
+                #     if 'job_id' in response:
+                #         self.jobs.append(response['job_id'])
+                #     elif 'bypass_results' not in response:
+                #         logger.warning(f"Bulk response with no job id: {response}")
+                # self.log_jobs()
 
 
-            created_count = 0
-            updated_count = 0
-            error_count = 0
-            dupe_data_batch = []
-            errored_data_batch = []
-            for index, response in enumerate(responses):
-                if response['success'] != True: 
-                    
-                    errored_data = data[index]
-                    logger.error(f"Error in bulk data load: {response['errors']} ({errored_data})")
+                created_count = 0
+                updated_count = 0
+                error_count = 0
+                dupe_data_batch = []
+                errored_data_batch = []
 
-                    if response['errors'][0]['statusCode'] == 'DUPLICATES_DETECTED':
-
-                        if dupe:
-                            logger.error(f"Error: DUPLICATE DETECTED (unresoved): {errored_data}")
-                        else:
-                            logger.error(f"Error: DUPLICATE DETECTED -- Errored Data: {errored_data}")
-                            dupe_data_batch.append(errored_data)
-
-                    else: 
-                        logger.error(f"Error: {response['errors'][0]['statusCode']}: {errored_data}")
-                        errored_data_batch.append(errored_data)
-
-                    # if response['errors'][0]['statusCode'] == 'CANNOT_INSERT_UPDATE_ACTIVATE_ENTITY':
-                    #     # get errored ids
-                    #     pass
-                    #     # self.pushBulk(object_name, [errored_data_object], retry=True)
+                pds_external_id_name = self.unique_ids[object]['id_name']
+                created_ids = {
+                    "object": object,
+                    "external_id_field": pds_external_id_name,
+                    "ids": []
+                }
+                for index, response in enumerate(responses):
+                    if response['success'] != True: 
                         
-                else:
-                    if response['created']:
-                        created_count += 1
+                        errored_data = data[index]
+                        logger.error(f"Error in bulk data load: {response['errors']} ({errored_data})")
+
+                        if response['errors'][0]['statusCode'] == 'DUPLICATES_DETECTED':
+
+                            if dupe:
+                                logger.error(f"Error: DUPLICATE DETECTED (unresoved): {errored_data}")
+                            else:
+                                logger.error(f"Error: DUPLICATE DETECTED -- Errored Data: {errored_data}")
+                                dupe_data_batch.append(errored_data)
+
+                        else: 
+                            logger.error(f"Error: {response['errors'][0]['statusCode']}: {errored_data}")
+                            errored_data_batch.append(errored_data)
+
+                        # if response['errors'][0]['statusCode'] == 'CANNOT_INSERT_UPDATE_ACTIVATE_ENTITY':
+                        #     # get errored ids
+                        #     pass
+                        #     # self.pushBulk(object_name, [errored_data_object], retry=True)
+                            
                     else:
-                        updated_count += 1
-                    logger.debug(response)
+                        if response['created']:
+                            created_count += 1
+                        else:
+                            updated_count += 1
+                        logger.debug(response)
 
-            if len(dupe_data_batch) > 0:
-                dupe_errors = self.check_duplicate(object, errored_data_batch)
-                error_count += dupe_errors
+                if len(dupe_data_batch) > 0:
+                    dupe_errors = self.check_duplicate(object, errored_data_batch)
+                    error_count += dupe_errors
 
-            if len(errored_data_batch) > 0:
+                if len(errored_data_batch) > 0:
 
-                logger.info(f"Trying errored records again {retries} more times")
-                retries -= 1
-                retry_response = self.pushBulk(object, errored_data_batch, retries=retries)
+                    logger.info(f"Trying errored records again {retries} more times")
+                    retries -= 1
+                    retry_response = self.pushBulk(object, errored_data_batch, retries=retries)
 
-                if isinstance(retry_response, int):
-                    error_count += retry_response
-                else:
-                    logger.info(f"Retry successful")
+                    if isinstance(retry_response, int):
+                        error_count += retry_response
+                    else:
+                        logger.info(f"Retry successful")
 
 
+                if len(created_ids['ids']) > 0:
+                    logger.info(created_ids)
 
-            if updated_count > 0:
-                logger.info(f"Updated {object} Records: {updated_count}")
-            if created_count > 0:
-                logger.info(f"Created {object} Records: {created_count}")
-            if error_count > 0:
-                logger.info(f"Errored {object} Records: {error_count}")
+                if updated_count > 0:
+                    logger.info(f"Updated {object} Records: {updated_count}")
+                if created_count > 0:
+                    logger.info(f"Created {object} Records: {created_count}")
+                if error_count > 0:
+                    logger.info(f"Errored {object} Records: {error_count}")
+                break
 
         except Exception as e:
             logger.error(f"Error with data push: {e}")

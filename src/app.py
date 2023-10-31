@@ -364,7 +364,7 @@ class SalesforcePersonUpdates:
             self.batch_threads.append(thread)
 
         
-        logger.info(f"Finished batch {count}: {tally_count} of {total_count}")
+        # logger.info(f"Finished batch {count}: {tally_count} of {total_count}")
 
         max_count = (total_count / size)
 
@@ -592,7 +592,6 @@ elif action == 'remove-unaffiliated-affiliations':
 
     if len(ids) > 0:
         logger.warning(f"Deleted {len(ids)} unaffiliated Affiliation records")
-
 elif action == 'remove-all-contacts':
     logger.info("remove-all-contacts")
 
@@ -611,7 +610,7 @@ elif action == 'remove-all-contacts':
 elif action == 'test':
     logger.info("test action called")
 
-    isTaskRunning()
+    # isTaskRunning()
 
     logger.info("test action finished")
 else: 

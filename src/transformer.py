@@ -48,7 +48,9 @@ class SalesforceTransformer:
         data = {}
         best_branches = {}
         count = 1
+
         for source_data_object in source_data:
+            # source_data_object is the full data source object of a single record
 
             time_now = datetime.now().strftime('%H:%M:%S')
             logger.debug(f"person {count}: {time_now}")
@@ -89,6 +91,19 @@ class SalesforceTransformer:
 
                 is_branched = False
 
+                if not isinstance(source_id_name, list):
+                    source_id_names = [source_id_name]
+                else:
+                    source_id_names = source_id_name
+
+                is_external_id_on_source = False
+                for sin in source_id_names:
+                    sin = sin.split(".")[0]
+                    if sin in source_data_object and sin is not None:
+                        is_external_id_on_source = True
+
+                if not is_external_id_on_source:
+                    continue
 
                 # logger.debug(f"object: {object_name}")
 
@@ -342,22 +357,41 @@ class SalesforceTransformer:
 
                 if object_name not in data: 
                     data[object_name] = []
+                
+                # check to make sure current_record contains the appropriate external id for the object
+                # if isinstance(self.hashed_ids[object_name]['id_name'], list):
+                #     id_in_current_record = False
+                #     for id_name in self.hashed_ids[object_name]['id_name']:
+                #         if id_name in current_record:
+                #             id_in_current_record = True
+                #     if not id_in_current_record:
+                #         # logger.warn(f"Skipping record because it has no external id associated.")
+                #         continue
+                # else:
+                #     if self.hashed_ids[object_name]['id_name'] not in current_record:
+                #         # logger.warn(f"Skipping record because it has no external id associated.")
+                #         continue
+                    
 
                 if not skip_object:
                     if is_flat:
                         current_record = self.setId(source_data_object=source_data_object, object_name=object_name, current_record=current_record)
                         # data[object_name].append(current_record[object_name])
-                        yield { object_name: current_record[object_name] }
+                        if current_record and salesforce_id_name in current_record[object_name]:
+                            yield { object_name: current_record[object_name] }
                     elif not is_branched:
                         current_record = self.setId(source_data_object=source_data_object, object_name=object_name, current_record=current_record)
                         # data[object_name].append(current_record[object_name])
-                        yield { object_name: current_record[object_name] }
+                        if current_record and salesforce_id_name in current_record[object_name]:
+                            if current_record[object_name][salesforce_id_name] is not None:
+                                yield { object_name: current_record[object_name] }
                     else:
                         # data[object_name] = good_records
                         
                         for good_record in good_records:
-                            if good_record[salesforce_id_name]:
-                                yield { object_name: good_record }
+                            if salesforce_id_name in good_record:
+                                if good_record[salesforce_id_name] is not None:
+                                    yield { object_name: good_record }
                             else:
                                 logger.error(f"Problem processing {object_name} record, required external id not found: {good_record}")
                                 raise Exception(f"Problem processing {object_name} record, required external id not found: {good_record}")
@@ -412,6 +446,28 @@ class SalesforceTransformer:
             else:
                 raise Exception("Error: config object's Id requires a pds and salesforce value to be able to match")
         
+
+        dotted_id_name = None
+        id_names = self.hashed_ids[object_name]['id_name']
+        if not isinstance(id_names, list):
+            id_names = [id_names]
+        for id_name in id_names:
+            first = id_name.split(".")[0]
+            if first in source_data_object:
+                if source_data_object[first]:
+                    dotted_id_name = id_name
+
+        if dotted_id_name:
+            current_record[object_name][salesforce_id_name] = source_data_object[id_name]
+            if salesforce_id_name not in current_record[object_name]:
+                logger.error(f"This is a problem...")
+                logger.error(f"pingo")
+
+        else: 
+            # logger.error(f"{source_data_object} is missing an external id: {id_names}")
+            # raise ValueError("Error, source object needs an external id: ")
+            return {}
+
         return current_record
                         
         
