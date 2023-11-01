@@ -727,12 +727,12 @@ class HarvardSalesforce:
             # first we get all of the externalids/uniques for the object that we collected in type data
             unique_object_fields = [i for i, obj in self.type_data[object_name].items() if obj['unique'] or obj['externalId']]
 
-            # build the where clause
-            whereses = []
-            where_clause = ""
-
             retryable_data_objects = []
             for errored_data_object in errored_data_objects:
+
+                # build the where clause
+                whereses = []
+                where_clause = ""
 
                 for field in unique_object_fields:
                     if field in errored_data_object:
@@ -763,7 +763,7 @@ class HarvardSalesforce:
 
                 # go through each record 
                 if len(sf_data['records']) > 1:
-                    logger.error(f"Error: too many records found on object {object_name} with this data: {errored_data_object} -- Ids: {sf_data}")
+                    logger.error(f"Error: too many records found on object {object_name} with this select: {select_string} and this data: {errored_data_object} -- Ids: {sf_data}")
                 elif len(sf_data['records']) < 1:
                     logger.error(f"Error: no records found on object {object_name} with this data: {errored_data_object}")
                 else:
