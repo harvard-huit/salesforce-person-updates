@@ -123,7 +123,7 @@ class HarvardSalesforce:
                         logger.debug(response)
 
                 if len(dupe_data_batch) > 0:
-                    dupe_errors = self.check_duplicate(object, errored_data_batch)
+                    dupe_errors = self.check_duplicate(object, dupe_data_batch)
                     error_count += dupe_errors
 
                 if len(errored_data_batch) > 0:
@@ -731,6 +731,7 @@ class HarvardSalesforce:
             whereses = []
             where_clause = ""
 
+            retryable_data_objects = []
             for errored_data_object in errored_data_objects:
 
                 for field in unique_object_fields:
@@ -770,10 +771,10 @@ class HarvardSalesforce:
                     logger.info(f"Success resolving duplicate! id: {found_id} trying to re-push record")
                     error_count -= 1
                     errored_data_object['Id'] = found_id
-                    errored_data_objects.append(errored_data_object)
+                    retryable_data_objects.append(errored_data_object)
 
             if not dry_run:
-                self.pushBulk(object_name, errored_data_objects, dupe=True)
+                self.pushBulk(object_name, retryable_data_objects, dupe=True)
             return error_count
 
         except Exception as e:
