@@ -38,12 +38,8 @@ jobs:
         # with: 
         #   path: ./salesforce
 
-      - name: Create virtual env and activate
+      - name: Create virtual env
         run: |
-          whoami
-          pwd
-          ls -la
-          ls -la /
           python -m venv env
 
       - name: Get requirements
@@ -51,7 +47,8 @@ jobs:
           source env/bin/activate
           pwd
           ls -la
-          python -m pip config --cache-dir . global.extra-index-url https://artifactory.huit.harvard.edu/artifactory/api/pypi/ats-python/simple
+          ls -la ..
+          python -m pip config --cache-dir ../env global.extra-index-url https://artifactory.huit.harvard.edu/artifactory/api/pypi/ats-python/simple
           python -m pip install -r src/requirements.txt
 
       - name: Run tests
