@@ -35,15 +35,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-        with: 
-          path: ./salesforce
+        # with: 
+        #   path: ./salesforce
 
       - name: Create virtual env and activate
         run: |
+          whoami
           pwd
           ls -la
           ls -la /
-          cd salesforce
           python -m venv env
 
       - name: Get requirements
