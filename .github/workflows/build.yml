@@ -40,6 +40,9 @@ jobs:
 
       - name: Create virtual env and activate
         run: |
+          pwd
+          ls -la
+          ls -la /
           cd salesforce
           python -m venv env
 
