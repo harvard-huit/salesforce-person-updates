@@ -43,7 +43,7 @@ jobs:
       - name: Get requirements
         run: |
           source env/bin/activate
-          python -m pip config user.extra-index-url https://artifactory.huit.harvard.edu/artifactory/api/pypi/ats-python/simple
+          python -m pip config --cache-dir . global.extra-index-url https://artifactory.huit.harvard.edu/artifactory/api/pypi/ats-python/simple
           python -m pip install -r src/requirements.txt
           
 
