@@ -37,8 +37,8 @@ COPY src /opt/app
 COPY config.schema.json /opt/app
 WORKDIR /opt/app
 
-
 # # Install the Python modules our API application uses.
+RUN python${PYTHON_VERSION} -m pip config set global.index-url https://artifactory.huit.harvard.edu/artifactory/api/pypi/ats-python/simple
 RUN python${PYTHON_VERSION} -m pip install --user --no-cache-dir -r requirements.txt
 
 # Needed for boto to be able to find the parameter store

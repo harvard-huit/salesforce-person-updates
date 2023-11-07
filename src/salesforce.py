@@ -155,15 +155,15 @@ class HarvardSalesforce:
 
         return True
     
-    # this will check for outstanding jobs and log them if they're done
-    # this does NOT work to get results
-    # a call to /jobs/ingest/JOBID will return as it should, in json, but will only have 
-    #   - number of processed records 
-    #   - number of failed records
-    # That leaves us with no way to determine what actually went wrong
-    # /jobs/ingest/JOBID/successfulResults is supposed to return a CSV of the actual results of each record
-    #   However, it does not return anything. (same with /jobs/ingest/JOBID/failedResults)
     def log_jobs(self):
+        # this will check for outstanding jobs and log them if they're done
+        # this does NOT work to get results
+        # a call to /jobs/ingest/JOBID will return as it should, in json, but will only have 
+        #   - number of processed records 
+        #   - number of failed records
+        # That leaves us with no way to determine what actually went wrong
+        # /jobs/ingest/JOBID/successfulResults is supposed to return a CSV of the actual results of each record
+        #   However, it does not return anything. (same with /jobs/ingest/JOBID/failedResults)
 
 
         # NOTE: this query can get the status, but not results (i.e. if the job is finished)

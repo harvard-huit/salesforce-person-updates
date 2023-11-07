@@ -109,6 +109,7 @@ class SalesforcePersonUpdates:
             else:
                 batch_size = 500
             self.pds = pds.People(apikey=self.app_config.pds_apikey, batch_size=batch_size)
+            # self.pds_thread = 
 
             self.batch_threads = []
 
@@ -120,6 +121,8 @@ class SalesforcePersonUpdates:
         except Exception as e:
             logger.error(f"Run failed with error: {e}")
             raise e
+        
+    
 
     # this will make logs come out as json and send logs elsewhere
     def setup_logging(self, logger=logging.getLogger(__name__)):
@@ -282,7 +285,6 @@ class SalesforcePersonUpdates:
         #     if not thread.is_alive():
         #         self.threads.remove(thread)
 
-
     def update_single_person(self, huids):
         pds_query = self.app_config.pds_query
         if 'conditions' not in pds_query:
@@ -294,11 +296,6 @@ class SalesforcePersonUpdates:
 
         self.people_data_load(pds_query=pds_query)
 
-        logger.debug(f"Waiting for batch jobs to finish.")
-        while(self.batch_threads):
-            for thread in self.batch_threads.copy():
-                if not thread.is_alive():
-                    self.batch_threads.remove(thread)
         logger.info(f"Finished spot data load: {self.run_id}")
 
     def update_people_data_load(self, watermark: datetime=None):
@@ -331,99 +328,85 @@ class SalesforcePersonUpdates:
             logger.error(f"Error with full data load")
             raise e
 
-    # This method creates a thread for each batch, this may seem like a lot, but it is necessitated by the following factors:
-    #   1. If we rely on the async of a bulk push, we cannot get the results (created/updated/error results)
-    #      (as I was unable to get the API to return results. If this changes in the future, we could rethink that)
-    #      Without the results, we cannot resolve duplicate errors or have good logging
-    #   2. It needs to be async in some way to make sure the PDS pagination timeout does not happen
-    #   3. If we collect results and THEN process, that is too memory intensive and requires sizing up the instance
-    # NOTE: we don't allow more than 3 parent threads to run at a time
-    #       and the max bulk load jobs Salesforce will handle at once is 5.
-    #       Some batch jobs will take an excessively long time (20 minutes) most will take 30 seconds.
     def people_data_load(self, dry_run=False, pds_query=None):
+        # This method creates a thread for each batch, this may seem like a lot, but it is necessitated by the following factors:
+        #   1. If we rely on the async of a bulk push, we cannot get the results (created/updated/error results)
+        #      (as I was unable to get the API to return results. If this changes in the future, we could rethink that)
+        #      Without the results, we cannot resolve duplicate errors or have good logging
+        #   2. It needs to be async in some way to make sure the PDS pagination timeout does not happen
+        #   3. If we collect results and THEN process, that is too memory intensive and requires sizing up the instance
+        # NOTE: we don't allow more than 3 parent threads to run at a time
+        #       and the max bulk load jobs Salesforce will handle at once is 5.
+        #       Some batch jobs will take an excessively long time (20 minutes) most will take 30 seconds.
         logger.debug(f"Starting data load")
 
         # without the pds_query, it uses the "full" configured query
         if pds_query is None:
             pds_query = self.app_config.pds_query
-        response = self.pds.search(pds_query, paginate=True)
-        current_count = response['count']
-        size = self.pds.batch_size
-        total_count = response['total_count']
-        tally_count = current_count
-        results = response['results']
-        people = self.pds.make_people(results)
 
-        count = 1
-        logger.info(f"Starting batch {count}: {tally_count} of {total_count}")
 
-        if not dry_run:
-            # self.process_people_batch(people)
-            thread = threading.Thread(target=self.process_people_batch, args=(people,))
-            thread.start()
-            self.batch_threads.append(thread)
+        try:
+            self.pds.start_pagination(pds_query)
+            size = self.pds.batch_size
+            total_count = self.pds.total_count
+            batch_count = 1
+            max_count = (total_count / size)
 
-        
-        # logger.info(f"Finished batch {count}: {tally_count} of {total_count}")
 
-        max_count = (total_count / size)
+            while True:
+                tally_count = self.pds.count
+                logger.info(f"Starting batch {batch_count}: {tally_count} of {total_count}")
+                results = self.pds.next_page_results()
+                people = self.pds.make_people(results)
 
-        while(True):
-            # make sure we don't have too many threads going (max it at 3)
-            while len(self.batch_threads) >= 3:
-                time.sleep(10)
+                if total_count != self.pds.total_count:
+                    raise Exception(f"total_count changed from {total_count} to {self.pds.total_count}. The PDS pagination failed.")
+
+                logger.info(f"Starting batch {batch_count}: {tally_count} of {total_count} ({len(self.batch_threads)} threads in process).")
+
+                if len(results) < 1 and not self.pds.is_paginating:
+                    logger.info(f"Finished getting all records from the PDS")
+                    break
+                else: 
+                    batch_count += 1
+                    if batch_count > (max_count + 5):
+                        logger.error(f"Something probably went wrong with the batching. Max estimated batch number ({max_count}) exceeded.")
+                        raise Exception(f"estimated max_count: {max_count}, batch_size: {size}, batch_count: {batch_count}, total_count: {total_count}")
+
+
+                if not dry_run:
+                    # self.process_people_batch(people)
+                    thread = threading.Thread(target=self.process_people_batch, args=(people,))
+                    thread.start()
+                    self.batch_threads.append(thread)
+
+                    while len(self.batch_threads) >= 3:
+                        time.sleep(10)
+                        for thread in self.batch_threads.copy():
+                            # logger.info(f"{len(self.batch_threads)} unresolved threads")
+                            if not thread.is_alive():
+                                self.batch_threads.remove(thread)
+
+
+                # this will close off threads that are done, once closed, the threads will be able to bubble logs up
                 for thread in self.batch_threads.copy():
-                    # logger.info(f"{len(self.batch_threads)} unresolved threads")
                     if not thread.is_alive():
                         self.batch_threads.remove(thread)
 
-            # just adding a sleep here to give it a little breather, this may not be necessary
-            time.sleep(30)
+            logger.info(f"Finishing remaining processing threads: {len(self.batch_threads)}")
+            while(self.batch_threads):
+                for thread in self.batch_threads.copy():
+                    if not thread.is_alive():
+                        self.batch_threads.remove(thread)
 
-            response = self.pds.next()
-            count += 1
 
-            # this should trigger if response is None or {}, which is what happens when pagination finishes.
-            if not response:
-                break
+        except Exception as e:
+            logger.error(f"Something went wrong with the processing.")
+            self.pds.wait_for_pagination()
 
-            if response['total_count'] != total_count:
-                error_msg = f"Something went wrong with PDS pagination. Total counts changed from {total_count} to {response['total_count']}"
-                logger.error(response)
-                raise Exception(error_msg)
+        logger.info(f"Successfully finished data load: {self.run_id}")
 
-            current_time = datetime.now().strftime('%H:%M:%S')
-            logger.info(f"Starting batch {count}: {tally_count} of {total_count} ({len(self.batch_threads)} threads in process).")
 
-            results = response['results']
-            people = self.pds.make_people(results)
-            if not dry_run:
-                # self.process_people_batch(people)
-                thread = threading.Thread(target=self.process_people_batch, args=(people,))
-                thread.start()
-                self.batch_threads.append(thread)
-
-            current_count = response['count']
-
-            logger.info(f"Finished batch {count}: {tally_count} of {total_count}")
-            tally_count += current_count
-
-            if count > (max_count + 5):
-                logger.error(f"Something probably went wrong with the batching. Max estimated batch number ({max_count}) exceeded.")
-                raise Exception(f"estimated max_count: {max_count}, batch_size: {size}, batch number (count): {count}, total_count: {total_count}")
-            
-
-            # this will close off threads that are done, once closed, the threads will be able to bubble logs up
-            for thread in self.batch_threads.copy():
-                if not thread.is_alive():
-                    self.batch_threads.remove(thread)
-
-        # this is a sanity check to make sure there wasn't an issue with the PDS pagination
-        if tally_count != total_count:
-            logger.error(f"PDS failed to retrieve all records ({tally_count} != {total_count})")
-            raise Exception(f"Error: PDS failed to retrieve all records")
-        else:
-            logger.debug(f"Successfully finished data load: {self.run_id}")
 
     # This is intended for debug use only.
     # We should not be deleting any records.

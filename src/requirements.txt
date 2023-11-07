@@ -7,4 +7,5 @@ simple-salesforce==1.12.3
 python-dotenv
 asyncio==3.4.3
 
-pds @ git+https://github.com/harvard-huit/py-pds@v1.0.2
+# pds @ git+https://github.com/harvard-huit/py-pds@v1.0.3
+pds==1.0.3
