@@ -48,7 +48,7 @@ jobs:
           pwd
           ls -la
           ls -la ..
-          python -m pip config --cache-dir ../env global.extra-index-url https://artifactory.huit.harvard.edu/artifactory/api/pypi/ats-python/simple
+          python -m pip config --cache-dir env global.extra-index-url https://artifactory.huit.harvard.edu/artifactory/api/pypi/ats-python/simple
           python -m pip install -r src/requirements.txt
 
       - name: Run tests
