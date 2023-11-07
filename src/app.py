@@ -362,8 +362,6 @@ class SalesforcePersonUpdates:
                 if total_count != self.pds.total_count:
                     raise Exception(f"total_count changed from {total_count} to {self.pds.total_count}. The PDS pagination failed.")
 
-                logger.info(f"Starting batch {batch_count}: {tally_count} of {total_count} ({len(self.batch_threads)} threads in process).")
-
                 if len(results) < 1 and not self.pds.is_paginating:
                     logger.info(f"Finished getting all records from the PDS")
                     break
@@ -374,6 +372,7 @@ class SalesforcePersonUpdates:
                         raise Exception(f"estimated max_count: {max_count}, batch_size: {size}, batch_count: {batch_count}, total_count: {total_count}")
 
 
+                logger.info(f"Starting batch {batch_count}: {tally_count} of {total_count} ({len(self.batch_threads)} threads in process).")
                 if not dry_run:
                     # self.process_people_batch(people)
                     thread = threading.Thread(target=self.process_people_batch, args=(people,))
@@ -386,6 +385,8 @@ class SalesforcePersonUpdates:
                             # logger.info(f"{len(self.batch_threads)} unresolved threads")
                             if not thread.is_alive():
                                 self.batch_threads.remove(thread)
+                else:
+                    logger.info(f"dry_run active: No processing happening.")
 
 
                 # this will close off threads that are done, once closed, the threads will be able to bubble logs up
