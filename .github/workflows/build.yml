@@ -42,20 +42,19 @@ jobs:
         run: |
           cd salesforce
           python -m venv env
-        working-directory: salesforce
 
       - name: Get requirements
         run: |
           source env/bin/activate
+          pwd
+          ls -la
           python -m pip config --cache-dir . global.extra-index-url https://artifactory.huit.harvard.edu/artifactory/api/pypi/ats-python/simple
           python -m pip install -r src/requirements.txt
-        working-directory: salesforce
 
       - name: Run tests
         run: | 
           source env/bin/activate
           python -m unittest discover -s src -p *_test.py    
-        working-directory: salesforce
 
   build:
     name: Build Code ${{ github.event.inputs.version }}
