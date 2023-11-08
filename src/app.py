@@ -347,15 +347,16 @@ class SalesforcePersonUpdates:
 
         try:
             self.pds.start_pagination(pds_query)
+
             size = self.pds.batch_size
             total_count = self.pds.total_count
             batch_count = 1
-            max_count = (total_count / size)
+            max_count = total_count / size
 
+            logger.info(f"batch: {size}, total_count: {total_count}, max_count: {max_count}")
 
             while True:
                 tally_count = self.pds.count
-                logger.info(f"Starting batch {batch_count}: {tally_count} of {total_count}")
                 results = self.pds.next_page_results()
                 people = self.pds.make_people(results)
 
@@ -366,13 +367,13 @@ class SalesforcePersonUpdates:
                     logger.info(f"Finished getting all records from the PDS")
                     break
                 else: 
+                    logger.info(f"Starting batch {batch_count}: {tally_count} of {total_count} ({len(self.batch_threads)} threads in process).")
                     batch_count += 1
                     if batch_count > (max_count + 5):
                         logger.error(f"Something probably went wrong with the batching. Max estimated batch number ({max_count}) exceeded.")
                         raise Exception(f"estimated max_count: {max_count}, batch_size: {size}, batch_count: {batch_count}, total_count: {total_count}")
 
 
-                logger.info(f"Starting batch {batch_count}: {tally_count} of {total_count} ({len(self.batch_threads)} threads in process).")
                 if not dry_run:
                     # self.process_people_batch(people)
                     thread = threading.Thread(target=self.process_people_batch, args=(people,))
