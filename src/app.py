@@ -12,8 +12,6 @@ import logging
 import time
 from datetime import datetime
 
-import requests
-
 #### DEV debugging section #########
 from pprint import pformat
 
@@ -350,24 +348,29 @@ class SalesforcePersonUpdates:
 
             size = self.pds.batch_size
             total_count = self.pds.total_count
+            current_count = 0
             batch_count = 1
             max_count = total_count / size
 
             logger.info(f"batch: {size}, total_count: {total_count}, max_count: {max_count}")
 
             while True:
-                tally_count = self.pds.count
                 results = self.pds.next_page_results()
+                if len(results) < 1 and self.pds.is_paginating:
+                    continue
                 people = self.pds.make_people(results)
 
                 if total_count != self.pds.total_count:
                     raise Exception(f"total_count changed from {total_count} to {self.pds.total_count}. The PDS pagination failed.")
 
-                if len(results) < 1 and not self.pds.is_paginating:
+                if current_count == total_count:
                     logger.info(f"Finished getting all records from the PDS")
                     break
+                elif current_count > total_count:
+                    raise Exception(f"Count exceeds total_count {current_count}/{total_count}. The PDS pagination failed.")
                 else: 
-                    logger.info(f"Starting batch {batch_count}: {tally_count} of {total_count} ({len(self.batch_threads)} threads in process).")
+                    current_count += len(results)
+                    logger.info(f"Starting batch {batch_count}: {current_count}/{total_count} ({len(self.batch_threads)} threads in process).")
                     batch_count += 1
                     if batch_count > (max_count + 5):
                         logger.error(f"Something probably went wrong with the batching. Max estimated batch number ({max_count}) exceeded.")
@@ -403,7 +406,7 @@ class SalesforcePersonUpdates:
 
 
         except Exception as e:
-            logger.error(f"Something went wrong with the processing.")
+            logger.error(f"Something went wrong with the processing. ({e})")
             self.pds.wait_for_pagination()
 
         logger.info(f"Successfully finished data load: {self.run_id}")
@@ -597,6 +600,27 @@ elif action == 'test':
     logger.info("test action called")
 
     # isTaskRunning()
+    try:
+        pds_query = sfpu.app_config.pds_query
+        if 'conditions' not in pds_query:
+            pds_query['conditions'] = {}
+        pds_query['conditions']['names.name'] = "john"
+        # logger.info(f"{pds_query}")
+        sfpu.people_data_load(dry_run=True)
+
+        logger.debug(f"Waiting for batch jobs to finish.")
+        while(sfpu.batch_threads):
+            #  logger.info(f"{len(self.batch_threads)} remaining threads")
+            for thread in sfpu.batch_threads.copy():
+                if not thread.is_alive():
+                    sfpu.batch_threads.remove(thread)
+
+        # sfpu.app_config.update_watermark("person")
+        logger.info(f"Finished full data load: {sfpu.run_id}")
+    except Exception as e:
+        logger.error(f"Error with full data load")
+        raise e
+
 
     logger.info("test action finished")
 else: 
