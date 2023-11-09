@@ -35,10 +35,11 @@ on:
         default: '1024'
         options:
           - '1024'
+          - '2048'
       memory:
         type: choice
         required: false
-        default: '2048'
+        default: '4096'
         options:
           - '2048'
           - '3072'
@@ -47,6 +48,7 @@ on:
           - '6144'
           - '7168'
           - '8192'
+          - '16384'
           
                   
 
@@ -127,7 +129,7 @@ jobs:
                   "name": "action", 
                   "value": "full-person-load"
                 }, {
-                  "name": "batch_size", 
+                  "name": "BATCH_SIZE", 
                   "value": "${{ github.event.inputs.batch_size }}"
                 }, {
                   "name": "DEBUG", 

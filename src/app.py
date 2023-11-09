@@ -383,7 +383,7 @@ class SalesforcePersonUpdates:
                     thread.start()
                     self.batch_threads.append(thread)
 
-                    while len(self.batch_threads) >= 3:
+                    while len(self.batch_threads) >= 2:
                         time.sleep(10)
                         for thread in self.batch_threads.copy():
                             # logger.info(f"{len(self.batch_threads)} unresolved threads")

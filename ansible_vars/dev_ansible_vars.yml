@@ -13,8 +13,10 @@ create_service: false
 # this is the lowest for fargate?
 # target_memory_mb: 1024
 # target_cpu: 256
-target_memory_mb: 2048
-target_cpu: 1024
+# target_memory_mb: 2048
+# target_cpu: 1024
+target_memory_mb: 16384
+target_cpu: 2048
 
 # target_port: 9201
 target_app_name: "salesforce-person-updates"
