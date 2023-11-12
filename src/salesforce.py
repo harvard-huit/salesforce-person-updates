@@ -151,7 +151,8 @@ class HarvardSalesforce:
                 break
 
             if retries == 0:
-                logger.error(f"Failure to resolve these records: {errored_data_batch}")
+                logger.error(f"Failure to push these records: {errored_data_batch}")
+                return False
 
         except Exception as e:
             logger.error(f"Error with data push: {e}")
@@ -765,9 +766,8 @@ class HarvardSalesforce:
                 sf_data = self.sf.query_all(select_string)
                 logger.debug(f"got this data from salesforce: {sf_data['records']}")
 
-                # go through each record 
                 if len(sf_data['records']) > 1:
-                    logger.error(f"Error: too many records found on object {object_name} with this select: {select_string} and this data: {errored_data_object} -- Ids: {sf_data}")
+                    logger.error(f"DUPLICATES DETECTED: {sf_data} -- too many records found on object {object_name} with this select: {select_string} and this data: {errored_data_object}")
                 elif len(sf_data['records']) < 1:
                     logger.error(f"Error: no records found on object {object_name} with this data: {errored_data_object}")
                 else:
@@ -777,7 +777,7 @@ class HarvardSalesforce:
                     errored_data_object['Id'] = found_id
                     retryable_data_objects.append(errored_data_object)
 
-            if not dry_run:
+            if not dry_run and len(retryable_data_objects) > 0:
                 self.pushBulk(object_name, retryable_data_objects, dupe=True)
             return error_count
 
