@@ -2,6 +2,8 @@ from common import logger
 from datetime import datetime
 import re
 
+import psutil
+
 
 class SalesforceTransformer:
     def __init__(self, config, hsf):
@@ -32,8 +34,7 @@ class SalesforceTransformer:
     #   For example, if you ran the Contacts a minute ago (to get ids), you may not want to run them again
     def transform(self, source_data, source_name=None, target_object=None, exclude_target_objects=[]):
 
-        start_time = datetime.now().strftime('%H:%M:%S')
-        logger.debug(f"Starting transfom: {start_time}")
+        logger.debug(f"Starting transfom")
         if target_object is not None:
             source_config = self.getTargetConfig(target_object)
             source_name = source_config[target_object]['source']
@@ -52,8 +53,15 @@ class SalesforceTransformer:
         for source_data_object in source_data:
             # source_data_object is the full data source object of a single record
 
-            time_now = datetime.now().strftime('%H:%M:%S')
-            logger.debug(f"person {count}: {time_now}")
+
+            logger.info(f"Person {count}")
+            # check memory usage
+            memory_use_percent = psutil.virtual_memory().percent  # percentage of memory use
+            memory_avail = psutil.virtual_memory().available * 0.000001  # memory available in MB
+            memory_total = psutil.virtual_memory().total * 0.000001
+            logger.info(f"Source loop memory usage: {memory_use_percent}% memory available: {memory_avail}/{memory_total}")
+
+
             count += 1
             salesforce_person = {}
             if 'Contact' in self.hashed_ids:
@@ -70,6 +78,12 @@ class SalesforceTransformer:
             for object_name in source_config:
                 if object_name in exclude_target_objects:
                     continue
+
+                memory_use_percent = psutil.virtual_memory().percent  # percentage of memory use
+                memory_avail = psutil.virtual_memory().available * 0.000001  # memory available in MB
+                memory_total = psutil.virtual_memory().total * 0.000001
+                logger.info(f"Object loop memory usage: {memory_use_percent}% memory available: {memory_avail}/{memory_total}")
+
 
                 # if object_name != 'HUDA__hud_Address__c':
                 #     continue

@@ -4,6 +4,9 @@ import logging
 from datetime import datetime, date
 from simple_salesforce import Salesforce, exceptions
 
+import psutil
+
+
 from common import logger
 logging.getLogger("simple_salesforce").setLevel(logging.WARNING)
 
@@ -52,8 +55,16 @@ class HarvardSalesforce:
     # a single record will take anywhere from 2-50 seconds
     # dupe: this makes sure we don't keep retrying a dupe check
     def pushBulk(self, object, data, dupe=False, id_name='Id', retries=3):
+
+
+        # check memory usage
+        memory_use_percent = psutil.virtual_memory().percent  # percentage of memory use
+        memory_avail = psutil.virtual_memory().available * 0.000001  # memory available in MB
+        memory_total = psutil.virtual_memory().total * 0.000001
+        logger.info(f"Push memory usage: {memory_use_percent}% memory available: {memory_avail}/{memory_total}")
+
         if data is None or len(data) == 0:
-            logger.warn(f"No data to push to {object}")
+            logger.warning(f"No data to push to {object}")
             return True
         if retries < 1:
             logger.error(f"Error processing data, retries exhausted: {object}: {data}")
