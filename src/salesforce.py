@@ -130,12 +130,13 @@ class HarvardSalesforce:
 
                     logger.info(f"Trying errored records again {retries} more times")
                     retries -= 1
-                    retry_response = self.pushBulk(object, errored_data_batch, retries=retries)
+                    continue
+                    # retry_response = self.pushBulk(object, errored_data_batch, retries=retries)
 
-                    if isinstance(retry_response, int):
-                        error_count += retry_response
-                    else:
-                        logger.info(f"Retry successful")
+                    # if isinstance(retry_response, int):
+                    #     error_count += retry_response
+                    # else:
+                    #     logger.info(f"Retry successful")
 
 
                 if len(created_ids['ids']) > 0:
@@ -148,6 +149,9 @@ class HarvardSalesforce:
                 if error_count > 0:
                     logger.info(f"Errored {object} Records: {error_count}")
                 break
+
+            if retries == 0:
+                logger.error(f"Failure to resolve these records: {errored_data_batch}")
 
         except Exception as e:
             logger.error(f"Error with data push: {e}")
