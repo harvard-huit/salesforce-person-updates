@@ -22,6 +22,10 @@ on:
         type: number
         required: false
         default: 500
+      batch_thread_count: 
+        type: number
+        required: false
+        default: 3
       debug:
         type: choice
         required: false
@@ -131,6 +135,9 @@ jobs:
                 }, {
                   "name": "BATCH_SIZE", 
                   "value": "${{ github.event.inputs.batch_size }}"
+                }, {
+                  "name": "BATCH_THREAD_COUNT", 
+                  "value": "${{ github.event.inputs.batch_thread_count }}"
                 }, {
                   "name": "DEBUG", 
                   "value": "${{ github.event.inputs.debug }}"

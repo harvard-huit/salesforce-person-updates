@@ -38,6 +38,7 @@ else:
     person_ids = []
 
 batch_size_override = os.getenv("BATCH_SIZE") or None
+batch_thread_count_override = os.getenv("BATCH_THREAD_COUNT") or None
 LOCAL = os.getenv("LOCAL") or False
 ####################################
 
@@ -110,7 +111,10 @@ class SalesforcePersonUpdates:
             self.pds = pds.People(apikey=self.app_config.pds_apikey, batch_size=batch_size)
             # self.pds_thread = 
 
-            self.batch_thread_count = 2
+            if batch_thread_count_override:
+                self.batch_thread_count = batch_thread_count_override
+            else:
+                self.batch_thread_count = 3
             self.batch_threads = []
 
             self.transformer = SalesforceTransformer(config=self.app_config.config, hsf=self.hsf)
