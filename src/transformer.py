@@ -54,12 +54,12 @@ class SalesforceTransformer:
             # source_data_object is the full data source object of a single record
 
 
-            logger.info(f"Person {count}")
+            # logger.info(f"Person {count}")
             # check memory usage
-            memory_use_percent = psutil.virtual_memory().percent  # percentage of memory use
-            memory_avail = psutil.virtual_memory().available * 0.000001  # memory available in MB
-            memory_total = psutil.virtual_memory().total * 0.000001
-            logger.info(f"Source loop memory usage: {memory_use_percent}% memory available: {memory_avail}/{memory_total}")
+            # memory_use_percent = psutil.virtual_memory().percent  # percentage of memory use
+            # memory_avail = psutil.virtual_memory().available * 0.000001  # memory available in MB
+            # memory_total = psutil.virtual_memory().total * 0.000001
+            # logger.info(f"Source loop memory usage: {memory_use_percent}% memory available: {memory_avail}/{memory_total}")
 
 
             count += 1
@@ -79,10 +79,10 @@ class SalesforceTransformer:
                 if object_name in exclude_target_objects:
                     continue
 
-                memory_use_percent = psutil.virtual_memory().percent  # percentage of memory use
-                memory_avail = psutil.virtual_memory().available * 0.000001  # memory available in MB
-                memory_total = psutil.virtual_memory().total * 0.000001
-                logger.info(f"Object loop memory usage: {memory_use_percent}% memory available: {memory_avail}/{memory_total}")
+                # memory_use_percent = psutil.virtual_memory().percent  # percentage of memory use
+                # memory_avail = psutil.virtual_memory().available * 0.000001  # memory available in MB
+                # memory_total = psutil.virtual_memory().total * 0.000001
+                # logger.info(f"Object loop memory usage: {memory_use_percent}% memory available: {memory_avail}/{memory_total}")
 
 
                 # if object_name != 'HUDA__hud_Address__c':

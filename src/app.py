@@ -262,7 +262,20 @@ class SalesforcePersonUpdates:
                     if i not in data:
                         data[i] = []
                     data[i].append(v)
+                    if len(data) >= 200:
+                        self.push_records(object_data=object_data, data=data)
+                        data = {}
+                        
+        del data_gen
 
+        self.push_records(object_data=object_data, data=data)
+        data = {}
+
+        # for thread in self.threads.copy():
+        #     if not thread.is_alive():
+        #         self.threads.remove(thread)
+
+    def push_records(self, object_data, data):
         branch_threads = []
 
         for object, object_data in data.items():
@@ -280,9 +293,6 @@ class SalesforcePersonUpdates:
         for thread in branch_threads:
             thread.join()
 
-        # for thread in self.threads.copy():
-        #     if not thread.is_alive():
-        #         self.threads.remove(thread)
 
     def update_single_person(self, huids):
         pds_query = self.app_config.pds_query
@@ -356,6 +366,20 @@ class SalesforcePersonUpdates:
             logger.info(f"batch: {size}, total_count: {total_count}, max_count: {max_count}")
 
             while True:
+
+                # reset salesforce connection
+                self.hsf = HarvardSalesforce(
+                    domain = self.app_config.salesforce_domain,
+                    username = self.app_config.salesforce_username,
+                    password = self.app_config.salesforce_password,
+                    token = self.app_config.salesforce_token,
+                    consumer_key = self.app_config.salesforce_client_key,
+                    consumer_secret = self.app_config.salesforce_client_secret
+                )
+
+                #reset transformer
+                # self.transformer = SalesforceTransformer(config=self.app_config.config, hsf=self.hsf)
+
 
                 results = self.pds.next_page_results()
                 if len(results) < 1 and self.pds.is_paginating:

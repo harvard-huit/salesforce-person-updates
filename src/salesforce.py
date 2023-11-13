@@ -61,7 +61,7 @@ class HarvardSalesforce:
         memory_use_percent = psutil.virtual_memory().percent  # percentage of memory use
         memory_avail = psutil.virtual_memory().available * 0.000001  # memory available in MB
         memory_total = psutil.virtual_memory().total * 0.000001
-        logger.info(f"Push memory usage: {memory_use_percent}% memory available: {memory_avail}/{memory_total}")
+        logger.debug(f"Push memory usage: {memory_use_percent}% memory available: {memory_avail}/{memory_total}")
 
         if data is None or len(data) == 0:
             logger.warning(f"No data to push to {object}")
