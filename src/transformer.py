@@ -43,8 +43,8 @@ class SalesforceTransformer:
         else:
             source_config = self.config
         
-        time_now = datetime.now().strftime('%H:%M:%S')
-        logger.debug(f"Getting unique ids: {time_now}")
+        start_time = datetime.now().strftime('%H:%M:%S')
+        logger.debug(f"Getting unique ids: {start_time}")
 
         data = {}
         best_branches = {}
