@@ -112,7 +112,7 @@ class SalesforcePersonUpdates:
             # self.pds_thread = 
 
             if batch_thread_count_override:
-                self.batch_thread_count = batch_thread_count_override
+                self.batch_thread_count = int(batch_thread_count_override)
             else:
                 self.batch_thread_count = 3
             self.batch_threads = []
@@ -267,9 +267,9 @@ class SalesforcePersonUpdates:
                     if i not in data:
                         data[i] = []
                     data[i].append(v)
-                    if len(data) >= 200:
-                        self.push_records(object_data=object_data, data=data)
-                        data = {}
+                    # if len(data) >= 200:
+                    #     self.push_records(object_data=object_data, data=data)
+                    #     data = {}
                         
         del data_gen
 
