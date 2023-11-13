@@ -110,6 +110,7 @@ class SalesforcePersonUpdates:
             self.pds = pds.People(apikey=self.app_config.pds_apikey, batch_size=batch_size)
             # self.pds_thread = 
 
+            self.batch_thread_count = 2
             self.batch_threads = []
 
             self.transformer = SalesforceTransformer(config=self.app_config.config, hsf=self.hsf)
@@ -367,20 +368,6 @@ class SalesforcePersonUpdates:
 
             while True:
 
-                # reset salesforce connection
-                self.hsf = HarvardSalesforce(
-                    domain = self.app_config.salesforce_domain,
-                    username = self.app_config.salesforce_username,
-                    password = self.app_config.salesforce_password,
-                    token = self.app_config.salesforce_token,
-                    consumer_key = self.app_config.salesforce_client_key,
-                    consumer_secret = self.app_config.salesforce_client_secret
-                )
-
-                #reset transformer
-                # self.transformer = SalesforceTransformer(config=self.app_config.config, hsf=self.hsf)
-
-
                 results = self.pds.next_page_results()
                 if len(results) < 1 and self.pds.is_paginating:
                     continue
@@ -423,7 +410,7 @@ class SalesforcePersonUpdates:
                     thread.start()
                     self.batch_threads.append(thread)
 
-                    while len(self.batch_threads) >= 1:
+                    while len(self.batch_threads) >= self.batch_thread_count:
                         time.sleep(10)
                         for thread in self.batch_threads.copy():
                             # logger.info(f"{len(self.batch_threads)} unresolved threads")
