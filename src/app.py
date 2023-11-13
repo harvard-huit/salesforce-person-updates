@@ -390,8 +390,16 @@ class SalesforcePersonUpdates:
                 memory_use_percent = psutil.virtual_memory().percent  # percentage of memory use
                 memory_avail = psutil.virtual_memory().available * 0.000001  # memory available in MB
                 memory_total = psutil.virtual_memory().total * 0.000001
-                logger.info(f"Memory usage: {memory_use_percent}% memory available: {memory_avail}/{memory_total}")
+                current_pds_count = self.pds.result_queue.qsize() * self.pds.batch_size
+                logger.info(f"Memory usage: {memory_use_percent}%  pds: {current_pds_count}/{self.pds.total_count}   memory available: {memory_avail}/{memory_total}")
+                
+                if memory_use_percent > 50:
+                    time.sleep(60)
+                    memory_use_percent = psutil.virtual_memory().percent  # percentage of memory use
 
+                if memory_use_percent > 55:
+                    raise Exception(f"out of memory ({memory_use_percent})")
+                
                 if total_count != self.pds.total_count:
                     raise Exception(f"total_count changed from {total_count} to {self.pds.total_count}. The PDS pagination failed.")
 
