@@ -379,34 +379,36 @@ class SalesforcePersonUpdates:
 
                 # check memory usage
                 memory_use_percent = psutil.virtual_memory().percent  # percentage of memory use
-                memory_avail = psutil.virtual_memory().available * 0.000001  # memory available in MB
-                memory_total = psutil.virtual_memory().total * 0.000001
-                current_pds_count = self.pds.result_queue.qsize() * self.pds.batch_size
-                logger.info(f"Memory usage: {memory_use_percent}%  pds: {current_pds_count}/{self.pds.total_count}   memory available: {memory_avail}/{memory_total}")
+                # memory_avail = psutil.virtual_memory().available * 0.000001  # memory available in MB
+                # memory_total = psutil.virtual_memory().total * 0.000001
+
+                # this will get the current backlog of pds results
+                current_pds_backlog = self.pds.result_queue.qsize() * self.pds.batch_size
+                logger.info(f"Memory usage: {memory_use_percent}%  current pds backlog: {current_pds_backlog}/{self.pds.max_backlog} pds records {current_count}/{self.pds.total_count}")
                 
                 if memory_use_percent > 50:
                     time.sleep(60)
                     memory_use_percent = psutil.virtual_memory().percent  # percentage of memory use
 
                 if memory_use_percent > 55:
-                    raise Exception(f"out of memory ({memory_use_percent})")
+                    raise Exception(f"Out of memory ({memory_use_percent}).")
                 
                 if total_count != self.pds.total_count:
                     raise Exception(f"total_count changed from {total_count} to {self.pds.total_count}. The PDS pagination failed.")
 
+                current_count += len(results)
                 if current_count == total_count:
                     logger.info(f"Finished getting all records from the PDS")
                     break
                 elif current_count > total_count:
-                    raise Exception(f"Count exceeds total_count {current_count}/{total_count}. The PDS pagination failed.")
+                    logger.warning(f"Count exceeds total_count {current_count}/{total_count}. The PDS pagination may have failed.")
+                    break
                 else: 
-                    current_count += len(results)
                     logger.info(f"Starting batch {batch_count}: {current_count}/{total_count} ({len(self.batch_threads)} threads in process).")
                     batch_count += 1
-                    if batch_count > (max_count + 5):
-                        logger.error(f"Something probably went wrong with the batching. Max estimated batch number ({max_count}) exceeded.")
+                    if batch_count > (max_count + 50):
+                        logger.error(f"Something may have wrong with the batching. Max estimated batch count ({max_count}) exceeded current batch count: {batch_count}")
                         raise Exception(f"estimated max_count: {max_count}, batch_size: {size}, batch_count: {batch_count}, total_count: {total_count}")
-
 
                 if not dry_run:
                     # self.process_people_batch(people)
@@ -631,27 +633,16 @@ elif action == 'test':
     logger.info("test action called")
 
     # isTaskRunning()
-    try:
-        pds_query = sfpu.app_config.pds_query
-        if 'conditions' not in pds_query:
-            pds_query['conditions'] = {}
-        pds_query['conditions']['names.name'] = "john"
-        # logger.info(f"{pds_query}")
-        sfpu.people_data_load(dry_run=True)
 
-        logger.debug(f"Waiting for batch jobs to finish.")
-        while(sfpu.batch_threads):
-            #  logger.info(f"{len(self.batch_threads)} remaining threads")
-            for thread in sfpu.batch_threads.copy():
-                if not thread.is_alive():
-                    sfpu.batch_threads.remove(thread)
+    # Query for Bulk Data Load Jobs that are not completed
+    query = "SELECT Id, Status FROM BulkDataLoadJob WHERE Status != 'Completed'"
+    jobs = sfpu.hsf.sf.query(query)['records']
 
-        # sfpu.app_config.update_watermark("person")
-        logger.info(f"Finished full data load: {sfpu.run_id}")
-    except Exception as e:
-        logger.error(f"Error with full data load")
-        raise e
-
+    # Iterate over the jobs and mark them as completed
+    for job in jobs:
+        job_id = job['Id']
+        logger.info(f"job_id")
+        # sfpu.hsf.sf.BulkDataLoadJob.update(job_id, {'Status': 'Completed'})
 
     logger.info("test action finished")
 else: 
