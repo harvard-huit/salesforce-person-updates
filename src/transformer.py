@@ -2,8 +2,6 @@ from common import logger
 from datetime import datetime
 import re
 
-import psutil
-
 
 class SalesforceTransformer:
     def __init__(self, config, hsf):
@@ -376,8 +374,6 @@ class SalesforceTransformer:
                             else:
                                 logger.error(f"Problem processing {object_name} record, required external id not found: {good_record}")
                                 raise Exception(f"Problem processing {object_name} record, required external id not found: {good_record}")
-        time_now = datetime.now().strftime('%H:%M:%S')
-        logger.debug(f"Transform finished: {start_time} -> {time_now}")
 
         # return data
     
