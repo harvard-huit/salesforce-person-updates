@@ -109,7 +109,6 @@ class SalesforcePersonUpdates:
             else:
                 batch_size = 500
             self.pds = pds.People(apikey=self.app_config.pds_apikey, batch_size=batch_size)
-            # self.pds_thread = 
 
             if batch_thread_count_override:
                 self.batch_thread_count = int(batch_thread_count_override)
@@ -267,18 +266,15 @@ class SalesforcePersonUpdates:
                     if i not in data:
                         data[i] = []
                     data[i].append(v)
-                    # if len(data) >= 200:
-                    #     self.push_records(object_data=object_data, data=data)
-                    #     data = {}
                         
         del data_gen
 
         self.push_records(object_data=object_data, data=data)
         data = {}
 
-        # for thread in self.threads.copy():
-        #     if not thread.is_alive():
-        #         self.threads.remove(thread)
+        for thread in self.threads.copy():
+            if not thread.is_alive():
+                self.threads.remove(thread)
 
     def push_records(self, object_data, data):
         branch_threads = []
@@ -309,6 +305,14 @@ class SalesforcePersonUpdates:
         # self.process_people_batch(people=people)
 
         self.people_data_load(pds_query=pds_query)
+        
+        if len(self.batch_threads) > 0:
+            logger.info(f"Waiting for batch jobs to finish.")	
+            while(self.batch_threads):	
+                for thread in self.batch_threads.copy():	
+                    if not thread.is_alive():	
+                        self.batch_threads.remove(thread)
+
 
         logger.info(f"Finished spot data load: {self.run_id}")
 
@@ -615,34 +619,24 @@ elif action == 'remove-unaffiliated-affiliations':
     if len(ids) > 0:
         logger.warning(f"Deleted {len(ids)} unaffiliated Affiliation records")
 elif action == 'remove-all-contacts':
-    logger.info("remove-all-contacts")
+    logger.warning("remove-all-contacts")
 
     # get all unaffiliated Affiliation records
     result = sfpu.hsf.sf.query_all("SELECT Id, HUDA__hud_UNIV_ID__c FROM Contact LIMIT 10000")
-    logger.info(f"Found {len(result['records'])} Contact records")
+    logger.warning(f"Found {len(result['records'])} Contact records")
 
     # if len(ids) > 0:
     #     logger.warning(f"Deleted {len(ids)} Contact records")
 
     # delete them
     ids = [record['HUDA__hud_UNIV_ID__c'] for record in result['records']]
-    sfpu.delete_people(dry_run=False, huids=ids)    
+    sfpu.delete_people(dry_run=True, huids=ids)    
 
 
 elif action == 'test':
     logger.info("test action called")
 
     # isTaskRunning()
-
-    # Query for Bulk Data Load Jobs that are not completed
-    query = "SELECT Id, Status FROM BulkDataLoadJob WHERE Status != 'Completed'"
-    jobs = sfpu.hsf.sf.query(query)['records']
-
-    # Iterate over the jobs and mark them as completed
-    for job in jobs:
-        job_id = job['Id']
-        logger.info(f"job_id")
-        # sfpu.hsf.sf.BulkDataLoadJob.update(job_id, {'Status': 'Completed'})
 
     logger.info("test action finished")
 else: 

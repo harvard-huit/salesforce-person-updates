@@ -43,23 +43,12 @@ class SalesforceTransformer:
         else:
             source_config = self.config
         
-        start_time = datetime.now().strftime('%H:%M:%S')
-        logger.debug(f"Getting unique ids: {start_time}")
-
         data = {}
         best_branches = {}
         count = 1
 
         for source_data_object in source_data:
             # source_data_object is the full data source object of a single record
-
-
-            # logger.info(f"Person {count}")
-            # check memory usage
-            # memory_use_percent = psutil.virtual_memory().percent  # percentage of memory use
-            # memory_avail = psutil.virtual_memory().available * 0.000001  # memory available in MB
-            # memory_total = psutil.virtual_memory().total * 0.000001
-            # logger.info(f"Source loop memory usage: {memory_use_percent}% memory available: {memory_avail}/{memory_total}")
 
 
             count += 1
@@ -79,14 +68,6 @@ class SalesforceTransformer:
                 if object_name in exclude_target_objects:
                     continue
 
-                # memory_use_percent = psutil.virtual_memory().percent  # percentage of memory use
-                # memory_avail = psutil.virtual_memory().available * 0.000001  # memory available in MB
-                # memory_total = psutil.virtual_memory().total * 0.000001
-                # logger.info(f"Object loop memory usage: {memory_use_percent}% memory available: {memory_avail}/{memory_total}")
-
-
-                # if object_name != 'HUDA__hud_Address__c':
-                #     continue
                 current_record = {}
                 good_records = []
                 best_branches = {}
@@ -372,20 +353,6 @@ class SalesforceTransformer:
                 if object_name not in data: 
                     data[object_name] = []
                 
-                # check to make sure current_record contains the appropriate external id for the object
-                # if isinstance(self.hashed_ids[object_name]['id_name'], list):
-                #     id_in_current_record = False
-                #     for id_name in self.hashed_ids[object_name]['id_name']:
-                #         if id_name in current_record:
-                #             id_in_current_record = True
-                #     if not id_in_current_record:
-                #         # logger.warn(f"Skipping record because it has no external id associated.")
-                #         continue
-                # else:
-                #     if self.hashed_ids[object_name]['id_name'] not in current_record:
-                #         # logger.warn(f"Skipping record because it has no external id associated.")
-                #         continue
-                    
 
                 if not skip_object:
                     if is_flat:
@@ -474,12 +441,9 @@ class SalesforceTransformer:
         if dotted_id_name:
             current_record[object_name][salesforce_id_name] = source_data_object[id_name]
             if salesforce_id_name not in current_record[object_name]:
-                logger.error(f"This is a problem...")
-                logger.error(f"pingo")
+                logger.error(f"The external_id {dotted_id_name} was not found on the current record {current_record[object_name]}")
 
         else: 
-            # logger.error(f"{source_data_object} is missing an external id: {id_names}")
-            # raise ValueError("Error, source object needs an external id: ")
             return {}
 
         return current_record
