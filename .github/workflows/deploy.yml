@@ -83,8 +83,7 @@ jobs:
           docker manifest inspect artifactory.huit.harvard.edu/ats-docker/salesforce-person-updates:$version
           
       - name: Run AAIS Deploy Container Action
-        # uses: HUIT/aais-ecs-deploy-action@v1.0.1
-        uses: HUIT/aais-ecs-deploy-action@dev
+        uses: HUIT/aais-ecs-deploy-action@v1.0.2
         with:
           # Required
           common_config: aais-services-config/aais_services_${{ github.event.inputs.environment }}.yml
