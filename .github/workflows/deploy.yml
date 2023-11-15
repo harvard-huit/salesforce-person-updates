@@ -94,4 +94,5 @@ jobs:
           #   this needs to match the directory the main repository was checked out into
           #   if the checkout was done without a path, this is not needed
           app_root: salesforce
+          schedules: true
      
