@@ -38,7 +38,7 @@ target_alb_name: "def"
 
 schedules:
     # required
-  - schedule_rule_name: "5 minutes" # this will be appended to the task definition name, e.g my-cluster-dev-feed-my-dataload-half-hourly
+  - schedule_rule_name: "5-minutes" # this will be appended to the task definition name, e.g my-cluster-dev-feed-my-dataload-half-hourly
     schedule_expression: "rate(5 minutes)" # rate or cron expression
     # optional
     schedule_rule_description: "a test schedule"
