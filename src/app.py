@@ -442,6 +442,7 @@ class SalesforcePersonUpdates:
         except Exception as e:
             logger.error(f"Something went wrong with the processing. ({e})")
             self.pds.wait_for_pagination()
+            raise
 
         logger.info(f"Successfully finished data load: {self.run_id}")
 
