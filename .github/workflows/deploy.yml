@@ -18,6 +18,14 @@ on:
           - 'stage'
           - 'prod'
         required: true
+      schedules:
+        type: choice
+        default: 'false'
+        options:
+          - 'true'
+          - 'false'
+        required: true
+
 
 env:
   version: ${{ github.event.inputs.version }}
@@ -93,5 +101,5 @@ jobs:
           #   this needs to match the directory the main repository was checked out into
           #   if the checkout was done without a path, this is not needed
           app_root: salesforce
-          schedules: true
+          schedules: ${{ github.event.inputs.schedules }}
      
