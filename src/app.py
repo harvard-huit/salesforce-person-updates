@@ -272,9 +272,6 @@ class SalesforcePersonUpdates:
         self.push_records(object_data=object_data, data=data)
         data = {}
 
-        for thread in self.threads.copy():
-            if not thread.is_alive():
-                self.threads.remove(thread)
 
     def push_records(self, object_data, data):
         branch_threads = []
