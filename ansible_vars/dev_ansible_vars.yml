@@ -34,3 +34,23 @@ target_alb_name: "def"
 # target_app_secrets_ref:
 #   - aais-: "arn:aws:secretsmanager:us-east-1:001980101248:secret:aais-services-oakdev-mule-oOJhHY:password::"
 #     aais-elastic: "arn:aws:secretsmanager:us-east-1:001980101248:secret:aais-services-elastic-dev-SfyZ3Z:password::"
+
+
+schedules:
+    # required
+  - schedule_rule_name: "5 minutes" # this will be appended to the task definition name, e.g my-cluster-dev-feed-my-dataload-half-hourly
+    schedule_expression: "rate(5 minutes)" # rate or cron expression
+    # optional
+    schedule_rule_description: "a test schedule"
+    # environment variable overrides
+    schedule_env_overrides:
+      - name: "TABLE_NAME"
+        value: "aais-services-salesforce-person-updates-dev"
+      - name: "SALESFORCE_INSTANCE_ID"
+        value: "huit-full-sandbox"
+      - name: "action"
+        value: "single-person-update"
+      - name: "person_ids"
+        value: "['80719647']"
+  # - schedule_rule_name: "mon-fri" # this will be appended to the task definition name, e.g my-cluster-dev-feed-my-dataload-mon-fri
+  #   schedule_expression: "cron(5 * * * 1-5)" # rate or cron expression
