@@ -464,8 +464,6 @@ class SalesforcePersonUpdates:
             source_data=results
         )
 
-        
-
         for object_name, hashed_ids in self.transformer.hashed_ids.items():
             ids = []
             for source_id, salesforce_id in hashed_ids["Ids"].items():
