@@ -238,6 +238,11 @@ class AppConfig():
                         ':val': string_watermarks
                     }
                 )
+    
+                if watermark_name:
+                    return string_watermarks[watermark_name]
+                else:
+                    return string_watermarks
             except Exception as e:
                 logger.error(f"Error: failiure to update dynamo table {self.table_name} with watermarks {string_watermarks}")
                 raise e

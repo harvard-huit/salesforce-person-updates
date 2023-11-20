@@ -323,7 +323,8 @@ class SalesforcePersonUpdates:
         pds_query['conditions']['updateDate'] = ">" + watermark.strftime('%Y-%m-%dT%H:%M:%S')
         self.people_data_load(pds_query=pds_query)
 
-        self.app_config.update_watermark("person")
+        watermark = self.app_config.update_watermark("person")
+        logger.info(f"Watermark updated: {watermark}")
 
     def full_people_data_load(self, dry_run=False):
         logger.info(f"Processing full data load")
