@@ -278,7 +278,7 @@ class SalesforcePersonUpdates:
         branch_threads = []
 
         for object, object_data in data.items():
-            logger.debug(f"Upserting to {object} with {len(object_data)} records")
+            logger.info(f"Upserting to {object} with {len(object_data)} records")
 
             # unthreaded:
             # self.hsf.pushBulk(object, object_data)    
@@ -452,10 +452,18 @@ class SalesforcePersonUpdates:
             self.pds.wait_for_pagination()
             raise
 
-        while(self.batch_threads):
-            for thread in self.batch_threads.copy():
-                if not thread.is_alive():
-                    self.batch_threads.remove(thread)
+        # while(self.batch_threads):
+        #     for thread in self.batch_threads.copy():
+        #         if not thread.is_alive():
+        #             self.batch_threads.remove(thread)
+
+        if len(self.batch_threads) > 0:
+            logger.info(f"Waiting for batch jobs to finish.")	
+            while(self.batch_threads):	
+                for thread in self.batch_threads.copy():	
+                    if not thread.is_alive():	
+                        self.batch_threads.remove(thread)
+
 
         logger.info(f"Successfully finished data load: {self.run_id}")
 
