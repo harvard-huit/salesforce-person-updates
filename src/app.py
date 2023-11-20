@@ -10,6 +10,7 @@ import threading
 import json
 import logging
 import time
+import math
 from datetime import datetime
 
 #### DEV debugging section #########
@@ -269,11 +270,11 @@ class SalesforcePersonUpdates:
                         
         del data_gen
 
-        self.push_records(object_data=object_data, data=data)
+        self.push_records(data=data)
         data = {}
 
 
-    def push_records(self, object_data, data):
+    def push_records(self, data):
         branch_threads = []
 
         for object, object_data in data.items():
@@ -294,8 +295,8 @@ class SalesforcePersonUpdates:
 
     def update_single_person(self, huids):
         pds_query = self.app_config.pds_query
-        if 'conditions' not in pds_query:
-            pds_query['conditions'] = {}
+        # if 'conditions' not in pds_query:
+        pds_query['conditions'] = {}
         pds_query['conditions']['univid'] = huids
         # people = self.pds.get_people(pds_query)
 
@@ -350,6 +351,7 @@ class SalesforcePersonUpdates:
         #      Without the results, we cannot resolve duplicate errors or have good logging
         #   2. It needs to be async in some way to make sure the PDS pagination timeout does not happen
         #   3. If we collect results and THEN process, that is too memory intensive and requires sizing up the instance
+        #   (update): 2 and 3 have been further mitigated by the addition of async pagination and memory management in the pds lib
         # NOTE: we don't allow more than 3 parent threads to run at a time
         #       and the max bulk load jobs Salesforce will handle at once is 5.
         #       Some batch jobs will take an excessively long time (20 minutes) most will take 30 seconds.
@@ -367,7 +369,7 @@ class SalesforcePersonUpdates:
             total_count = self.pds.total_count
             current_count = 0
             batch_count = 1
-            max_count = total_count / size
+            max_count = math.ceil(total_count / size)
 
             logger.info(f"batch: {size}, total_count: {total_count}, max_count: {max_count}")
 
@@ -387,12 +389,13 @@ class SalesforcePersonUpdates:
                 current_pds_backlog = self.pds.result_queue.qsize() * self.pds.batch_size
                 logger.info(f"Memory usage: {memory_use_percent}%  current pds backlog: {current_pds_backlog}/{self.pds.max_backlog} pds records {current_count}/{self.pds.total_count}")
                 
-                if memory_use_percent > 50:
-                    time.sleep(60)
-                    memory_use_percent = psutil.virtual_memory().percent  # percentage of memory use
+                if stack != "developer":
+                    if (memory_use_percent > 50) and not LOCAL:
+                        time.sleep(60)
+                        memory_use_percent = psutil.virtual_memory().percent  # percentage of memory use
 
-                if memory_use_percent > 55:
-                    raise Exception(f"Out of memory ({memory_use_percent}).")
+                    if (memory_use_percent > 55) and not LOCAL:
+                        raise Exception(f"Out of memory ({memory_use_percent}).")
                 
                 if total_count != self.pds.total_count:
                     raise Exception(f"total_count changed from {total_count} to {self.pds.total_count}. The PDS pagination failed.")
@@ -400,7 +403,6 @@ class SalesforcePersonUpdates:
                 current_count += len(results)
                 if current_count == total_count:
                     logger.info(f"Finished getting all records from the PDS")
-                    break
                 elif current_count > total_count:
                     logger.warning(f"Count exceeds total_count {current_count}/{total_count}. The PDS pagination may have failed.")
                     break
@@ -413,6 +415,7 @@ class SalesforcePersonUpdates:
 
                 if not dry_run:
                     # self.process_people_batch(people)
+                    logger.info(f"Starting a process thread")
                     thread = threading.Thread(target=self.process_people_batch, args=(people,))
                     thread.start()
                     self.batch_threads.append(thread)
@@ -432,7 +435,12 @@ class SalesforcePersonUpdates:
                     if not thread.is_alive():
                         self.batch_threads.remove(thread)
 
-            logger.info(f"Finishing remaining processing threads: {len(self.batch_threads)}")
+            
+                if current_count >= total_count:
+                    break
+
+            if len(self.batch_threads) > 0:
+                logger.info(f"Finishing remaining processing threads: {len(self.batch_threads)}")
             while(self.batch_threads):
                 for thread in self.batch_threads.copy():
                     if not thread.is_alive():
@@ -443,6 +451,11 @@ class SalesforcePersonUpdates:
             logger.error(f"Something went wrong with the processing. ({e})")
             self.pds.wait_for_pagination()
             raise
+
+        while(self.batch_threads):
+            for thread in self.batch_threads.copy():
+                if not thread.is_alive():
+                    self.batch_threads.remove(thread)
 
         logger.info(f"Successfully finished data load: {self.run_id}")
 
