@@ -278,7 +278,7 @@ class SalesforcePersonUpdates:
         branch_threads = []
 
         for object, object_data in data.items():
-            logger.info(f"Upserting to {object} with {len(object_data)} records")
+            logger.debug(f"Upserting to {object} with {len(object_data)} records")
 
             # unthreaded:
             # self.hsf.pushBulk(object, object_data)    
@@ -305,7 +305,7 @@ class SalesforcePersonUpdates:
         self.people_data_load(pds_query=pds_query)
         
         if len(self.batch_threads) > 0:
-            logger.info(f"Waiting for batch jobs to finish.")	
+            logger.debug(f"Waiting for batch jobs to finish.")	
             while(self.batch_threads):	
                 for thread in self.batch_threads.copy():	
                     if not thread.is_alive():	
@@ -315,9 +315,10 @@ class SalesforcePersonUpdates:
         logger.info(f"Finished spot data load: {self.run_id}")
 
     def update_people_data_load(self, watermark: datetime=None):
-        logger.info(f"Processing updates since {watermark}")
         if not watermark:
             watermark = self.app_config.watermarks['person']
+
+        logger.info(f"Processing updates since {watermark}")
 
         pds_query = self.app_config.pds_query
         pds_query['conditions']['updateDate'] = ">" + watermark.strftime('%Y-%m-%dT%H:%M:%S')
