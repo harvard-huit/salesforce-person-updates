@@ -32,8 +32,7 @@ class SalesforceTransformer:
     #   For example, if you ran the Contacts a minute ago (to get ids), you may not want to run them again
     def transform(self, source_data, source_name=None, target_object=None, exclude_target_objects=[]):
 
-        start_time = datetime.now().strftime('%H:%M:%S')
-        logger.debug(f"Starting transfom: {start_time}")
+        logger.debug(f"Starting transfom")
         if target_object is not None:
             source_config = self.getTargetConfig(target_object)
             source_name = source_config[target_object]['source']
@@ -42,16 +41,14 @@ class SalesforceTransformer:
         else:
             source_config = self.config
         
-        time_now = datetime.now().strftime('%H:%M:%S')
-        logger.debug(f"Getting unique ids: {time_now}")
-
         data = {}
         best_branches = {}
         count = 1
-        for source_data_object in source_data:
 
-            time_now = datetime.now().strftime('%H:%M:%S')
-            logger.debug(f"person {count}: {time_now}")
+        for source_data_object in source_data:
+            # source_data_object is the full data source object of a single record
+
+
             count += 1
             salesforce_person = {}
             if 'Contact' in self.hashed_ids:
@@ -69,8 +66,6 @@ class SalesforceTransformer:
                 if object_name in exclude_target_objects:
                     continue
 
-                # if object_name != 'HUDA__hud_Address__c':
-                #     continue
                 current_record = {}
                 good_records = []
                 best_branches = {}
@@ -89,6 +84,19 @@ class SalesforceTransformer:
 
                 is_branched = False
 
+                if not isinstance(source_id_name, list):
+                    source_id_names = [source_id_name]
+                else:
+                    source_id_names = source_id_name
+
+                is_external_id_on_source = False
+                for sin in source_id_names:
+                    sin = sin.split(".")[0]
+                    if sin in source_data_object and sin is not None:
+                        is_external_id_on_source = True
+
+                if not is_external_id_on_source:
+                    continue
 
                 # logger.debug(f"object: {object_name}")
 
@@ -300,8 +308,8 @@ class SalesforceTransformer:
                             source_pieces = source.split(".")
 
                             # this might be needed for affiliations
-                            # if source_pieces[0] not in [branch_name, 'sf']:
-                            #     continue
+                            if (source_pieces[0] not in [branch_name, 'sf']) and isinstance(source_value, list):
+                                continue
                             
                             branch_temp = branch
                             if source_pieces[0] in source_data_object:
@@ -342,27 +350,30 @@ class SalesforceTransformer:
 
                 if object_name not in data: 
                     data[object_name] = []
+                
 
                 if not skip_object:
                     if is_flat:
                         current_record = self.setId(source_data_object=source_data_object, object_name=object_name, current_record=current_record)
                         # data[object_name].append(current_record[object_name])
-                        yield { object_name: current_record[object_name] }
+                        if current_record and salesforce_id_name in current_record[object_name]:
+                            yield { object_name: current_record[object_name] }
                     elif not is_branched:
                         current_record = self.setId(source_data_object=source_data_object, object_name=object_name, current_record=current_record)
                         # data[object_name].append(current_record[object_name])
-                        yield { object_name: current_record[object_name] }
+                        if current_record and salesforce_id_name in current_record[object_name]:
+                            if current_record[object_name][salesforce_id_name] is not None:
+                                yield { object_name: current_record[object_name] }
                     else:
                         # data[object_name] = good_records
                         
                         for good_record in good_records:
-                            if good_record[salesforce_id_name]:
-                                yield { object_name: good_record }
+                            if salesforce_id_name in good_record:
+                                if good_record[salesforce_id_name] is not None:
+                                    yield { object_name: good_record }
                             else:
                                 logger.error(f"Problem processing {object_name} record, required external id not found: {good_record}")
                                 raise Exception(f"Problem processing {object_name} record, required external id not found: {good_record}")
-        time_now = datetime.now().strftime('%H:%M:%S')
-        logger.debug(f"Transform finished: {start_time} -> {time_now}")
 
         # return data
     
@@ -412,6 +423,25 @@ class SalesforceTransformer:
             else:
                 raise Exception("Error: config object's Id requires a pds and salesforce value to be able to match")
         
+
+        dotted_id_name = None
+        id_names = self.hashed_ids[object_name]['id_name']
+        if not isinstance(id_names, list):
+            id_names = [id_names]
+        for id_name in id_names:
+            first = id_name.split(".")[0]
+            if first in source_data_object:
+                if source_data_object[first]:
+                    dotted_id_name = id_name
+
+        if dotted_id_name:
+            current_record[object_name][salesforce_id_name] = source_data_object[id_name]
+            if salesforce_id_name not in current_record[object_name]:
+                logger.error(f"The external_id {dotted_id_name} was not found on the current record {current_record[object_name]}")
+
+        else: 
+            return {}
+
         return current_record
                         
         

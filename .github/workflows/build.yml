@@ -26,8 +26,36 @@ defaults:
     shell: bash
 
 jobs:
+  unittest:
+    name: Running Unit tests
+    runs-on: ubuntu-latest
+    container:
+      image: python:3.9
+      options: --user root
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        # with: 
+        #   path: ./salesforce
+
+      - name: Create virtual env
+        run: |
+          python -m venv env
+
+      - name: Get requirements
+        run: |
+          source env/bin/activate
+          python -m pip config --cache-dir env set global.extra-index-url https://artifactory.huit.harvard.edu/artifactory/api/pypi/ats-python/simple
+          python -m pip install -r src/requirements.txt
+
+      - name: Run tests
+        run: | 
+          source env/bin/activate
+          python -m unittest discover -s src -p *_test.py    
+
   build:
     name: Build Code ${{ github.event.inputs.version }}
+    needs: [unittest]
     runs-on: ubuntu-latest
 
     steps:

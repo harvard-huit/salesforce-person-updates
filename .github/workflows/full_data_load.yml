@@ -22,7 +22,39 @@ on:
         type: number
         required: false
         default: 500
-              
+      batch_thread_count: 
+        type: number
+        required: false
+        default: 3
+      debug:
+        type: choice
+        required: false
+        default: 'False'
+        options:
+          - 'True'
+          - 'False'
+      cpu:
+        type: choice
+        required: false
+        default: '1024'
+        options:
+          - '1024'
+          - '2048'
+      memory:
+        type: choice
+        required: false
+        default: '4096'
+        options:
+          - '2048'
+          - '3072'
+          - '4096'
+          - '5120'
+          - '6144'
+          - '7168'
+          - '8192'
+          - '16384'
+          
+                  
 
 env:
   AWS_REGION: us-east-1
@@ -88,8 +120,8 @@ jobs:
           CONTAINER_OVERRIDES='[ 
             {
               "name": "aais-services-${{ github.event.inputs.environment }}-feed-salesforce-person-updates", 
-              "cpu": 1024,
-              "memory": 2048,
+              "cpu": ${{ github.event.inputs.cpu }},
+              "memory": ${{ github.event.inputs.memory }},
               "environment": [ 
                 {
                   "name": "SALESFORCE_INSTANCE_ID", 
@@ -101,8 +133,14 @@ jobs:
                   "name": "action", 
                   "value": "full-person-load"
                 }, {
-                  "name": "batch_size", 
+                  "name": "BATCH_SIZE", 
                   "value": "${{ github.event.inputs.batch_size }}"
+                }, {
+                  "name": "BATCH_THREAD_COUNT", 
+                  "value": "${{ github.event.inputs.batch_thread_count }}"
+                }, {
+                  "name": "DEBUG", 
+                  "value": "${{ github.event.inputs.debug }}"
                 }
               ]
             } 
@@ -110,11 +148,11 @@ jobs:
           CONTAINER_OVERRIDES=$(echo "$CONTAINER_OVERRIDES" | tr -d '\n')
           echo "CONTAINER_OVERRIDES=$CONTAINER_OVERRIDES" >> $GITHUB_ENV
 
-      - name: Run ${{ github.event.inputs.environment }} spot update on [${{ github.event.inputs.people }}]
+      - name: Run ${{ github.event.inputs.environment }} full data load on [${{ github.event.inputs.people }}]
         run: |
           aws ecs run-task \
             --cluster aais-services-${{ github.event.inputs.environment }}-cluster \
-            --overrides '{"containerOverrides": ${{ env.CONTAINER_OVERRIDES }} }' \
+            --overrides '{"cpu": "${{ github.event.inputs.cpu }}", "memory": "${{ github.event.inputs.memory }}", "containerOverrides": ${{ env.CONTAINER_OVERRIDES }} }' \
             --task-definition arn:aws:ecs:us-east-1:${{ env.account }}:task-definition/aais-services-${{ github.event.inputs.environment }}-feed-salesforce-person-updates${{ env.task_version }} \
             --network-configuration '{ "awsvpcConfiguration": { "assignPublicIp":"DISABLED", "securityGroups": ["${{ env.security_group }}"], "subnets": ["${{ env.subnet }}"]}}' \
             --launch-type FARGATE

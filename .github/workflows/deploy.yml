@@ -18,6 +18,14 @@ on:
           - 'stage'
           - 'prod'
         required: true
+      schedules:
+        type: choice
+        default: 'false'
+        options:
+          - 'true'
+          - 'false'
+        required: true
+
 
 env:
   version: ${{ github.event.inputs.version }}
@@ -71,7 +79,7 @@ jobs:
           fi
           done < ./ansible_vars/${{ github.event.inputs.environment }}_ansible_vars.yml
 
-          if [[ $version -ne ${{ env.version }} ]]; then
+          if [[ $version -ne ${{ github.event.inputs.version }} ]]; then
             echo "Error: version does not match in ansible_vars"
             exit 1
           fi
@@ -83,7 +91,7 @@ jobs:
           docker manifest inspect artifactory.huit.harvard.edu/ats-docker/salesforce-person-updates:$version
           
       - name: Run AAIS Deploy Container Action
-        uses: HUIT/aais-ecs-deploy-action@v1.0.1
+        uses: HUIT/aais-ecs-deploy-action@v1.0.2
         with:
           # Required
           common_config: aais-services-config/aais_services_${{ github.event.inputs.environment }}.yml
@@ -93,4 +101,5 @@ jobs:
           #   this needs to match the directory the main repository was checked out into
           #   if the checkout was done without a path, this is not needed
           app_root: salesforce
+          schedules: ${{ github.event.inputs.schedules }}
      

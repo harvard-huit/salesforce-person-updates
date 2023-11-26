@@ -119,77 +119,79 @@ class AppConfig():
 
 
     def get_config_values(self):
+            """
+            Retrieves configuration values from DynamoDB and secrets manager and sets them as attributes of the object.
+            """
+            try:
+                dynamo = boto3.client('dynamodb')
+                response = dynamo.get_item(
+                    Key={
+                        'id': {'S': self.id},
+                        'name': {'S': self.name}
+                    },
+                    TableName=self.table_name
+                )
+                if 'Item' in response:
+                    self.salesforce_username = response.get('Item').get('salesforce_username').get('S')
+                    self.salesforce_domain = response.get('Item').get('salesforce_domain').get('S')
+                    self.pds_query = json.loads(response.get('Item').get('pds_query').get('S'))
+                    self.config = json.loads(response.get('Item').get('transformation_config').get('S'))
 
-        try:
-            dynamo = boto3.client('dynamodb')
-            response = dynamo.get_item(
-                Key={
-                    'id': {'S': self.id},
-                    'name': {'S': self.name}
-                },
-                TableName=self.table_name
-            )
-            if 'Item' in response:
-                self.salesforce_username = response.get('Item').get('salesforce_username').get('S')
-                self.salesforce_domain = response.get('Item').get('salesforce_domain').get('S')
-                self.pds_query = json.loads(response.get('Item').get('pds_query').get('S'))
-                self.config = json.loads(response.get('Item').get('transformation_config').get('S'))
+                    self.watermarks = response.get('Item').get('watermarks').get('M')
+                    if os.getenv("FORCE_PERSON_WATERMARK"):
+                        self.watermarks["person"] = os.getenv("FORCE_PERSON_WATERMARK")
+                    if os.getenv("FORCE_DEPARTMENT_WATERMARK"):
+                        self.watermarks["department"] = os.getenv("FORCE_DEPARTMENT_WATERMARK")
 
-                self.watermarks = response.get('Item').get('watermarks').get('M')
-                if os.getenv("FORCE_PERSON_WATERMARK"):
-                    self.watermarks["person"] = os.getenv("FORCE_PERSON_WATERMARK")
-                if os.getenv("FORCE_DEPARTMENT_WATERMARK"):
-                    self.watermarks["department"] = os.getenv("FORCE_DEPARTMENT_WATERMARK")
+                    # we want the watermarks to be datetime objects so we can do comparisons easily on them
+                    #   this will also throw an error if the format is wrong on the watermark
+                    datetime_watermarks = {}
+                    for index, watermark in self.watermarks.items():
+                        datetime_watermarks[index] = datetime.strptime(watermark['S'], '%Y-%m-%dT%H:%M:%S').date()
+                    self.watermarks = datetime_watermarks
 
-                # we want the watermarks to be datetime objects so we can do comparisons easily on them
-                #   this will also throw an error if the format is wrong on the watermark
-                datetime_watermarks = {}
-                for index, watermark in self.watermarks.items():
-                    datetime_watermarks[index] = datetime.strptime(watermark['S'], '%Y-%m-%dT%H:%M:%S').date()
-                self.watermarks = datetime_watermarks
+                    self.config = json.loads(response.get('Item').get('transformation_config').get('S'))
 
-                self.config = json.loads(response.get('Item').get('transformation_config').get('S'))
+                    salesforce_password_arn = response.get('Item').get('salesforce_password_arn').get('S')
 
-                salesforce_password_arn = response.get('Item').get('salesforce_password_arn').get('S')
+                    salesforce_token_arn = None
+                    if 'salesforce_token_arn' in response.get('Item'):
+                        salesforce_token_arn = response.get('Item').get('salesforce_token_arn').get('S')
 
-                salesforce_token_arn = None
-                if 'salesforce_token_arn' in response.get('Item'):
-                    salesforce_token_arn = response.get('Item').get('salesforce_token_arn').get('S')
+                    salesforce_client_key_arn = None
+                    if 'salesforce_client_key_arn' in response.get('Item'):
+                        salesforce_client_key_arn = response.get('Item').get('salesforce_client_key_arn').get('S')
 
-                salesforce_client_key_arn = None
-                if 'salesforce_client_key_arn' in response.get('Item'):
-                    salesforce_client_key_arn = response.get('Item').get('salesforce_client_key_arn').get('S')
+                    salesforce_client_secret_arn = None
+                    if 'salesforce_client_secret_arn' in response.get('Item'):
+                        salesforce_client_secret_arn = response.get('Item').get('salesforce_client_secret_arn').get('S')
 
-                salesforce_client_secret_arn = None
-                if 'salesforce_client_secret_arn' in response.get('Item'):
-                    salesforce_client_secret_arn = response.get('Item').get('salesforce_client_secret_arn').get('S')
+                    pds_apikey_arn = response.get('Item').get('pds_apikey_arn').get('S')
+                    dept_apikey_arn = response.get('Item').get('dept_apikey_arn').get('S')
 
-                pds_apikey_arn = response.get('Item').get('pds_apikey_arn').get('S')
-                dept_apikey_arn = response.get('Item').get('dept_apikey_arn').get('S')
-
+                
+                else:
+                    raise Exception(f"Error: unable to retrieve table values for table {self.table_name}: {response}")
+            except Exception as e:
+                logger.error(f"Error: failure to get configuration for id:{self.id} on table: {self.table_name}")
+                raise e
             
-            else:
-                raise Exception(f"Error: unable to retrieve table values for table {self.table_name}: {response}")
-        except Exception as e:
-            logger.error(f"Error: failure to get configuration for id:{self.id} on table: {self.table_name}")
-            raise e
-        
-        try:
-        
-            self.salesforce_password = self.get_secret(salesforce_password_arn)
-            if salesforce_token_arn:
-                self.salesforce_token = self.get_secret(salesforce_token_arn)
-            if salesforce_client_key_arn:
-                self.salesforce_client_key = self.get_secret(salesforce_client_key_arn)
-            if salesforce_client_secret_arn:
-                self.salesforce_client_secret = self.get_secret(salesforce_client_secret_arn)
+            try:
+            
+                self.salesforce_password = self.get_secret(salesforce_password_arn)
+                if salesforce_token_arn:
+                    self.salesforce_token = self.get_secret(salesforce_token_arn)
+                if salesforce_client_key_arn:
+                    self.salesforce_client_key = self.get_secret(salesforce_client_key_arn)
+                if salesforce_client_secret_arn:
+                    self.salesforce_client_secret = self.get_secret(salesforce_client_secret_arn)
 
-            self.pds_apikey = self.get_secret(pds_apikey_arn)
-            self.dept_apikey = self.get_secret(dept_apikey_arn)
+                self.pds_apikey = self.get_secret(pds_apikey_arn)
+                self.dept_apikey = self.get_secret(dept_apikey_arn)
 
-        except Exception as e:
-            logger.error(f"Error: failure to get secrets manager values")    
-            raise e
+            except Exception as e:
+                logger.error(f"Error: failure to get secrets manager values")    
+                raise e
         
     def get_secret(self, arn):
         secretsmanager = boto3.client('secretsmanager')
@@ -236,9 +238,15 @@ class AppConfig():
                         ':val': string_watermarks
                     }
                 )
+    
+                if watermark_name:
+                    return string_watermarks[watermark_name]
+                else:
+                    return string_watermarks
             except Exception as e:
                 logger.error(f"Error: failiure to update dynamo table {self.table_name} with watermarks {string_watermarks}")
                 raise e
+
 #============================================================================================
 # Other
 #============================================================================================
@@ -262,6 +270,8 @@ def isTaskRunning():
         cluster=cluster_name,
         family=task_family,
     )['taskArns']
+
+    logger.info(mylist)
 
     # note that it will retrieve itself, so we need to make sure more than one is running
     # to determine if it's "already" running

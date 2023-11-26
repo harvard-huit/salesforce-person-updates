@@ -1,8 +1,12 @@
+import os
 import json
 import jsonschema
 import logging
 from datetime import datetime, date
 from simple_salesforce import Salesforce, exceptions
+
+import psutil
+
 
 from common import logger
 logging.getLogger("simple_salesforce").setLevel(logging.WARNING)
@@ -51,73 +55,133 @@ class HarvardSalesforce:
     # NOTE: the Bulk API can take a max of 10000 records at a time
     # a single record will take anywhere from 2-50 seconds
     # dupe: this makes sure we don't keep retrying a dupe check
-    def pushBulk(self, object, data, dupe=False, id_name='Id'):
+    def pushBulk(self, object, data, dupe=False, id_name='Id', retries=3):
+
+
+        # check memory usage
+        if os.getenv("DEBUG") == "True":
+            memory_use_percent = psutil.virtual_memory().percent  # percentage of memory use
+            memory_avail = psutil.virtual_memory().available * 0.000001  # memory available in MB
+            memory_total = psutil.virtual_memory().total * 0.000001
+            logger.debug(f"Push memory usage: {memory_use_percent}% memory available: {memory_avail}/{memory_total}")
+
         if data is None or len(data) == 0:
-            logger.warn(f"No data to push to {object}")
+            logger.warning(f"No data to push to {object}")
             return True
+        if retries < 1:
+            logger.error(f"Error processing data, retries exhausted: {object}: {data}")
+            return len(data)
         logger.debug(f"upsert to {object} with {len(data)} records")
 
         # This will send the upsert as async, the results will just be a jobId that you can query for results later (in theory)
         # responses = self.sf.bulk.__getattr__(object).upsert(data, external_id_field=id_name, batch_size=5000, use_serial=True, bypass_results=True)
 
         # This is the sync/blocking version of the upsert, it will return with the results of each record
-        responses = self.sf.bulk.__getattr__(object).upsert(data, external_id_field=id_name)
-        
-        
-        # Keeping this in here as a way to work with async pushes in the future
-        # logger.info(f"{responses}")
-        # for response in responses:
-        #     if 'job_id' in response:
-        #         self.jobs.append(response['job_id'])
-        #     elif 'bypass_results' not in response:
-        #         logger.warning(f"Bulk response with no job id: {response}")
-        # self.log_jobs()
+        try: 
+
+            while(retries > 0):
+
+                responses = self.sf.bulk.__getattr__(object).upsert(data, external_id_field=id_name)
+
+                # Keeping this in here as a way to work with async pushes in the future
+                # logger.info(f"{responses}")
+                # for response in responses:
+                #     if 'job_id' in response:
+                #         self.jobs.append(response['job_id'])
+                #     elif 'bypass_results' not in response:
+                #         logger.warning(f"Bulk response with no job id: {response}")
+                # self.log_jobs()
 
 
-        created_count = 0
-        updated_count = 0
-        error_count = 0
-        for index, response in enumerate(responses):
-            if response['success'] != True: 
-                
-                errored_data = data[index]
-                logger.error(f"Error in bulk data load: {response['errors']} ({errored_data})")
+                created_count = 0
+                updated_count = 0
+                error_count = 0
+                dupe_data_batch = []
+                errored_data_batch = []
 
-                if response['errors'][0]['statusCode'] == 'DUPLICATES_DETECTED':
+                pds_external_id_name = self.unique_ids[object]['id_name']
+                created_ids = {
+                    "object": object,
+                    "external_id_field": pds_external_id_name,
+                    "ids": []
+                }
+                for index, response in enumerate(responses):
+                    if response['success'] != True: 
+                        
+                        errored_data = data[index]
+                        logger.error(f"Error in bulk data load: {response['errors']} ({errored_data})")
 
-                    if dupe:
-                        logger.error(f"Error: DUPLICATE DETECTED (unresoved): {errored_data}")
+                        if response['errors'][0]['statusCode'] == 'DUPLICATES_DETECTED':
+
+                            if dupe:
+                                logger.error(f"Error: DUPLICATE DETECTED (unresoved): {errored_data}")
+                            else:
+                                logger.error(f"Error: DUPLICATE DETECTED -- Errored Data: {errored_data}")
+                                dupe_data_batch.append(errored_data)
+
+                        else: 
+                            logger.error(f"Error: {response['errors'][0]['statusCode']}: {errored_data}")
+                            errored_data_batch.append(errored_data)
+
+                        # if response['errors'][0]['statusCode'] == 'CANNOT_INSERT_UPDATE_ACTIVATE_ENTITY':
+                        #     # get errored ids
+                        #     pass
+                        #     # self.pushBulk(object_name, [errored_data_object], retry=True)
+                            
                     else:
-                        logger.error(f"Error: DUPLICATE DETECTED -- Errored Data: {errored_data}")
-                        if self.check_duplicate(object, errored_data):
-                            error_count -= 1
-                error_count += 1
-            else:
-                if response['created']:
-                    created_count += 1
-                else:
-                    updated_count += 1
-                logger.debug(response)
-        if updated_count > 0:
-            logger.info(f"Updated {object} Records: {updated_count}")
-        if created_count > 0:
-            logger.info(f"Created {object} Records: {created_count}")
-        if error_count > 0:
-            logger.info(f"Errored {object} Records: {error_count}")
+                        if response['created']:
+                            created_count += 1
+                        else:
+                            updated_count += 1
+                        logger.debug(response)
+
+                if len(dupe_data_batch) > 0:
+                    dupe_errors = self.check_duplicate(object, dupe_data_batch)
+                    error_count += dupe_errors
+
+                if len(errored_data_batch) > 0:
+
+                    logger.info(f"Trying errored records again {retries} more times")
+                    retries -= 1
+                    continue
+                    # retry_response = self.pushBulk(object, errored_data_batch, retries=retries)
+
+                    # if isinstance(retry_response, int):
+                    #     error_count += retry_response
+                    # else:
+                    #     logger.info(f"Retry successful")
 
 
+                if len(created_ids['ids']) > 0:
+                    logger.info(created_ids)
+
+                if updated_count > 0:
+                    logger.info(f"Updated {object} Records: {updated_count}")
+                if created_count > 0:
+                    logger.info(f"Created {object} Records: {created_count}")
+                if error_count > 0:
+                    logger.info(f"Errored {object} Records: {error_count}")
+                break
+
+            if retries == 0:
+                logger.error(f"Failure to push these records: {errored_data_batch}")
+                return False
+
+        except Exception as e:
+            logger.error(f"Error with data push: {e}")
+            raise e
 
         return True
     
-    # this will check for outstanding jobs and log them if they're done
-    # this does NOT work to get results
-    # a call to /jobs/ingest/JOBID will return as it should, in json, but will only have 
-    #   - number of processed records 
-    #   - number of failed records
-    # That leaves us with no way to determine what actually went wrong
-    # /jobs/ingest/JOBID/successfulResults is supposed to return a CSV of the actual results of each record
-    #   However, it does not return anything. (same with /jobs/ingest/JOBID/failedResults)
     def log_jobs(self):
+        # this will check for outstanding jobs and log them if they're done
+        # this does NOT work to get results
+        # a call to /jobs/ingest/JOBID will return as it should, in json, but will only have 
+        #   - number of processed records 
+        #   - number of failed records
+        # That leaves us with no way to determine what actually went wrong
+        # /jobs/ingest/JOBID/successfulResults is supposed to return a CSV of the actual results of each record
+        #   However, it does not return anything. (same with /jobs/ingest/JOBID/failedResults)
 
 
         # NOTE: this query can get the status, but not results (i.e. if the job is finished)
@@ -223,7 +287,7 @@ class HarvardSalesforce:
         # we want to skip these fields, they'll always be different
         ignore_fields = ['Id', 'attributes', 'OwnerId', 'Name', 'CreatedDate', 'CreatedById', 'LastModifiedDate', 
                          'LastModifiedById', 'SystemModstamp', 'AccountId', 'LastActivityDate', 'LastViewedDate', 
-                         'LastReferenceDated', 'IAM_Grouper_WS_Customers__c', 'IAM_Grouper_App_Customers__c', 
+                         'LastReferencedDated', 'IAM_Grouper_WS_Customers__c', 'IAM_Grouper_App_Customers__c', 
                          'PAM__Partner_Server_URL_80__c', 'IAM_Harvard_Key_Auth_CAS_Owners__c', 'IAM_Midas_Customers__c',
                          'CloudAware_Application__c', 'PAM__Contact_Score_Rating__c', 'PAM__Contact_Score__c',
                          'IAM_IDP_Customers__c', 'IAM_IIQ_Customers__c'
@@ -232,13 +296,13 @@ class HarvardSalesforce:
         result = {}
 
         if len(dataset1['records']) != len(dataset2['records']):
-            logger.error(f"Error: not correct number of records")
-            logger.error(f"Sand has:")
+            logger.warning(f"{object_name}: not correct number of records")
+            logger.info(f"Sand has:")
             for record in dataset1['records']:
-                logger.error(f"{record[ref_field]}")
-            logger.error(f"Prod has:")
+                logger.info(f"{record[ref_field]}")
+            logger.info(f"Prod has:")
             for record in dataset2['records']:
-                logger.error(f"{record[ref_field]}")
+                logger.info(f"{record[ref_field]}")
             result['ids'] = {
                 "sand": [record[ref_field] for record in dataset1['records']],
                 "prod": [record[ref_field] for record in dataset2['records']]
@@ -287,7 +351,7 @@ class HarvardSalesforce:
     # this function soft-deletes the records included in the list argument
     # WARNING: this currently has no real world use, it's just being used for debugging purposes
     def delete_records(self, object_name: dict, ids: list):
-        logger.warn(f"WARNING: bulk soft DELETE to {object} with {ids}")
+        logger.warn(f"WARNING: bulk soft DELETE to {object_name} with {ids}")
         logger.warn(f"WARNING: this operation has no real world use and should only be used for debugging purposes in test orgs")
 
         data = []
@@ -295,8 +359,9 @@ class HarvardSalesforce:
             data.append({
                 'Id': id
             })
-        responses = self.sf.bulk.__getattr__(object_name).delete(data,batch_size=10000,use_serial=True)
-        logger.warn(f"WARNING: DELETED ids from {object_name} with response: {responses}")
+        if data:
+            responses = self.sf.bulk.__getattr__(object_name).delete(data,batch_size=10000,use_serial=True)
+            logger.warn(f"WARNING: DELETED ids from {object_name} with response: {responses}")
         return True
 
     # NOTE: the integration user I'm using seems to only have GET/POST/HEAD permissions (on standard objects at least)
@@ -400,7 +465,7 @@ class HarvardSalesforce:
     
     # this will try to make sure the data going to the sf object is the right type
     def validate(self, object, field, value, identifier):
-        logger.debug(f"validating the value ({value}) for the field: {object}.{field} from {identifier}")
+        # logger.debug(f"validating the value ({value}) for the field: {object}.{field} from {identifier}")
         if object not in self.type_data:
             logger.warn("Warning: no type data found, run getTypeMap() first for better performance")
             self.type_data([object])
@@ -670,60 +735,73 @@ class HarvardSalesforce:
 
     # this method is trying to find an Id for a record that failed as a dupe
     # the `errored_data_object` should be of the same record that triggered the error
-    def check_duplicate(self, object_name, errored_data_object, dry_run=False):
+    def check_duplicate(self, object_name, errored_data_objects, dry_run=False):
 
-        # first we get all of the externalids/uniques for the object that we collected in type data
-        unique_object_fields = [i for i, obj in self.type_data[object_name].items() if obj['unique'] or obj['externalId']]
 
-        # build the where clause
-        whereses = []
-        where_clause = ""
-        for field in unique_object_fields:
-            if field in errored_data_object:
-                field_value = errored_data_object[field]
-                whereses.append(f"{field} = '{field_value}'")
+        error_count = len(errored_data_objects)
 
-        # this is to handle the standard contact duplicate matching rule, or at least the most common breaking of it
-        # see: https://help.salesforce.com/s/articleView?language=en_US&id=sf.matching_rules_standard_contact_rule.htm&type=5
-        if object_name == 'Contact':
-            standard_contact_rule_string = ''
-            email = None
-            first_name = None
-            last_name = None
-            if 'Email' in errored_data_object and 'FirstName' in errored_data_object and 'LastName' in errored_data_object:
-                email = errored_data_object['Email']
-                first_name = errored_data_object['FirstName']
-                last_name = errored_data_object['LastName']
-                standard_contact_rule_string = f"(Email = '{email}' and LastName = '{last_name}' and FirstName = '{first_name}')"
+        try:
+
+            # first we get all of the externalids/uniques for the object that we collected in type data
+            unique_object_fields = [i for i, obj in self.type_data[object_name].items() if obj['unique'] or obj['externalId']]
+
+            retryable_data_objects = []
+            for errored_data_object in errored_data_objects:
+
+                # build the where clause
+                whereses = []
+                where_clause = ""
+
+                for field in unique_object_fields:
+                    if field in errored_data_object:
+                        field_value = errored_data_object[field]
+                        whereses.append(f"{field} = '{field_value}'")
+
+                # this is to handle the standard contact duplicate matching rule, or at least the most common breaking of it
+                # see: https://help.salesforce.com/s/articleView?language=en_US&id=sf.matching_rules_standard_contact_rule.htm&type=5
+                if object_name == 'Contact':
+                    standard_contact_rule_string = ''
+                    email = None
+                    first_name = None
+                    last_name = None
+                    if 'Email' in errored_data_object and 'FirstName' in errored_data_object and 'LastName' in errored_data_object:
+                        email = errored_data_object['Email']
+                        first_name = errored_data_object['FirstName']
+                        last_name = errored_data_object['LastName']
+                        standard_contact_rule_string = f"(Email = '{email}' and LastName = '{last_name}' and FirstName = '{first_name}')"
+                        
+                        whereses.append(f"{standard_contact_rule_string}")
                 
-                whereses.append(f"{standard_contact_rule_string}")
-        
-        where_clause = " or ".join(whereses)
+                where_clause = " or ".join(whereses)
 
-        select_string = f"SELECT {object_name}.Id FROM {object_name} WHERE {where_clause}"
-        logger.debug(select_string)
-        sf_data = self.sf.query_all(select_string)
-        logger.debug(f"got this data from salesforce: {sf_data['records']}")
+                select_string = f"SELECT {object_name}.Id FROM {object_name} WHERE {where_clause}"
+                logger.debug(select_string)
+                sf_data = self.sf.query_all(select_string)
+                logger.debug(f"got this data from salesforce: {sf_data['records']}")
 
-        # go through each record 
-        if len(sf_data['records']) > 1:
-            logger.error(f"Error: too many records found on object {object_name} with this data: {errored_data_object} -- Ids: {sf_data}")
-        elif len(sf_data['records']) < 1:
-            logger.error(f"Error: no records found on object {object_name} with this data: {errored_data_object}")
-        else:
-            found_id = sf_data['records'][0]['Id']
-            logger.debug(f"Success resolving duplicate! id: {found_id} trying to re-push record")
-            errored_data_object['Id'] = found_id
-            if not dry_run:
-                self.pushBulk(object_name, [errored_data_object], dupe=True)
-            return True
+                if len(sf_data['records']) > 1:
+                    logger.error(f"DUPLICATES DETECTED: {sf_data} -- too many records found on object {object_name} with this select: {select_string} and this data: {errored_data_object}")
+                elif len(sf_data['records']) < 1:
+                    logger.error(f"Error: no records found on object {object_name} with this data: {errored_data_object}")
+                else:
+                    found_id = sf_data['records'][0]['Id']
+                    logger.info(f"Success resolving duplicate! id: {found_id} trying to re-push record")
+                    error_count -= 1
+                    errored_data_object['Id'] = found_id
+                    retryable_data_objects.append(errored_data_object)
+
+            if not dry_run and len(retryable_data_objects) > 0:
+                self.pushBulk(object_name, retryable_data_objects, dupe=True)
+            return error_count
+
+        except Exception as e:
+            logger.error(f"Error with duplicate resolution: {e}")
+            return error_count
 
 
 
-
-
-        # then we use those ids to see if there's an Id for the record we're looking for
-        # we can do that in a single soql call
-        #   select Id from object_name where externalid1 = X || externalid2 = Y || email = Z and firstname and lastname ....
+            # then we use those ids to see if there's an Id for the record we're looking for
+            # we can do that in a single soql call
+            #   select Id from object_name where externalid1 = X || externalid2 = Y || email = Z and firstname and lastname ....
         
 

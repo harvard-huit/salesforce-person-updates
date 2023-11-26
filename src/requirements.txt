@@ -5,6 +5,10 @@ jsonschema==4.17.3
 requests==2.31.0
 simple-salesforce==1.12.3
 python-dotenv
-asyncio==3.4.3
 
-pds @ git+https://github.com/harvard-huit/py-pds@v1.0.2
+psutil==5.9.6
+
+# pds @ git+https://github.com/harvard-huit/py-pds@v1.0.3
+# NOTE: requires something like: 
+#   pip config set global.extra-index-url https://artifactory.huit.harvard.edu/artifactory/api/pypi/ats-python/simple
+pds==1.1.0

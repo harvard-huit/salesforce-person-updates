@@ -57,6 +57,7 @@ class SalesforceTransformerTest(unittest.TestCase):
                 },
                 "fields": {
                     "salesforceId": "names.personNameKey",
+                    "rootId": "personKey",
                     "FirstName__c": "names.firstName",
                     "LastName__c": "names.lastName",
                     "Name_Contact__c": "sf.contact.id",
@@ -73,6 +74,19 @@ class SalesforceTransformerTest(unittest.TestCase):
                 "fields": {
                     "Name": "departmentName",
                     "departmentKey__c": "departmentKey"
+                }
+            },
+            "Affiliation__c": {
+                "flat": False,
+                "source": "pds",
+                "Id": {
+                    "pds": ["emps.id", "stus.id", "pois.id"],
+                    "salesforce": "affiliationId"
+                },
+                "fields": {
+                    "affiliationId": ["emps.id", "stus.id", "pois.id"],
+                    "rootId": "personKey",
+                    "otherValue": ["emps.other_value", "stus.other_value", "pois.other_value"]
                 }
             }
         }
@@ -143,6 +157,12 @@ class SalesforceTransformerTest(unittest.TestCase):
                                 "code": "OFFICIAL"
                             }
                         }
+                    ],
+                    "stus": [
+                        {
+                            "id": "1",
+                            "other_value": "one"
+                        }
                     ]
                 },
                 {
@@ -165,6 +185,26 @@ class SalesforceTransformerTest(unittest.TestCase):
                                 "code": "OFFICIAL"
                             }
                         }
+                    ],
+                    "emps": [
+                        {
+                            "id": "2",
+                            "other_value": "two"
+                        },
+                        {
+                            "id": "3",
+                            "other_value": "three"
+                        },
+                        {
+                            "id": "4",
+                            "other_value": "four"
+                        }
+                    ],
+                    "stus": [
+                        {
+                            "id": "5",
+                            "other_value": "five"
+                        }
                     ]
                 },
                 {
@@ -186,6 +226,24 @@ class SalesforceTransformerTest(unittest.TestCase):
                             "personNameType": {
                                 "code": "OFFICIAL"
                             }
+                        }
+                    ],
+                    "emps": [
+                        {
+                            "id": "6",
+                            "other_value": "six"
+                        }
+                    ],
+                    "stus": [
+                        {
+                            "id": "7",
+                            "other_value": "seven"
+                        }
+                    ],
+                    "pois": [
+                        {
+                            "id": "8",
+                            "other_value": "eight"
                         }
                     ]
                 }
@@ -217,6 +275,7 @@ class SalesforceTransformerTest(unittest.TestCase):
                 {
                     "Id": "N11",
                     "salesforceId": "11",
+                    "rootId": "1",
                     "FirstName__c": "Happy",
                     "LastName__c": "Gilmore",
                     "Name_Contact__c": "A1",
@@ -225,6 +284,7 @@ class SalesforceTransformerTest(unittest.TestCase):
                 {
                     "Id": "N22",
                     "salesforceId": "22",
+                    "rootId": "2",
                     "FirstName__c": "Nana",
                     "LastName__c": "Visitor",
                     "Name_Contact__c": "A2",
@@ -233,6 +293,7 @@ class SalesforceTransformerTest(unittest.TestCase):
                 {
                     "Id": "N21",
                     "salesforceId": "21",
+                    "rootId": "2",
                     "FirstName__c": "Nana",
                     "LastName__c": "Tucker",
                     "Name_Contact__c": "A2",
@@ -241,6 +302,7 @@ class SalesforceTransformerTest(unittest.TestCase):
                 {
                     "Id": "N32",
                     "salesforceId": "32",
+                    "rootId": "3",
                     "FirstName__c": "JaZahn",
                     "LastName__c": "Clevenger",
                     "Name_Contact__c": "A3",
@@ -249,10 +311,53 @@ class SalesforceTransformerTest(unittest.TestCase):
                 {
                     "Id": "N31",
                     "salesforceId": "31",
+                    "rootId": "3",
                     "FirstName__c": "Jazahn",
                     "LastName__c": "Clevenger",
                     "Name_Contact__c": "A3",
                     "Name_Type_Code__c": "OFFICIAL"
+                }
+            ],
+            "Affiliation__c": [
+                {
+                    "affiliationId": "1",
+                    "rootId": "1",
+                    "otherValue": "one"
+                },
+                {
+                    "affiliationId": "2",
+                    "rootId": "2",
+                    "otherValue": "two"
+                },
+                {
+                    "affiliationId": "3",
+                    "rootId": "2",
+                    "otherValue": "three"
+                },
+                {
+                    "affiliationId": "4",
+                    "rootId": "2",
+                    "otherValue": "four"
+                },
+                {
+                    "affiliationId": "5",
+                    "rootId": "2",
+                    "otherValue": "five"
+                },
+                {
+                    "affiliationId": "6",
+                    "rootId": "3",
+                    "otherValue": "six"
+                },
+                {
+                    "affiliationId": "7",
+                    "rootId": "3",
+                    "otherValue": "seven"
+                },
+                {
+                    "affiliationId": "8",
+                    "rootId": "3",
+                    "otherValue": "eight"
                 }
             ]
         }
@@ -302,6 +407,11 @@ class SalesforceTransformerTest(unittest.TestCase):
                 "Ids": {
                     
                 }
+            },
+            'Affiliation__c': {
+                "Ids": {
+                    
+                }
             }
         }
 
@@ -331,6 +441,12 @@ class SalesforceTransformerTest(unittest.TestCase):
                     "22": "N22",
                     "31": "N31",
                     "32": "N32"
+                }
+            },
+            "Affiliation__c": {
+                "id_name": "id",
+                "Ids": {
+
                 }
             }
         }
@@ -369,6 +485,11 @@ class SalesforceTransformerTest(unittest.TestCase):
                     "updateable": True,
                     "length": 100
                 },
+                "rootId": {
+                    "type": "string",
+                    "updateable": True,
+                    "length": 100
+                },
                 "FirstName__c": {
                     "type": "string",
                     "updateable": True,
@@ -388,8 +509,31 @@ class SalesforceTransformerTest(unittest.TestCase):
                     "type": "string",
                     "updateable": True,
                     "length": 100
+                }
+            },
+            "Affiliation__c": {
+                "Id": {
+                    "type": "string",
+                    "updateable": False,
+                    "length": 100
                 },
+                "affiliationId": {
+                    "type": "string",
+                    "updateable": True,
+                    "length": 100
+                },
+                "rootId": {
+                    "type": "string",
+                    "updateable": True,
+                    "length": 100
+                },
+                "otherValue": {
+                    "type": "string",
+                    "updateable": True,
+                    "length": 100
+                }          
             }
+
         }
 
 
@@ -406,7 +550,7 @@ class SalesforceTransformerTest(unittest.TestCase):
         source_config = self.transformer.getSourceConfig('pds')
 
         self.assertTrue(self.sf.validateConfig(source_config, dry_run=True))
-        self.assertEqual(2, len(source_config))
+        self.assertEqual(3, len(source_config))
         for object_name in source_config:
             self.assertEqual('pds', source_config[object_name]['source'])
 
@@ -473,7 +617,17 @@ class SalesforceTransformerTest(unittest.TestCase):
                 # thisone = self.sample_transformed_pds_data[object_name][count]
                 self.assertDictEqual(self.sample_transformed_pds_data[object_name][count], object)
                 count += 1
-    
+                
+    def test_transform_affiliation(self):
+        self.transformer.config = self.fakeConfig
+        sample_people = People.make_people({}, self.sample_pds_data['results'])
+        data_gen = self.transformer.transform(source_data=sample_people, source_name='pds', target_object='Affiliation__c')
+        count = 0
+        for d in data_gen:
+            for object_name, object in d.items():
+                self.assertDictEqual(self.sample_transformed_pds_data[object_name][count], object)
+                count += 1
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -329,11 +329,11 @@ class HarvardSalesforceTest(unittest.TestCase):
             }]
         }
 
-        response = self.sf.check_duplicate(object_name='Contact', errored_data_object={
+        response = self.sf.check_duplicate(object_name='Contact', errored_data_objects=[{
             "EPPN": "1234"
-        }, dry_run=True)
+        }], dry_run=True)
 
-        self.assertTrue(response)
+        self.assertEquals(response, 0)
 
 
 
