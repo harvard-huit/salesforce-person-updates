@@ -228,6 +228,31 @@ Some useful queries:
  - **All logs**: `index="huit-admints-aais-dev" "attrs.APP_NAME"="salesforce-person-updates"`
  - **Errors**: `index="huit-admints-aais-dev" "attrs.APP_NAME"="salesforce-person-updates" error` (see what I did there?)
 
+## Scheduling
+
+There were some great advancements with the [aais-ecs-infrastructure](https://github.huit.harvard.edu/HUIT/aais-ecs-infrastructure) scripts that allow for configuring scheduled tasks. Scheduling is set up in the `ansible_vars`. These can be deployed with the [Github Action Deploy Task Workflow](https://github.huit.harvard.edu/HUIT/salesforce-person-updates/actions/workflows/deploy.yml). A note that schedule names are limited to 64 characters, including the task name, which in this case is quite long -- so you only really end up with ~14 characers to name a schedule. You probably want to include the target and action associated with the scheduled job, so it will need to be somewhat truncated -- description should be used to include more specifics. It's important we don't mix these up. 
+
+### Example: updates
+
+```yml
+schedules:
+    ####### HUIT Full Sandbox ####################################################################
+    # required
+    # Note: the full schedule name can only be 64 characters long
+  - schedule_rule_name: "huit-updates" # this will be appended to the task definition name, e.g my-cluster-dev-feed-my-dataload-half-hourly
+    schedule_expression: "rate(30 minutes)" # rate or cron expression
+    # optional
+    schedule_rule_description: "Updates for the HUIT full sandbox"
+    # environment variable overrides
+    schedule_env_overrides:
+      - name: "TABLE_NAME"
+        value: "aais-services-salesforce-person-updates-prod"
+      - name: "SALESFORCE_INSTANCE_ID"
+        value: "huit-full-sandbox"
+      - name: "action"
+        value: "person-updates"
+```
+
 ## Notes on simple-salesforce
 
 simple-salesforce is the most used Python salesforce integration library. We were also using simple-salesforce in the old HUDA API, but an older version. 
