@@ -103,6 +103,9 @@ class SalesforcePersonUpdates:
             # TODO: implement updates_only
             self.updates_only = os.getenv('UPDATES_ONLY') or False
 
+            # initialize storage for updated ids
+            self.updated_ids = []
+
             # self.pds_apikey = os.getenv("PDS_APIKEY")
             # initialize pds
             if batch_size_override:
@@ -378,8 +381,11 @@ class SalesforcePersonUpdates:
             while True:
 
                 results = self.pds.next_page_results()
-                if len(results) < 1 and self.pds.is_paginating:
-                    continue
+                if len(results) < 1:
+                    if self.pds.is_paginating:
+                        continue
+                    else:
+                        break
                 people = self.pds.make_people(results)
 
                 # check memory usage
@@ -422,12 +428,19 @@ class SalesforcePersonUpdates:
                     thread.start()
                     self.batch_threads.append(thread)
 
+                    if self.action == 'person-updates':
+                        # we need a record of updated ids
+                        external_id = self.app_config.config['Contact']['Ids']['pds']
+                        self.updated_ids += [person[external_id] for person in people]
+
+
                     while len(self.batch_threads) >= self.batch_thread_count:
                         time.sleep(10)
                         for thread in self.batch_threads.copy():
                             # logger.info(f"{len(self.batch_threads)} unresolved threads")
                             if not thread.is_alive():
                                 self.batch_threads.remove(thread)
+
                 else:
                     logger.info(f"dry_run active: No processing happening.")
 
@@ -656,6 +669,47 @@ elif action == 'test':
     logger.info("test action called")
 
     # isTaskRunning()
+
+    # force action
+    sfpu.action = 'person-updates'
+
+    # do the updates
+    sfpu.update_people_data_load()
+
+    # we should now have updated_ids populated
+    logger.info(sfpu.updated_ids)
+    # not the ids
+    notted_updated_ids = [f"!{id}" for id in sfpu.updated_ids]
+
+
+    external_id = sfpu.app_config.config['Contact']['Ids']['pds']
+
+    # create query
+    updated_ids_query = {
+        'fields': ["univid"],
+        'conditions': {
+            'updateDate': ">" + sfpu.app_config.watermarks['pds'].strftime('%Y-%m-%dT%H:%M:%S')
+        }
+    }
+    updated_ids_query['conditions'][external_id] = notted_updated_ids
+
+    # get all possible updated ids
+    sfpu.pds.start_pagination(query=updated_ids_query, type='list', wait=True)
+
+    id_list = sfpu.pds.results
+    logger.info(id_list)
+    id_list_string = "'" + '\',\''.join(id_list) + "'"
+
+    # now select from Contact with this id list and if we have any hits filter list
+    sf_data = sfpu.hsf.sf.query_all(f"SELECT {external_id} FROM Contact WHERE {external_id} IN({id_list_string})")
+
+    new_id_list = []
+    for record in sf_data['records']:
+        new_id_list.append(record[external_id])
+
+    
+
+
 
     logger.info("test action finished")
 else: 
