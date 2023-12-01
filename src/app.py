@@ -381,11 +381,9 @@ class SalesforcePersonUpdates:
             while True:
 
                 results = self.pds.next_page_results()
+
                 if len(results) < 1:
-                    if self.pds.is_paginating:
-                        continue
-                    else:
-                        break
+                    break
                 people = self.pds.make_people(results)
 
                 # check memory usage
