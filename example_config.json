@@ -85,7 +85,13 @@
             "salesforce": "HUDA__PERSON_NAMES_KEY__c"
         },
         "fields": {
-            "HUDA__Name_Contact__c": "sf.contact.id",
+            "HUDA__Name_Contact__r": {
+                "ref": {
+                    "object": "Contact",
+                    "ref_external_id": "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c",
+                    "source_external_id": "personKey"
+                }
+            },
             "HUDA__EFF_STATUS__c": "names.effectiveStatus.code",
             "HUDA__EFFDT__c": "names.effectiveDate",
             "HUDA__NAME_FIRST__c": "names.firstName",
@@ -109,7 +115,13 @@
             "salesforce": "HUDA__CONTACT_EMAIL_ADDRESS_KEY__c"
         },
         "fields": {
-            "HUDA__Email_Contact__c": "sf.contact.id",
+            "HUDA__Email_Contact__r": {
+                "ref": {
+                    "object": "Contact",
+                    "ref_external_id": "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c",
+                    "source_external_id": "personKey"
+                }
+            },
             "HUDA__CONTACT_EMAIL_ADDRESS_KEY__c": "emails.personEmailKey",
             "HUDA__EFF_STATUS__c": "emails.effectiveStatus.code",
             "HUDA__EFFDT__c": "emails.effectiveDate",
@@ -133,7 +145,13 @@
             "salesforce": "HUDA__CONTACT_ADDRESS_KEY__c"
         },
         "fields": {
-            "HUDA__Address_Contact__c": "sf.contact.id",
+            "HUDA__Address_Contact__r": {
+                "ref": {
+                    "object": "Contact",
+                    "ref_external_id": "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c",
+                    "source_external_id": "personKey"
+                }
+            },
             "HUDA__CONTACT_ADDRESS_KEY__c": "addresses.addressKey",
             "HUDA__ADDR_CATEGORY_CD__c": "addresses.addressCategory.code",
             "HUDA__ADDR_CITY__c": "addresses.addressCity",
@@ -161,7 +179,13 @@
             "salesforce": "HUDA__CONTACT_DATA_KEY__c"
         },
         "fields": {
-            "HUDA__Phone_Contact__c": "sf.contact.id",
+            "HUDA__Phone_Contact__r": {
+                "ref": {
+                    "object": "Contact",
+                    "ref_external_id": "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c",
+                    "source_external_id": "personKey"
+                }
+            },
             "HUDA__CONTACT_DATA_KEY__c": "phones.phoneKey",
             "HUDA__CONTACT_DATA__c": "phones.dataValue",
             "HUDA__CONTACT_DATA_EXT__c": "phones.dataExtension",
@@ -183,7 +207,13 @@
             "salesforce": "HUDA__CONTACT_LOCATION_KEY__c"
         },
         "fields": {
-            "HUDA__Location_Contact__c": "sf.contact.id",
+            "HUDA__Location_Contact__r": {
+                "ref": {
+                    "object": "Contact",
+                    "ref_external_id": "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c",
+                    "source_external_id": "personKey"
+                }
+            },
             "HUDA__CONTACT_LOCATION_KEY__c": "locations.personLocationKey",
             "HUDA__BLDG_LOC__c": "locations.location",
             "HUDA__BLDG_LOC_IDENTIFIER__c": "locations.locationIdentifier",
@@ -205,7 +235,20 @@
             "salesforce": "HUDA__hud_PERSON_ROLES_KEY__c"
         },
         "fields": {
-            "hed__Contact__c": "sf.contact.id",
+            "hed__Contact__r": {
+                "ref": {
+                    "object": "Contact",
+                    "ref_external_id": "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c",
+                    "source_external_id": "personKey"
+                }
+            },
+            "hed__Account__r": {
+                "ref": {
+                    "object": "Account",
+                    "ref_external_id": "HUDA__hud_DEPT_ID__c",
+                    "source_external_id": "employeeRoles.hrDeptId"
+                }
+            },
             "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c": "personKey",
             "HUDA__hud_PERSON_ROLES_KEY__c": ["employeeRoles.personRoleKey", "poiRoles.personRoleKey", "studentRoles.personRoleKey"],
             "HUDA__hud_EFF_STATUS__c": ["employeeRoles.effectiveStatus.code", "poiRoles.effectiveStatus.code", "studentRoles.effectiveStatus.code"],

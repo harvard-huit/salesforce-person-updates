@@ -51,7 +51,6 @@ class Departments:
             logger.error(f"Error: Deparments API gave unknown response: {response.json()}")
 
         return json.loads(response.text)
-
         
     def hashSort(self, results):
         if not isinstance(results, list):
@@ -62,3 +61,27 @@ class Departments:
             departments[result['hrDeptId']] = result
 
         return departments
+    
+    def get_major_affiliations(self, departments):
+        if departments == None:
+            raise Exception("Error: departments required")
+
+        major_affiliations = []
+        for department in departments:
+            if departments[department]['majAffiliation'] not in major_affiliations:
+                major_affiliations.append({
+                    department['majAffiliation']['code']: department['majAffiliation']['description']
+                })
+        return major_affiliations
+    
+    def get_sub_affiliations(self, departments):
+        if departments == None:
+            raise Exception("Error: departments required")
+
+        minor_affiliations = []
+        for department in departments:
+            if departments[department]['subAffiliation'] not in minor_affiliations:
+                minor_affiliations.append({
+                    department['subAffiliation']['code']: department['subAffiliation']['description']
+                })
+        return minor_affiliations

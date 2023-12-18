@@ -120,6 +120,9 @@ class SalesforcePersonUpdates:
                 self.batch_thread_count = 3
             self.batch_threads = []
 
+            if os.getenv("FORCE_LOCAL_CONFIG"):
+                self.app_config.config = config
+                # self.app_config.pds_query = pds_query
             self.transformer = SalesforceTransformer(config=self.app_config.config, hsf=self.hsf)
 
 
@@ -186,6 +189,22 @@ class SalesforcePersonUpdates:
         except Exception as e: 
             raise Exception(f"Logging failed: {data} :: {e}")
 
+    def setup_department_hierarchy(self, departments: list=[]):
+        logger.info(f"Starting department hierarchy setup")
+        self.departments = Departments(apikey=self.app_config.dept_apikey)
+
+        major_affiliation_map = self.departments.get_major_affiliations(departments)
+        data = {}
+
+        # for code, description in major_affiliation_map.items():
+        #     logger.debug(f"object: {object}")
+            # logger.debug(pformat(object_data))
+            
+
+            # self.hsf.pushBulk(object, object_data)
+
+        # sub_affiliation_map = self.departments.get_sub_affiliations(departments)
+
     # valid types are "full" and "update"
     def departments_data_load(self, type="full"):
         logger.info(f"Starting a department {type} load")
@@ -232,29 +251,37 @@ class SalesforcePersonUpdates:
 
     def process_people_batch(self, people: list=[]):
 
-        self.transformer.hashed_ids = self.hsf.getUniqueIds(
+        hashed_ids = self.hsf.getUniqueIds(
             config=self.transformer.getTargetConfig('Contact'), 
             source_data=people
         )
+        # this will overwrite the existing hashed_ids
+        if 'Contact' in self.transformer.hashed_ids:
+            self.transformer.hashed_ids['Contact'] = hashed_ids['Contact']
 
-        logger.info(f"Processing {len(people)} Contact records")
-        data = {}
-        data_gen = self.transformer.transform(source_data=people, target_object='Contact')
-        for d in data_gen:
-            for i, v in d.items():
-                if i not in data:
-                    data[i] = []
-                data[i].append(v)
+        if 'Contact' in self.app_config.config:
+            logger.info(f"Processing {len(people)} Contact records")
+            data = {}
+            data_gen = self.transformer.transform(source_data=people, target_object='Contact')
+            for d in data_gen:
+                for i, v in d.items():
+                    if i not in data:
+                        data[i] = []
+                    data[i].append(v)
 
 
-        for object, object_data in data.items():
-            logger.debug(f"Upserting to {object} with {len(object_data)} records")
-            self.hsf.pushBulk(object, object_data)
+            for object, object_data in data.items():
+                logger.debug(f"Upserting to {object} with {len(object_data)} records")
+                self.hsf.pushBulk(object, object_data, id_name='HUDA__hud_MULE_UNIQUE_PERSON_KEY__c')
 
-        self.transformer.hashed_ids = self.hsf.getUniqueIds(
+
+        hashed_ids = self.hsf.getUniqueIds(
             config=self.transformer.getSourceConfig('pds'), 
             source_data=people
         )
+        # this will overwrite the existing hashed_ids
+        for object_name in hashed_ids.keys():
+            self.transformer.hashed_ids[object_name] = hashed_ids[object_name]
 
         data = {}
 
@@ -366,6 +393,11 @@ class SalesforcePersonUpdates:
         if pds_query is None:
             pds_query = self.app_config.pds_query
 
+
+        # logger.debug(f"Getting all department ids")
+        # self.transformer.hashed_ids = self.hsf.getUniqueIds(
+        #     config=self.transformer.getSourceConfig('departments')
+        # )
 
         try:
             self.pds.start_pagination(pds_query)
@@ -618,6 +650,10 @@ sfpu = SalesforcePersonUpdates(local=LOCAL)
 if not os.getenv("SIMPLE_LOGS"):
     logger = sfpu.setup_logging(logger=logger)
 
+if os.getenv("FORCE_LOCAL_CONFIG"):
+    sfpu.app_config.config = config
+    # sfpu.app_config.pds_query = pds_query
+
 if action == 'single-person-update' and len(person_ids) > 0:
     sfpu.update_single_person(person_ids)
 elif action == 'full-person-load':
@@ -648,6 +684,31 @@ elif action == 'remove-unaffiliated-affiliations':
 
     if len(ids) > 0:
         logger.warning(f"Deleted {len(ids)} unaffiliated Affiliation records")
+elif action == 'clean-branches':
+    logger.info(f"clean-branches action called")
+    
+    object_id_map = {
+        'HUDA__hud_Name__c': 'HUDA__PERSON_NAMES_KEY__c',
+        'HUDA__hud_Email__c': 'HUDA__CONTACT_EMAIL_ADDRESS_KEY__c',
+        'HUDA__hud_Phone__c': 'HUDA__CONTACT_DATA_KEY__c',
+        'HUDA__hud_Address__c': 'HUDA__CONTACT_ADDRESS_KEY__c',
+        'HUDA__hud_Location__c': 'HUDA__CONTACT_LOCATION_KEY__c'
+    }
+    for object_name in object_id_map.keys():
+        logger.info(f"Cleaning up {object_name}")
+        object_external_id = object_id_map[object_name]
+
+        result = sfpu.hsf.sf.query_all(f"SELECT Id FROM {object_name} WHERE {object_external_id} = null")
+        logger.info(f"Found {len(result['records'])} {object_name} records without external ids")
+
+        # delete them
+        if len(result['records']) > 0:
+            logger.warning(f"Deleting {len(result['records'])} {object_name} records without external ids")
+            ids = [{'Id': record['Id']} for record in result['records']]
+            result = sfpu.hsf.sf.bulk.__getattr__(object_name).delete(ids)
+            logger.info(f"{result}")
+
+    logger.info(f"clean-branches action finished")
 elif action == 'remove-all-contacts':
     logger.warning("remove-all-contacts")
 
@@ -663,8 +724,8 @@ elif action == 'remove-all-contacts':
     sfpu.delete_people(dry_run=True, huids=ids)    
 
 
-elif action == 'test':
-    logger.info("test action called")
+elif action == 'notted-test':
+    logger.info("notted-test action called")
 
     # isTaskRunning()
 
@@ -709,7 +770,119 @@ elif action == 'test':
 
 
 
-    logger.info("test action finished")
+    logger.info("notted-test action finished")
+elif action == "department test":
+    logger.info("department test action called")
+
+    departments = Departments(apikey=sfpu.app_config.dept_apikey)
+    department_external_id_name = sfpu.app_config.config['Account']['Id']['salesforce']
+    department_id_name = sfpu.app_config.config['Account']['Id']['departments']
+    department_ids = [department[department_id_name] for department in departments.results]
+
+    result = sfpu.hsf.get_accounts_hash(id_name=department_external_id_name, ids=department_ids)
+    logger.info(f"Found {len(result.keys())} Account records")
+
+    # get all maj affiliations
+    major_affiliations = departments.get_major_affiliations(departments.results)
+
+    object_data = []
+    for major_affiliation in major_affiliations:
+        obj = {
+            'Name': major_affiliation['description'],
+        }
+        obj[department_external_id_name] = major_affiliation['code']
+        if major_affiliation['code'] in result:
+            obj['Id'] = result[major_affiliation['code']]['Id']
+        object_data.append(obj)
+    
+    logger.info(f"Upserting to Account with {len(object_data)} records")
+    sfpu.hsf.pushBulk('Account', object_data)
+
+    # get all sub affiliations
+
+    for department in departments.results:
+        if department[department_id_name] not in result:
+            logger.warning(f"Department {department[department_id_name]} not found in Salesforce")
+        
+
+    # sfpu.setup_department_hierarchy(departments)
+
+
+    logger.info("department test action finished")
+elif action == "test":
+    logger.info(f"test action called")
+    data = [
+        {
+            "hed__Contact__c": {
+                "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c": "2940935f3b990174"
+            },
+            "hed__Account__c": {
+                "HUDA__hud_DEPT_ID__c": "103623"
+            },
+            "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c": "2940935f3b990174",
+            "HUDA__hud_PERSON_ROLES_KEY__c": "1981022",
+            "HUDA__hud_EFF_STATUS__c": "A",
+            "HUDA__hud_EFFDT__c": "2020-10-18T02:32:01",
+            "HUDA__hud_UPDATE_DT__c": "2020-10-18T02:32:01",
+            "HUDA__hud_PRIVACY_VALUE__c": "5",
+            "HUDA__hud_PRIME_ROLE_INDICATOR__c": 1,
+            "HUDA__hud_ROLE_END_DT__c": None,
+            "HUDA__hud_ROLE_ID__c": None,
+            "HUDA__hud_ROLE_SOURCE__c": "PS",
+            "HUDA__hud_ROLE_START_DT__c": "2020-10-18T00:00:00",
+            "HUDA__hud_ROLE_TITLE__c": "Senior Technical Architect",
+            "HUDA__hud_ROLE_TYPE_CD__c": "EMPLOYEE",
+            "HUDA__hud_DEPT_ID__c": "103623",
+            "HUDA__hud_ACADEMIC_PRIME_ROLE_INDICATOR__c": None,
+            "HUDA__hud_SUPERVISOR_ID__c": "30568559",
+            "HUDA__hud_EMP_APPOINT_END_DT__c": None,
+            "HUDA__hud_EMP_DEPT_ENTRY_DT__c": "2016-10-03T00:00:00",
+            "HUDA__hud_EMP_EMPL_CLASS__c": "A",
+            "HUDA__hud_EMP_EMPLOYMENT_STATUS__c": "A",
+            "HUDA__hud_EMP_HIRE_DT__c": "2008-01-07T00:00:00",
+            "HUDA__hud_EMP_ADDR_PS_LOCATION_CD__c": "H06033",
+            "HUDA__hud_EMP_REHIRE_DT__c": "2008-01-07T00:00:00",
+            "HUDA__hud_EMP_TERMINATION_DT__c": None,
+            "HUDA__hud_EMP_UNION_CD__c": "00",
+            "HUDA__hud_EMP_FACULTY_CD__c": "UIS",
+            "HUDA__hud_EMP_FULLTIME_FLAG__c": 1,
+            "HUDA__hud_EMP_MAJ_AFFILIATION_CD__c": "HUIT^MA",
+            "HUDA__hud_EMP_MAJ_AFFILIATION_DESC__c": "Harvard University Information",
+            "HUDA__hud_EMP_PAID_FLAG__c": 1,
+            "HUDA__hud_EMP_SUB_AFFILIATION_CD__c": "HUIT_ADMIT^SA",
+            "HUDA__hud_EMP_SUB_AFFILIATION_DESC__c": "Administrative IT",
+            "HUDA__hud_STU_STU_DEPT__c": None,
+            "HUDA__hud_STU_BOARD_LOCATION_HOUSE_CD__c": None,
+            "HUDA__hud_STU_BOARD_STATUS__c": None,
+            "HUDA__hud_STU_DEGREE__c": None,
+            "HUDA__hud_STU_GRADUATION_DT__c": None,
+            "HUDA__hud_STU_LAST_ATTENDANCE_DT__c": None,
+            "HUDA__hud_STU_SPEC_PROG__c": None,
+            "HUDA__hud_STU_RES_HOUSE_CD__c": None,
+            "HUDA__hud_STU_SCHOOL_CD__c": None,
+            "HUDA__hud_STU_STU_STAT_CD__c": None,
+            "HUDA__hud_STU_TIME_STATUS__c": None,
+            "HUDA__hud_STU_STU_YEAR_CD__c": None,
+            "HUDA__hud_POI_COMMENTS__c": None,
+            "HUDA__hud_POI_COMPANY__c": None,
+            "HUDA__hud_POI_FACULTY_CD__c": None,
+            "HUDA__hud_POI_SHORT_DESC_LINE1__c": None,
+            "HUDA__hud_POI_SHORT_DESC_LINE2__c": None
+        }
+    ]
+
+    # sfpu.hsf.pushBulk('hed__Affiliation__c', data)    
+
+
+    data = [{
+        'Id': 'aDm1R000000XsqaSAC',
+        'HUDA__Name_Contact__r': {
+            'HUDA__hud_MULE_UNIQUE_PERSON_KEY__c': '2940935f3b990174'
+        }
+    }]
+    sfpu.hsf.pushBulk('HUDA__hud_Name__c', data)
+
+    logger.info(f"test action finished")
 else: 
     logger.warning(f"App triggered without a valid action: {action}, please see documentation for more information.")
 

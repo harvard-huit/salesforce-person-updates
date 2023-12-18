@@ -67,9 +67,18 @@
                                             { "type": "array" }
                                         ]
                                     }
+                                },
+                                "ref": {
+                                    "type": "object",
+                                    "properties": {
+                                        "object": { "type": "string" },
+                                        "ref_external_id": { "type": "string" },
+                                        "source_external_id": { "type": "string" }
+                                    },
+                                    "required": ["object", "ref_external_id", "source_external_id"]
+
                                 }
-                            },
-                            "required": ["value"]
+                            }
                         }
                     ]
                 }
