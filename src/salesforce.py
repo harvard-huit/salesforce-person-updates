@@ -98,18 +98,19 @@ class HarvardSalesforce:
                 error_count = 0
                 dupe_data_batch = []
                 errored_data_batch = []
+                created_ids = {}
 
-                if object not in self.unique_ids:
+                if object not in self.unique_ids or 'id_name' not in self.unique_ids[object]:
                     logger.warning(f"Warning: no unique ids found for {object}")
                     self.unique_ids[object] = self.getUniqueIds({object: data})
+                else:
+                    pds_external_id_name = self.unique_ids[object]['id_name']
 
-                pds_external_id_name = self.unique_ids[object]['id_name']
-
-                created_ids = {
-                    "object": object,
-                    "external_id_field": pds_external_id_name,
-                    "ids": []
-                }
+                    created_ids = {
+                        "object": object,
+                        "external_id_field": pds_external_id_name,
+                        "ids": []
+                    }
                 for index, response in enumerate(responses):
                     if response['success'] != True: 
                         
@@ -157,7 +158,7 @@ class HarvardSalesforce:
                     #     logger.info(f"Retry successful")
 
 
-                if len(created_ids['ids']) > 0:
+                if 'ids' in created_ids and len(created_ids['ids']) > 0:
                     logger.info(created_ids)
 
                 if updated_count > 0:

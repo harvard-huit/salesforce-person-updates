@@ -160,9 +160,31 @@ There will be times when we have 2 values for a single field. For instance, a `C
 
 When we have multiple values for the same target field, sometimes we can't know if we'll get one, even with a defined `when`. For example, if we're looking for the email that has the `primaryEmailIndicator` set, because we don't have any kind of real MDM, we need to make a decision. As such, the default when is the value that has the latest updated date associated with it. 
 
-#### `sf.*` References
+#### `sf.*` References (DEPRECATED)
+
+_Deprecated in favor of the more generic "Lookup References" below_
 
 The `sf` reference identifies source data that comes from Salesforce itself. This is necessary for gathering and defining reference fields. For example, relationship objects will have a reference to a `Contact` record. A query is done before relationship objects are processed to create a mapping of existing Contacts and the relationship fields they have. This is built from the `Id`s associated with the mapping. When a `Contact` reference is not found, it means it's a new relationship. 
+
+#### Lookup References `ref`
+
+The `ref` object is used to declare a lookup reference that we're linking through an external id. This is being used moving forward isntead of the `sf` format (as that was too hardcoded). 
+
+ - `object`: not functionally used, but denotes the object being linked
+ - `ref_external_id`: the salesforce external id fieldname in the object being linked
+ - `source_value_ref`: the value in the source data (ex: fieldname from the PDS)
+
+**Example:**
+```
+{
+  "HUDA__hud_Name__c": {
+    "ref": {
+      "object": "Contact",
+      "ref_external_id": "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c",
+      "source_value_ref": "personKey"
+    }
+  }
+```
 
 #### Multiple Potential Sources
 
@@ -276,6 +298,25 @@ The way the Bulk functions work in simple-salesforce (by default) is they abstra
 This makes some of the logic easier, but it could lead to issues with performance unless we wrap the bulk calls in asyncio so we can be waiting on multiple jobs. 
 
 **NOTE:** In earlier versions of the API, setting a value to `null` required setting it to `#N/A`. (This might show up in different places and is not easy to find in SF documentation.)
+
+#### Referencing Lookup's with External Ids
+
+All "branch" objects (names/emails/addresses/affiliations/etc) need to have an "external id" that corresponds to a unique value on our end and a lookup field that links the object to a Contact (and sometimes Account). Originally, we were making a SOQL call to get the Ids of the Contact/Account, but that wasn't strictly necessary, as the API does permit referencing a lookup with an external id. 
+
+The call to the API needs to look like this:
+
+```
+{
+  "Object_Name__c": [
+    "lookup_field_name__r": {
+      "external_id__c": "12345"
+    }
+    "other_field__c": "other field's value"
+  ]  
+}
+```
+
+The part that is not documented well (read: at all) in Salesforce docs is that the reference field needs to have a `__r` on the end of it (for custom lookup fields), not `__c`. As far as I've seen, you can't find "`lookup_field_name__r`" anywhere in Salesforce, you just have to know to replace the `c` with an `r`. 
 
 #### Examples
 

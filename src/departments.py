@@ -20,12 +20,50 @@ class Departments:
             logger.error(f"Error getting valid data from Departments API: {e}")
             raise e
 
-        self.departments = self.hashSort(self.results)
+        self.department_hash = self.hashSort(self.results)
+
+        self.known_postfixes = ['', 'MA', 'SA']
+        self.known_prefixes = ['', 'CS', 'EVP', 'FAS', 'HBS', 'HG', 'HL', 'HLS', 'HMS', 'HUCTW', 'HUIT', 'HUPD', 'KSG', 'LAW', 'UNION', 'VPA', 'VPD', 'VPF', 'VPG']
+
 
     def __str__(self):
         return str(self.results)
     def __repr__(self):
         return str(self.results)
+    
+    def simplify_code(self, code):
+        postfix = ''
+        if '^' in code:
+            postfix = code.split('^')[-1:][0]
+            code = ''.join(code.split('^')[:-1])
+        
+        if postfix not in self.known_postfixes:
+            logger.error(f"unknown postfix: {postfix}")
+            return None
+        postfix_code = self.known_postfixes.index(postfix)
+
+        prefix = ''
+        if '_' in code:
+            prefix = code.split('_')[0]
+            code = ''.join(code.split('_')[1:])
+
+        if prefix not in self.known_prefixes:
+            logger.error(f"unknown prefix: {prefix}")
+            return None
+        prefix_code = self.known_prefixes.index(prefix)
+        
+        # trim code to be at most 7 characters
+        if len(code) > 7:
+            code = code[:7]
+
+        new_code = f"{prefix_code}{code}{postfix_code}"
+
+        if len(new_code) > 10:
+            logger.error(f"Error: new code is too long: {new_code}")
+            return None
+
+        return new_code
+
 
     def getDepartments(self, apikey):
         if self == None and apikey == None:
@@ -66,22 +104,38 @@ class Departments:
         if departments == None:
             raise Exception("Error: departments required")
 
-        major_affiliations = []
-        for department in departments:
-            if departments[department]['majAffiliation'] not in major_affiliations:
-                major_affiliations.append({
-                    department['majAffiliation']['code']: department['majAffiliation']['description']
-                })
-        return major_affiliations
+        major_affiliations_map = {}
+        for department_code, department in departments.items():
+            if 'majAffiliation' not in department:
+                continue
+            if 'code' not in department['majAffiliation']:
+                continue
+            if department['majAffiliation']['code'] == None:
+                continue
+            if department['majAffiliation']['code'] not in major_affiliations_map.keys():
+                major_affiliations_map[department['majAffiliation']['code']] = {
+                    'description': department['majAffiliation']['description']
+                }
+
+        return major_affiliations_map
     
     def get_sub_affiliations(self, departments):
         if departments == None:
             raise Exception("Error: departments required")
 
-        minor_affiliations = []
-        for department in departments:
-            if departments[department]['subAffiliation'] not in minor_affiliations:
-                minor_affiliations.append({
-                    department['subAffiliation']['code']: department['subAffiliation']['description']
-                })
-        return minor_affiliations
+        sub_affiliations_map = {}
+        for department_code, department in departments.items():
+            if 'subAffiliation' not in department:
+                continue
+            if 'code' not in department['subAffiliation']:
+                continue
+            if department['subAffiliation']['code'] == None:
+                continue
+            if department['subAffiliation']['code'] not in sub_affiliations_map.keys():
+                sub_affiliations_map[department['subAffiliation']['code']] = {
+                    'description': department['subAffiliation']['description'],
+                    'parent_code': department['majAffiliation']['code']
+                }
+
+
+        return sub_affiliations_map

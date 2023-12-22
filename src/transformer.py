@@ -143,13 +143,13 @@ class SalesforceTransformer:
                                 # process salesforce internal reference
                                 ref_object = source_object['ref']['object']
                                 ref_external_id_name = source_object['ref']['ref_external_id']
-                                source_external_id_name = source_object['ref']['source_external_id']
-                                external_id_value = source_data_object[source_external_id_name]
+                                source_value_ref = source_object['ref']['source_value_ref']
+                                source_value = source_data_object[source_value_ref]
                                 # salesforce_id = self.hashed_ids[ref_object]['Ids'][external_id]
                                 if object_name not in current_record:
                                     current_record[object_name] = {}
                                 current_record[object_name][target] = {}
-                                current_record[object_name][target][ref_external_id_name] = external_id_value
+                                current_record[object_name][target][ref_external_id_name] = source_value
                                 
                                 continue
                         elif isinstance(source_object, (str)):
@@ -321,7 +321,7 @@ class SalesforceTransformer:
                             if isinstance(source, dict):
                                 if 'ref' in source:
                                     # current_record[object_name][target] = source['ref']
-                                    source_pieces = source['ref']['source_external_id'].split(".")
+                                    source_pieces = source['ref']['source_value_ref'].split(".")
                             else:
                                 source_pieces = source.split(".")
 

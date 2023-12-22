@@ -189,28 +189,73 @@ class SalesforcePersonUpdates:
         except Exception as e: 
             raise Exception(f"Logging failed: {data} :: {e}")
 
-    def setup_department_hierarchy(self, departments: list=[]):
+    def setup_department_hierarchy(self, department_hash: dict={}):
+        """
+        NOTE on simplifying codes: we had to do this because codes are more than 10 characters and the current id field is 
+          limited to 10 characters
+        """
         logger.info(f"Starting department hierarchy setup")
-        self.departments = Departments(apikey=self.app_config.dept_apikey)
 
-        major_affiliation_map = self.departments.get_major_affiliations(departments)
-        data = {}
+        if not self.departments:
+            self.departments = Departments(apikey=self.app_config.dept_apikey)
 
-        # for code, description in major_affiliation_map.items():
-        #     logger.debug(f"object: {object}")
-            # logger.debug(pformat(object_data))
-            
+        simplified_codes = []
+        major_affiliations_map = self.departments.get_major_affiliations(department_hash)
+        data = []
+        for code, affiliation in major_affiliations_map.items():
+            description = affiliation['description']
+            simplified_code = self.departments.simplify_code(code)
+            if not simplified_code:
+                raise Exception(f"Error: code failed to simplify: {code}")
 
-            # self.hsf.pushBulk(object, object_data)
+            if simplified_code in simplified_codes:
+                raise Exception(f"Duplicate simplified major affiliation code found: {simplified_code} ({code})")
+            simplified_codes.append(simplified_code)
 
-        # sub_affiliation_map = self.departments.get_sub_affiliations(departments)
+            # push major affiliations into salesforce
+            data.append({
+                'Name': description,
+                'HUDA__hud_DEPT_ID__c': simplified_code,
+                'HUDA__hud_DEPT_OFFICIAL_DESC__c': code,
+                'HUDA__hud_DEPT_LONG_DESC__c': description
+            })
+        self.hsf.pushBulk('Account', data, id_name='HUDA__hud_DEPT_ID__c')
+
+        sub_affiliations_map = self.departments.get_sub_affiliations(department_hash)
+        data = []
+        for code, affiliation in sub_affiliations_map.items():
+            simplified_code = self.departments.simplify_code(code)
+            if not simplified_code:
+                raise Exception(f"Error: code failed to simplify: {code}")
+            if simplified_code in simplified_codes:
+                raise Exception(f"Duplicate simplified sub affiliation code found: {simplified_code} ({code})")
+            simplified_codes.append(simplified_code)
+
+            description = affiliation['description']
+            parent_code = affiliation['parent_code']
+            simplified_parent_code = self.departments.simplify_code(parent_code)
+
+            # push sub affiliations into salesforce
+            data.append({
+                'Name': description,
+                'HUDA__hud_DEPT_ID__c': simplified_code,
+                'Parent': {
+                    'HUDA__hud_DEPT_ID__c': simplified_parent_code
+                },
+                'HUDA__hud_DEPT_OFFICIAL_DESC__c': code,
+                'HUDA__hud_DEPT_LONG_DESC__c': description
+            })
+        self.hsf.pushBulk('Account', data, id_name='HUDA__hud_DEPT_ID__c')
+
+        logger.info(simplified_codes)
+
 
     # valid types are "full" and "update"
     def departments_data_load(self, type="full"):
         logger.info(f"Starting a department {type} load")
         self.departments = Departments(apikey=self.app_config.dept_apikey)
 
-        hashed_departments = self.departments.departments
+        hashed_departments = self.departments.department_hash
         logger.debug(f"Successfully got {len(self.departments.results)} departments")
 
         watermark = self.app_config.watermarks["department"]
@@ -650,6 +695,9 @@ sfpu = SalesforcePersonUpdates(local=LOCAL)
 if not os.getenv("SIMPLE_LOGS"):
     logger = sfpu.setup_logging(logger=logger)
 
+# this is poorly named, I know, don't @ me
+#  it's just a way to force the config to be set to the example config 
+#  (while getting the rest of the env vars from dynamo)
 if os.getenv("FORCE_LOCAL_CONFIG"):
     sfpu.app_config.config = config
     # sfpu.app_config.pds_query = pds_query
@@ -811,76 +859,18 @@ elif action == "department test":
     logger.info("department test action finished")
 elif action == "test":
     logger.info(f"test action called")
-    data = [
-        {
-            "hed__Contact__c": {
-                "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c": "2940935f3b990174"
-            },
-            "hed__Account__c": {
-                "HUDA__hud_DEPT_ID__c": "103623"
-            },
-            "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c": "2940935f3b990174",
-            "HUDA__hud_PERSON_ROLES_KEY__c": "1981022",
-            "HUDA__hud_EFF_STATUS__c": "A",
-            "HUDA__hud_EFFDT__c": "2020-10-18T02:32:01",
-            "HUDA__hud_UPDATE_DT__c": "2020-10-18T02:32:01",
-            "HUDA__hud_PRIVACY_VALUE__c": "5",
-            "HUDA__hud_PRIME_ROLE_INDICATOR__c": 1,
-            "HUDA__hud_ROLE_END_DT__c": None,
-            "HUDA__hud_ROLE_ID__c": None,
-            "HUDA__hud_ROLE_SOURCE__c": "PS",
-            "HUDA__hud_ROLE_START_DT__c": "2020-10-18T00:00:00",
-            "HUDA__hud_ROLE_TITLE__c": "Senior Technical Architect",
-            "HUDA__hud_ROLE_TYPE_CD__c": "EMPLOYEE",
-            "HUDA__hud_DEPT_ID__c": "103623",
-            "HUDA__hud_ACADEMIC_PRIME_ROLE_INDICATOR__c": None,
-            "HUDA__hud_SUPERVISOR_ID__c": "30568559",
-            "HUDA__hud_EMP_APPOINT_END_DT__c": None,
-            "HUDA__hud_EMP_DEPT_ENTRY_DT__c": "2016-10-03T00:00:00",
-            "HUDA__hud_EMP_EMPL_CLASS__c": "A",
-            "HUDA__hud_EMP_EMPLOYMENT_STATUS__c": "A",
-            "HUDA__hud_EMP_HIRE_DT__c": "2008-01-07T00:00:00",
-            "HUDA__hud_EMP_ADDR_PS_LOCATION_CD__c": "H06033",
-            "HUDA__hud_EMP_REHIRE_DT__c": "2008-01-07T00:00:00",
-            "HUDA__hud_EMP_TERMINATION_DT__c": None,
-            "HUDA__hud_EMP_UNION_CD__c": "00",
-            "HUDA__hud_EMP_FACULTY_CD__c": "UIS",
-            "HUDA__hud_EMP_FULLTIME_FLAG__c": 1,
-            "HUDA__hud_EMP_MAJ_AFFILIATION_CD__c": "HUIT^MA",
-            "HUDA__hud_EMP_MAJ_AFFILIATION_DESC__c": "Harvard University Information",
-            "HUDA__hud_EMP_PAID_FLAG__c": 1,
-            "HUDA__hud_EMP_SUB_AFFILIATION_CD__c": "HUIT_ADMIT^SA",
-            "HUDA__hud_EMP_SUB_AFFILIATION_DESC__c": "Administrative IT",
-            "HUDA__hud_STU_STU_DEPT__c": None,
-            "HUDA__hud_STU_BOARD_LOCATION_HOUSE_CD__c": None,
-            "HUDA__hud_STU_BOARD_STATUS__c": None,
-            "HUDA__hud_STU_DEGREE__c": None,
-            "HUDA__hud_STU_GRADUATION_DT__c": None,
-            "HUDA__hud_STU_LAST_ATTENDANCE_DT__c": None,
-            "HUDA__hud_STU_SPEC_PROG__c": None,
-            "HUDA__hud_STU_RES_HOUSE_CD__c": None,
-            "HUDA__hud_STU_SCHOOL_CD__c": None,
-            "HUDA__hud_STU_STU_STAT_CD__c": None,
-            "HUDA__hud_STU_TIME_STATUS__c": None,
-            "HUDA__hud_STU_STU_YEAR_CD__c": None,
-            "HUDA__hud_POI_COMMENTS__c": None,
-            "HUDA__hud_POI_COMPANY__c": None,
-            "HUDA__hud_POI_FACULTY_CD__c": None,
-            "HUDA__hud_POI_SHORT_DESC_LINE1__c": None,
-            "HUDA__hud_POI_SHORT_DESC_LINE2__c": None
-        }
-    ]
 
-    # sfpu.hsf.pushBulk('hed__Affiliation__c', data)    
+    sfpu.departments = Departments(apikey=sfpu.app_config.dept_apikey)
+    sfpu.setup_department_hierarchy(sfpu.departments.department_hash)
 
-
-    data = [{
-        'Id': 'aDm1R000000XsqaSAC',
-        'HUDA__Name_Contact__r': {
-            'HUDA__hud_MULE_UNIQUE_PERSON_KEY__c': '2940935f3b990174'
-        }
-    }]
-    sfpu.hsf.pushBulk('HUDA__hud_Name__c', data)
+    # data = [
+    #     {
+    #         "Name": "MBA and Doctoral Programs", 
+    #         "HUDA__hud_DEPT_ID__c": "HBS_MBA-DO", 
+    #         "Parent": {"HUDA__hud_DEPT_ID__c": "BUS^MA"}
+    #     }
+    # ]
+    # sfpu.hsf.pushBulk('Account', data, id_name='HUDA__hud_DEPT_ID__c')
 
     logger.info(f"test action finished")
 else: 
