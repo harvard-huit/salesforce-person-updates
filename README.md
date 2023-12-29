@@ -305,7 +305,7 @@ All "branch" objects (names/emails/addresses/affiliations/etc) need to have an "
 
 The call to the API needs to look like this:
 
-```
+```py
 {
   "Object_Name__c": [
     "lookup_field_name__r": {
@@ -316,7 +316,8 @@ The call to the API needs to look like this:
 }
 ```
 
-The part that is not documented well (read: at all) in Salesforce docs is that the reference field needs to have a `__r` on the end of it (for custom lookup fields), not `__c`. As far as I've seen, you can't find "`lookup_field_name__r`" anywhere in Salesforce, you just have to know to replace the `c` with an `r`. 
+The part that is not documented well (read: at all) in Salesforce docs is that the reference field needs to have a `__r` on the end of it (for custom lookup fields), not `__c`. As far as I've seen, you can't find "`lookup_field_name__r`" anywhere in Salesforce, you just have to know to replace the `c` with an `r`. See the [docs for simple-salesforce](https://github.com/simple-salesforce/simple-salesforce#using-bulk) to see the literal only place I found this referenced.
+
 
 #### Examples
 
@@ -403,7 +404,7 @@ In order to mitigate this, we are checking for that trigger and automatically di
 
 Most of the Objects in Salesforce are going to have a relationship to the Contact record of the person. Relationships are set and updated by simply sending the `Id` of the Contact (or other relationship). 
 
-NOTE: this does NOT determine if someone sees a hud_Name when viewing a Contact record, that is determined by the external id on the Contact record. 
+**NOTE:** this does NOT determine if someone sees a hud_Name when viewing a Contact record, that is determined by the external id on the Contact record. 
 
 ### Types
 

@@ -15,13 +15,15 @@ class Departments:
             self.results = self.getDepartments(apikey=self.apikey)
             # self.__setattr__('response', self.response)
             # self.count = self.response['count']
-            # self.__setattr__('count', self.count)w
+            # self.__setattr__('count', self.count)
         except Exception as e:
             logger.error(f"Error getting valid data from Departments API: {e}")
             raise e
 
         self.department_hash = self.hashSort(self.results)
 
+        # hardcoding these is not ideal, but it is the best solution we have for now
+        # it is currently needed for the simplify_code function
         self.known_postfixes = ['', 'MA', 'SA']
         self.known_prefixes = ['', 'CS', 'EVP', 'FAS', 'HBS', 'HG', 'HL', 'HLS', 'HMS', 'HUCTW', 'HUIT', 'HUPD', 'KSG', 'LAW', 'UNION', 'VPA', 'VPD', 'VPF', 'VPG']
 
@@ -31,7 +33,19 @@ class Departments:
     def __repr__(self):
         return str(self.results)
     
-    def simplify_code(self, code):
+    def simplify_code(self, code, size=10):
+        """
+        This function takes a department code and simplifies it to a 10 character code
+        We needed to do this specifically for Salesforce, which has a 10 character limit on the code
+        In the future this should be fixed in the package by allowing larger code/external id fields. 
+            At the time of this writing, that is not a valid option. 
+
+        The challenge is that we need to make sure that the code is unique, but many of the codes are similar
+            so something like trimming the code to 10 characters would not work
+            Likewise, hashing the code would not work because the hashes would be longer than 10 characters
+            and trimming the hashes would similarly not work because the codes are so similar...
+        This will not 100% gauarantee uniqueness, but it should be good enough for our purposes
+        """
         postfix = ''
         if '^' in code:
             postfix = code.split('^')[-1:][0]
@@ -52,9 +66,11 @@ class Departments:
             return None
         prefix_code = self.known_prefixes.index(prefix)
         
-        # trim code to be at most 7 characters
-        if len(code) > 7:
-            code = code[:7]
+        # trim code to be at most size - 3 characters
+        # this allows for 2 characters for prefix and 1 for postfix, which were converted to "numbers" above
+        middle_size = size - 3
+        if len(code) > middle_size:
+            code = code[:middle_size]
 
         new_code = f"{prefix_code}{code}{postfix_code}"
 
@@ -101,6 +117,12 @@ class Departments:
         return departments
     
     def get_major_affiliations(self, departments):
+        """
+        This takes a hash of departments and returns a hash of major affiliations
+            with the key being the major affiliation code and the value being an object with a description
+            This format was chosen because it is the same format as the sub affiliations and that needed 
+            additional information
+        """
         if departments == None:
             raise Exception("Error: departments required")
 
@@ -120,6 +142,11 @@ class Departments:
         return major_affiliations_map
     
     def get_sub_affiliations(self, departments):
+        """
+        This takes a hash of departments and returns a hash of sub affiliations
+            with the key being the sub affiliation code and the value being an object with a description and parent code
+            This format was chosen because it needed multiple pieces of information and we want it to be easy to look up
+        """
         if departments == None:
             raise Exception("Error: departments required")
 

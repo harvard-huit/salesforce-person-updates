@@ -189,69 +189,98 @@ class SalesforcePersonUpdates:
         except Exception as e: 
             raise Exception(f"Logging failed: {data} :: {e}")
 
-    def setup_department_hierarchy(self, department_hash: dict={}):
+    def setup_department_hierarchy(self, 
+                                   department_hash: dict, 
+                                   external_id: str, 
+                                   code_field: str, 
+                                   description_field: str):
         """
         NOTE on simplifying codes: we had to do this because codes are more than 10 characters and the current id field is 
           limited to 10 characters
+
+        This is hard-coded. The configuration needs to be put in the config file.
         """
         logger.info(f"Starting department hierarchy setup")
 
-        if not self.departments:
-            self.departments = Departments(apikey=self.app_config.dept_apikey)
+        try:
+            if not self.departments:
+                self.departments = Departments(apikey=self.app_config.dept_apikey)
 
-        simplified_codes = []
-        major_affiliations_map = self.departments.get_major_affiliations(department_hash)
-        data = []
-        for code, affiliation in major_affiliations_map.items():
-            description = affiliation['description']
-            simplified_code = self.departments.simplify_code(code)
-            if not simplified_code:
-                raise Exception(f"Error: code failed to simplify: {code}")
+            simplify_codes = True
+            # check length of the external id
+            account_type_map = self.hsf.getTypeMap(['Account'])
+            if external_id not in account_type_map['Account']:
+                raise Exception(f"Error: external_id {external_id} not found in Account Object")
+            if account_type_map['Account'][external_id]['externalId'] is False:
+                raise Exception(f"Error: external_id {external_id} is not an external id")
+            if code_field not in account_type_map['Account']:
+                raise Exception(f"Error: code_field {code_field} not found in Account Object")
+            if description_field not in account_type_map['Account']:
+                raise Exception(f"Error: description_field {description_field} not found in Account Object")
+            if account_type_map['Account'][external_id]['length'] < 10:
+                raise Exception(f"Error: external_id {external_id} is too short ({account_type_map['Account'][external_id]['length']} characters)")
+            if account_type_map['Account'][external_id]['length'] >= 20:
+                # if it's long enough, we don't need to simplify the codes
+                simplify_codes = False
 
-            if simplified_code in simplified_codes:
-                raise Exception(f"Duplicate simplified major affiliation code found: {simplified_code} ({code})")
-            simplified_codes.append(simplified_code)
+            simplified_codes = []
+            major_affiliations_map = self.departments.get_major_affiliations(department_hash)
+            data = []
+            for code, affiliation in major_affiliations_map.items():
+                description = affiliation['description']
+                simplified_code = code
+                if simplify_codes:
+                    simplified_code = self.departments.simplify_code(code)
+                    if not simplified_code:
+                        raise Exception(f"Error: code failed to simplify: {code}")
+                if simplified_code in simplified_codes:
+                    raise Exception(f"Duplicate simplified major affiliation code found: {simplified_code} ({code})")
+                simplified_codes.append(simplified_code)
 
-            # push major affiliations into salesforce
-            data.append({
-                'Name': description,
-                'HUDA__hud_DEPT_ID__c': simplified_code,
-                'HUDA__hud_DEPT_OFFICIAL_DESC__c': code,
-                'HUDA__hud_DEPT_LONG_DESC__c': description
-            })
-        self.hsf.pushBulk('Account', data, id_name='HUDA__hud_DEPT_ID__c')
+                # push major affiliations into salesforce
+                data.append({
+                    'Name': description,
+                    external_id: simplified_code,
+                    code_field: code,
+                    description_field: description
+                })
+            self.hsf.pushBulk('Account', data, id_name=external_id)
 
-        sub_affiliations_map = self.departments.get_sub_affiliations(department_hash)
-        data = []
-        for code, affiliation in sub_affiliations_map.items():
-            simplified_code = self.departments.simplify_code(code)
-            if not simplified_code:
-                raise Exception(f"Error: code failed to simplify: {code}")
-            if simplified_code in simplified_codes:
-                raise Exception(f"Duplicate simplified sub affiliation code found: {simplified_code} ({code})")
-            simplified_codes.append(simplified_code)
+            sub_affiliations_map = self.departments.get_sub_affiliations(department_hash)
+            data = []
+            for code, affiliation in sub_affiliations_map.items():
+                simplified_code = code
+                if simplify_codes:
+                    simplified_code = self.departments.simplify_code(code)
+                    if not simplified_code:
+                        raise Exception(f"Error: code failed to simplify: {code}")
+                if simplified_code in simplified_codes:
+                    raise Exception(f"Duplicate simplified sub affiliation code found: {simplified_code} ({code})")
+                simplified_codes.append(simplified_code)
 
-            description = affiliation['description']
-            parent_code = affiliation['parent_code']
-            simplified_parent_code = self.departments.simplify_code(parent_code)
+                description = affiliation['description']
+                parent_code = affiliation['parent_code']
+                simplified_parent_code = self.departments.simplify_code(parent_code)
 
-            # push sub affiliations into salesforce
-            data.append({
-                'Name': description,
-                'HUDA__hud_DEPT_ID__c': simplified_code,
-                'Parent': {
-                    'HUDA__hud_DEPT_ID__c': simplified_parent_code
-                },
-                'HUDA__hud_DEPT_OFFICIAL_DESC__c': code,
-                'HUDA__hud_DEPT_LONG_DESC__c': description
-            })
-        self.hsf.pushBulk('Account', data, id_name='HUDA__hud_DEPT_ID__c')
-
-        logger.info(simplified_codes)
-
+                # push sub affiliations into salesforce
+                data.append({
+                    'Name': description,
+                    external_id: simplified_code,
+                    'Parent': {
+                        external_id: simplified_parent_code
+                    },
+                    code_field: code,
+                    description_field: description
+                })
+            self.hsf.pushBulk('Account', data, id_name=external_id)
+            return True
+        except Exception as e:
+            logger.error(f"Error in building Account Hierarchy: {e}")
+            return False
+        # logger.debug(simplified_codes)
 
     # valid types are "full" and "update"
-    def departments_data_load(self, type="full"):
+    def departments_data_load(self, type="full", hierarchy=False):
         logger.info(f"Starting a department {type} load")
         self.departments = Departments(apikey=self.app_config.dept_apikey)
 
@@ -274,6 +303,14 @@ class SalesforcePersonUpdates:
             config=self.transformer.getSourceConfig('departments'), 
             source_data=results
         )
+
+        external_id = self.app_config.config['Account']['Id']['salesforce']
+        if hierarchy:
+            hashed_departments = self.departments.hashSort(updated_results)
+            code_field = self.app_config.config['Account']['hierarchy']['code_field']
+            description_field = self.app_config.config['Account']['hierarchy']['description_field']
+            self.setup_department_hierarchy(department_hash=hashed_departments, external_id=external_id, code_field=code_field, description_field=description_field)
+
 
         # data will have the structure of { "OBJECT": [{"FIELD": "VALUE"}, ...]}
         data = {}
@@ -348,7 +385,6 @@ class SalesforcePersonUpdates:
         self.push_records(data=data)
         data = {}
 
-
     def push_records(self, data):
         branch_threads = []
 
@@ -366,7 +402,6 @@ class SalesforcePersonUpdates:
         #   so they won't block the main thread
         for thread in branch_threads:
             thread.join()
-
 
     def update_single_person(self, huids):
         pds_query = self.app_config.pds_query
@@ -556,8 +591,6 @@ class SalesforcePersonUpdates:
 
 
         logger.info(f"Successfully finished data load: {self.run_id}")
-
-
 
     # This is intended for debug use only.
     # We should not be deleting any records.
@@ -861,14 +894,15 @@ elif action == "test":
     logger.info(f"test action called")
 
     sfpu.departments = Departments(apikey=sfpu.app_config.dept_apikey)
-    sfpu.setup_department_hierarchy(sfpu.departments.department_hash)
+    sfpu.setup_department_hierarchy(department_hash=sfpu.departments.department_hash, external_id='HUDA__hud_DEPT_ID__c', code_field='HUDA__hud_DEPT_OFFICIAL_DESC__c', description_field='HUDA__hud_DEPT_LONG_DESC__c')
 
     # data = [
-    #     {
-    #         "Name": "MBA and Doctoral Programs", 
-    #         "HUDA__hud_DEPT_ID__c": "HBS_MBA-DO", 
-    #         "Parent": {"HUDA__hud_DEPT_ID__c": "BUS^MA"}
-    #     }
+    # {
+    #     "Name": "Harvard Busn Sch Major Affil",
+    #     "HUDA__hud_DEPT_ID__c": "0BUS1",
+    #     "HUDA__hud_DEPT_OFFICIAL_DESC__c": "BUS^MA",
+    #     "HUDA__hud_DEPT_LONG_DESC__c": "Harvard Busn Sch Major Affil"
+    # }
     # ]
     # sfpu.hsf.pushBulk('Account', data, id_name='HUDA__hud_DEPT_ID__c')
 
