@@ -22,18 +22,14 @@ class Departments:
 
         self.department_hash = self.hashSort(self.results)
 
-        # hardcoding these is not ideal, but it is the best solution we have for now
-        # it is currently needed for the simplify_code function
-        self.known_postfixes = ['', 'MA', 'SA']
-        self.known_prefixes = ['', 'CS', 'EVP', 'FAS', 'HBS', 'HG', 'HL', 'HLS', 'HMS', 'HUCTW', 'HUIT', 'HUPD', 'KSG', 'LAW', 'UNION', 'VPA', 'VPD', 'VPF', 'VPG']
-
 
     def __str__(self):
         return str(self.results)
     def __repr__(self):
         return str(self.results)
     
-    def simplify_code(self, code, size=10):
+    @staticmethod
+    def simplify_code(code, size=10):
         """
         This function takes a department code and simplifies it to a 10 character code
         We needed to do this specifically for Salesforce, which has a 10 character limit on the code
@@ -46,25 +42,33 @@ class Departments:
             and trimming the hashes would similarly not work because the codes are so similar...
         This will not 100% gauarantee uniqueness, but it should be good enough for our purposes
         """
+
+        # hardcoding these is not ideal, but it is the best solution we have for now
+        known_postfixes = ['', 'MA', 'SA']
+        known_prefixes = ['', 'CS', 'EVP', 'FAS', 'HBS', 'HG', 'HL', 'HLS', 'HMS', 'HUCTW', 'HUIT', 'HUPD', 'KSG', 'LAW', 'UNION', 'VPA', 'VPD', 'VPF', 'VPG']
+
+        if code == None:
+            return None
+
         postfix = ''
         if '^' in code:
             postfix = code.split('^')[-1:][0]
             code = ''.join(code.split('^')[:-1])
         
-        if postfix not in self.known_postfixes:
+        if postfix not in known_postfixes:
             logger.error(f"unknown postfix: {postfix}")
             return None
-        postfix_code = self.known_postfixes.index(postfix)
+        postfix_code = known_postfixes.index(postfix)
 
         prefix = ''
         if '_' in code:
             prefix = code.split('_')[0]
             code = ''.join(code.split('_')[1:])
 
-        if prefix not in self.known_prefixes:
+        if prefix not in known_prefixes:
             logger.error(f"unknown prefix: {prefix}")
             return None
-        prefix_code = self.known_prefixes.index(prefix)
+        prefix_code = known_prefixes.index(prefix)
         
         # trim code to be at most size - 3 characters
         # this allows for 2 characters for prefix and 1 for postfix, which were converted to "numbers" above

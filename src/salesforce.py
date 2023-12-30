@@ -266,6 +266,7 @@ class HarvardSalesforce:
         logger.debug(f"got this data from salesforce: {sf_data}")
         return sf_data
     
+    
     # this is meant to take the output from compare_records and push it to a tsv file
     # with no output_file, it will just return the data as a string
     def compare_to_tsv(self, data, output_file:str=None):

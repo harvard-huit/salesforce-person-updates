@@ -2,6 +2,8 @@ from common import logger
 from datetime import datetime
 import re
 
+from departments import Departments
+
 
 class SalesforceTransformer:
     def __init__(self, config, hsf):
@@ -144,8 +146,17 @@ class SalesforceTransformer:
                                 ref_object = source_object['ref']['object']
                                 ref_external_id_name = source_object['ref']['ref_external_id']
                                 source_value_ref = source_object['ref']['source_value_ref']
-                                source_value = source_data_object[source_value_ref]
+                                if '.' in source_value_ref:
+                                    (obj, val) = source_value_ref.split(".")
+                                    source_value = source_data_object[obj][val]
+                                else:
+                                    source_value = source_data_object[source_value_ref]
+                                if 'simplify_code' in source_object['ref']:
+                                    if source_object['ref']['simplify_code'] == True:
+                                        source_value = Departments.simplify_code(source_value)
                                 # salesforce_id = self.hashed_ids[ref_object]['Ids'][external_id]
+                                if source_value is None:
+                                    continue
                                 if object_name not in current_record:
                                     current_record[object_name] = {}
                                 current_record[object_name][target] = {}
@@ -360,8 +371,14 @@ class SalesforceTransformer:
                                     continue
                                 
                                 if isinstance(source, dict) and 'ref' in source:
+                                    if 'simplify_code' in source['ref']:
+                                        if source['ref']['simplify_code'] == True:
+                                            value = Departments.simplify_code(value)
+                                    if value is None:
+                                        continue
                                     value_obj = {}
                                     value_obj[source['ref']['ref_external_id']] = value
+                                    
                                     current_record[object_name][target] = value_obj
                                 else:
                                     current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value, identifier=source_data_object)

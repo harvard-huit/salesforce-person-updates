@@ -319,6 +319,10 @@ The call to the API needs to look like this:
 The part that is not documented well (read: at all) in Salesforce docs is that the reference field needs to have a `__r` on the end of it (for custom lookup fields), not `__c`. As far as I've seen, you can't find "`lookup_field_name__r`" anywhere in Salesforce, you just have to know to replace the `c` with an `r`. See the [docs for simple-salesforce](https://github.com/simple-salesforce/simple-salesforce#using-bulk) to see the literal only place I found this referenced.
 
 
+#### Aggregate queries
+
+Aggregate queries are not supported for large data sets (larger than the LIMIT). The bulk api can be enabled to use aggregate queries, but a REST call will fail if there isn't a limit (if it relies on a queryMore() in the simple-salesforce)
+
 #### Examples
 
 ##### Synchronous 

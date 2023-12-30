@@ -327,7 +327,7 @@ class SalesforcePersonUpdates:
             logger.debug(f"object: {object}")
             logger.debug(pformat(object_data))
 
-            self.hsf.pushBulk(object, object_data)    
+            self.hsf.pushBulk(object, object_data, id_name=external_id)
 
         self.app_config.update_watermark("department")
 
@@ -719,6 +719,36 @@ class SalesforcePersonUpdates:
             workbook.save(filename)
 
 
+    def check_for_defunct_accounts(self):
+        # get all accounts that have our external id
+        external_id = self.app_config.config['Account']['Id']['salesforce']
+        result = self.hsf.sf.query_all(f"SELECT Id, {external_id}, LastModifiedDate FROM Account WHERE {external_id} != null ORDER BY LastModifiedDate DESC")
+
+        ids_to_remove = []
+        seen_external_ids = []
+        for record in result['records']:
+            if record[external_id] in seen_external_ids:
+                ids_to_remove.append(record['Id'])
+            else:
+                seen_external_ids.append(record[external_id])
+
+        # logger.info(f"{ids_to_remove}")
+        logger.info(f"Found {len(ids_to_remove)} accounts")
+        return ids_to_remove
+
+    def remove_defunct_accounts(self):
+        ids_to_remove = self.check_for_defunct_accounts()
+
+        # delete them
+        if len(ids_to_remove) > 0:
+            logger.warning(f"Deleting {len(ids_to_remove)} accounts")
+            ids = [{'Id': id} for id in ids_to_remove]
+            result = self.hsf.sf.bulk.Account.delete(ids)
+            # logger.info(f"{result}")
+
+        logger.info(f"remove_defunct_accounts action finished")
+            
+
     
 
 sfpu = SalesforcePersonUpdates(local=LOCAL)
@@ -893,8 +923,43 @@ elif action == "department test":
 elif action == "test":
     logger.info(f"test action called")
 
-    sfpu.departments = Departments(apikey=sfpu.app_config.dept_apikey)
-    sfpu.setup_department_hierarchy(department_hash=sfpu.departments.department_hash, external_id='HUDA__hud_DEPT_ID__c', code_field='HUDA__hud_DEPT_OFFICIAL_DESC__c', description_field='HUDA__hud_DEPT_LONG_DESC__c')
+    # sfpu.remove_defunct_accounts()
+    ids = sfpu.check_for_defunct_accounts()
+    
+    children = []
+    # find children
+    batch = 500
+    for i in range(0, len(ids), batch):
+        batch_ids = ids[i:i+batch]
+        ids_string = "'" + '\',\''.join(batch_ids) + "'"
+        select_statement = f"SELECT Id FROM Account WHERE ParentId IN ({ids_string})"
+        sf_data = sfpu.hsf.sf.query_all(select_statement)
+
+        for record in sf_data['records']:
+            children.append(record['Id'])
+
+    logger.info(f"Found {len(children)} children")
+
+
+    # find affiliations
+    affiliations = []
+    batch = 500
+    for i in range(0, len(ids), batch):
+        batch_ids = ids[i:i+batch]
+        ids_string = "'" + '\',\''.join(batch_ids) + "'"
+        select_statement = f"SELECT Id FROM hed__Affiliation__c WHERE hed__Account__c IN ({ids_string})"
+        sf_data = sfpu.hsf.sf.query_all(select_statement)
+
+        for record in sf_data['records']:
+            affiliations.append(record['Id'])
+    
+    logger.info(f"Found {len(affiliations)} affiliations")
+
+
+    # sfpu.check_duplicates('Account', dry_run=True)
+
+    # sfpu.departments = Departments(apikey=sfpu.app_config.dept_apikey)
+    # sfpu.setup_department_hierarchy(department_hash=sfpu.departments.department_hash, external_id='HUDA__hud_DEPT_ID__c', code_field='HUDA__hud_DEPT_OFFICIAL_DESC__c', description_field='HUDA__hud_DEPT_LONG_DESC__c')
 
     # data = [
     # {

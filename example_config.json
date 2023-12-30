@@ -30,7 +30,8 @@
                 "ref": {
                     "object": "Account",
                     "ref_external_id": "HUDA__hud_DEPT_ID__c",
-                    "source_value_ref": "subAffiliation.code"
+                    "source_value_ref": "subAffiliation.code",
+                    "simplify_code": true
                 }    
             }
         }
