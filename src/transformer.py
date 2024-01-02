@@ -146,7 +146,7 @@ class SalesforceTransformer:
                                 ref_object = source_object['ref']['object']
                                 ref_external_id_name = source_object['ref']['ref_external_id']
                                 source_value_ref = source_object['ref']['source_value_ref']
-                                if '.' in source_value_ref:
+                                if '.' in source_value_ref and is_flat:
                                     (obj, val) = source_value_ref.split(".")
                                     source_value = source_data_object[obj][val]
                                 else:

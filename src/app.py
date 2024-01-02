@@ -21,7 +21,11 @@ if stack == 'developer':
     from dotenv import load_dotenv
     load_dotenv() 
 
-    f = open('../example_config.json')
+    config_filename = '../config.json'
+    if os.getenv("CONFIG_FILENAME") is not None:
+        config_filename = os.getenv("CONFIG_FILENAME")
+
+    f = open(config_filename, 'r')
     config = json.load(f)
     f.close()
 
@@ -70,6 +74,10 @@ class SalesforcePersonUpdates:
                     raise Exception("ERROR: SALESFORCE_INSTANCE_ID and TABLE_NAME are required env vars, these tell us where to get the configuration.")
 
                 self.app_config = AppConfig(id=self.salesforce_instance_id, table_name=self.table_name)
+            
+            if os.getenv("FORCE_LOCAL_CONFIG"):
+                self.app_config.config = config
+                # self.app_config.pds_query = pds_query
 
             self.hsf = HarvardSalesforce(
                 domain = self.app_config.salesforce_domain,
@@ -120,9 +128,6 @@ class SalesforcePersonUpdates:
                 self.batch_thread_count = 3
             self.batch_threads = []
 
-            if os.getenv("FORCE_LOCAL_CONFIG"):
-                self.app_config.config = config
-                # self.app_config.pds_query = pds_query
             self.transformer = SalesforceTransformer(config=self.app_config.config, hsf=self.hsf)
 
 
@@ -202,11 +207,23 @@ class SalesforcePersonUpdates:
         """
         logger.info(f"Starting department hierarchy setup")
 
+
+        # get the record type ids for Account
+        account_record_type_ids = self.hsf.get_record_type_ids('Account')
+
+        logger.info(f"account record type ids: {account_record_type_ids}")
+
         try:
             if not self.departments:
                 self.departments = Departments(apikey=self.app_config.dept_apikey)
 
-            simplify_codes = True
+            if 'hierarchy' not in self.app_config.config['Account']:
+                raise Exception(f"Error: hierarchy config not found in Account config")
+            
+            simplify_codes = False
+            if 'simplify_codes' in self.app_config.config['Account']['hierarchy']:
+                simplify_codes = self.app_config.config['Account']['hierarchy']['simplify_codes']
+
             # check length of the external id
             account_type_map = self.hsf.getTypeMap(['Account'])
             if external_id not in account_type_map['Account']:
@@ -237,33 +254,43 @@ class SalesforcePersonUpdates:
                     raise Exception(f"Duplicate simplified major affiliation code found: {simplified_code} ({code})")
                 simplified_codes.append(simplified_code)
 
-                # push major affiliations into salesforce
-                data.append({
+                data_obj = {
                     'Name': description,
                     external_id: simplified_code,
                     code_field: code,
                     description_field: description
-                })
+                }
+
+                if 'Major Affiliation' in account_record_type_ids.keys():
+                    record_type_id = account_record_type_ids['Major Affiliation']
+                    data_obj['RecordTypeId'] = record_type_id
+
+                # push major affiliations into salesforce
+                data.append(data_obj)
+            logger.info(f"Pushing {len(data)} major affiliations")
             self.hsf.pushBulk('Account', data, id_name=external_id)
 
             sub_affiliations_map = self.departments.get_sub_affiliations(department_hash)
             data = []
             for code, affiliation in sub_affiliations_map.items():
+                
                 simplified_code = code
+                description = affiliation['description']
+                parent_code = affiliation['parent_code']
+                simplified_parent_code = parent_code
+
                 if simplify_codes:
                     simplified_code = self.departments.simplify_code(code)
                     if not simplified_code:
                         raise Exception(f"Error: code failed to simplify: {code}")
+                    simplified_parent_code = self.departments.simplify_code(parent_code)
+                    if not simplified_parent_code:
+                        raise Exception(f"Error: parent code failed to simplify: {parent_code}")
                 if simplified_code in simplified_codes:
                     raise Exception(f"Duplicate simplified sub affiliation code found: {simplified_code} ({code})")
                 simplified_codes.append(simplified_code)
 
-                description = affiliation['description']
-                parent_code = affiliation['parent_code']
-                simplified_parent_code = self.departments.simplify_code(parent_code)
-
-                # push sub affiliations into salesforce
-                data.append({
+                data_obj = {
                     'Name': description,
                     external_id: simplified_code,
                     'Parent': {
@@ -271,8 +298,16 @@ class SalesforcePersonUpdates:
                     },
                     code_field: code,
                     description_field: description
-                })
-            self.hsf.pushBulk('Account', data, id_name=external_id)
+                }
+                if 'Sub Affiliation' in account_record_type_ids.keys():
+                    record_type_id = account_record_type_ids['Sub Affiliation']
+                    data_obj['RecordTypeId'] = record_type_id
+
+                # push sub affiliations into salesforce
+                data.append(data_obj)
+
+            logger.info(f"Pushing {len(data)} sub affiliations")
+            self.hsf.pushBulk('Account', data, id_name=external_id, retries=1)
             return True
         except Exception as e:
             logger.error(f"Error in building Account Hierarchy: {e}")
@@ -284,8 +319,11 @@ class SalesforcePersonUpdates:
         logger.info(f"Starting a department {type} load")
         self.departments = Departments(apikey=self.app_config.dept_apikey)
 
+
         hashed_departments = self.departments.department_hash
         logger.debug(f"Successfully got {len(self.departments.results)} departments")
+
+        record_type_ids = self.hsf.get_record_type_ids('Account')
 
         watermark = self.app_config.watermarks["department"]
 
@@ -305,8 +343,7 @@ class SalesforcePersonUpdates:
         )
 
         external_id = self.app_config.config['Account']['Id']['salesforce']
-        if hierarchy:
-            hashed_departments = self.departments.hashSort(updated_results)
+        if hierarchy and False:
             code_field = self.app_config.config['Account']['hierarchy']['code_field']
             description_field = self.app_config.config['Account']['hierarchy']['description_field']
             self.setup_department_hierarchy(department_hash=hashed_departments, external_id=external_id, code_field=code_field, description_field=description_field)
@@ -319,6 +356,8 @@ class SalesforcePersonUpdates:
             for i, v in d.items():
                 if i not in data:
                     data[i] = []
+                if 'Harvard Department' in record_type_ids.keys():
+                    v['RecordTypeId'] = record_type_ids['Harvard Department']
                 data[i].append(v)
 
 
@@ -351,10 +390,10 @@ class SalesforcePersonUpdates:
                         data[i] = []
                     data[i].append(v)
 
-
+            contact_external_id = self.app_config.config['Contact']['Id']['salesforce']
             for object, object_data in data.items():
                 logger.debug(f"Upserting to {object} with {len(object_data)} records")
-                self.hsf.pushBulk(object, object_data, id_name='HUDA__hud_MULE_UNIQUE_PERSON_KEY__c')
+                self.hsf.pushBulk(object, object_data, id_name=contact_external_id)
 
 
         hashed_ids = self.hsf.getUniqueIds(
@@ -772,7 +811,10 @@ elif action == 'full-person-load':
 elif action == 'person-updates':
     sfpu.update_people_data_load()
 elif action == 'full-department-load':
-    sfpu.departments_data_load(type="full")
+    hierarchy = False
+    if 'hierarchy' in sfpu.app_config.config['Account']:
+        hierarchy = True
+    sfpu.departments_data_load(type="full", hierarchy=hierarchy)
 elif action == 'department-updates':
     sfpu.departments_data_load(type="update")
 elif action == 'delete-people':

@@ -8,7 +8,8 @@
         },
         "hierarchy": {
             "code_field": "HUDA__hud_DEPT_OFFICIAL_DESC__c",
-            "description_field": "HUDA__hud_DEPT_LONG_DESC__c"
+            "description_field": "HUDA__hud_DEPT_LONG_DESC__c",
+            "simplify_codes": true
         },
         "fields": {
             "HUDA__hud_DEPT_ID__c": "hrDeptId",

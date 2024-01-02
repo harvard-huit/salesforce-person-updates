@@ -47,6 +47,20 @@ class HarvardSalesforce:
         # through self.getTypeMap()
         self.type_data = {}
 
+    def get_record_type_ids(self, object_name):
+        """
+        This returns a hash of record type ids name: id for a given object
+        """
+        record_type_ids = {}
+        try:
+            description = self.sf.__getattr__(object_name).describe()
+            for record_type in description['recordTypeInfos']:
+                record_type_ids[record_type['name']] = record_type['recordTypeId']
+        except Exception as e:
+            logger.error(f"Error: {e}")
+            raise e
+        return record_type_ids
+
     # NOTE: this uses the Salesforce Bulk API
     # this API is generally async, but the way I'm using it, it will wait (synchronously) for the job to finish 
     # this allows us to get the error logs without having to wait/check
@@ -438,7 +452,9 @@ class HarvardSalesforce:
                         # in here we check that all fields we're trying to push to exist in the target salesforce
                         for config_field in config[object]['fields'].keys():
                             if config_field not in [f['name'] for f in description.get('fields')]:
-                                raise Exception(f"Error: {config_field} not found in {object}")
+                                # also make sure it's not a relationship name
+                                if config_field not in [f['relationshipName'] for f in description.get('fields')]:
+                                    raise Exception(f"Error: {config_field} not found in {object}")
 
 
                 except Exception as e:
