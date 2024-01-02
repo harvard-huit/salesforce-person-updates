@@ -1,7 +1,7 @@
 {
     "Account": {
         "source": "departments",
-        "flat": false,
+        "flat": true,
         "Id": {
             "departments": "hrDeptId",
             "salesforce": "HUDA__hud_DEPT_ID__c"

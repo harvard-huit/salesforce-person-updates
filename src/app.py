@@ -21,7 +21,7 @@ if stack == 'developer':
     from dotenv import load_dotenv
     load_dotenv() 
 
-    config_filename = '../config.json'
+    config_filename = '../example_config.json'
     if os.getenv("CONFIG_FILENAME") is not None:
         config_filename = os.getenv("CONFIG_FILENAME")
 
@@ -343,7 +343,7 @@ class SalesforcePersonUpdates:
         )
 
         external_id = self.app_config.config['Account']['Id']['salesforce']
-        if hierarchy and False:
+        if hierarchy:
             code_field = self.app_config.config['Account']['hierarchy']['code_field']
             description_field = self.app_config.config['Account']['hierarchy']['description_field']
             self.setup_department_hierarchy(department_hash=hashed_departments, external_id=external_id, code_field=code_field, description_field=description_field)
@@ -369,6 +369,8 @@ class SalesforcePersonUpdates:
             self.hsf.pushBulk(object, object_data, id_name=external_id)
 
         self.app_config.update_watermark("department")
+        logger.info(f"Department Watermark updated: {watermark}")
+        logger.info(f"Finished department {type} load")
 
     def process_people_batch(self, people: list=[]):
 
@@ -778,12 +780,15 @@ class SalesforcePersonUpdates:
     def remove_defunct_accounts(self):
         ids_to_remove = self.check_for_defunct_accounts()
 
+
+        self.hsf.delete_records(object_name='Account', ids=ids_to_remove)
         # delete them
-        if len(ids_to_remove) > 0:
-            logger.warning(f"Deleting {len(ids_to_remove)} accounts")
-            ids = [{'Id': id} for id in ids_to_remove]
-            result = self.hsf.sf.bulk.Account.delete(ids)
-            # logger.info(f"{result}")
+        # if len(ids_to_remove) > 0:
+        #     logger.warning(f"Deleting {len(ids_to_remove)} accounts")
+        #     ids = [{'Id': id} for id in ids_to_remove]
+
+        #     result = self.hsf.sf.bulk.Account.delete(ids)
+        #     logger.info(f"{result}")
 
         logger.info(f"remove_defunct_accounts action finished")
             
@@ -845,7 +850,8 @@ elif action == 'clean-branches':
         'HUDA__hud_Email__c': 'HUDA__CONTACT_EMAIL_ADDRESS_KEY__c',
         'HUDA__hud_Phone__c': 'HUDA__CONTACT_DATA_KEY__c',
         'HUDA__hud_Address__c': 'HUDA__CONTACT_ADDRESS_KEY__c',
-        'HUDA__hud_Location__c': 'HUDA__CONTACT_LOCATION_KEY__c'
+        'HUDA__hud_Location__c': 'HUDA__CONTACT_LOCATION_KEY__c',
+        # 'hed__Affiliation__c': 'HUDA__hud_PERSON_ROLES_KEY__c'
     }
     for object_name in object_id_map.keys():
         logger.info(f"Cleaning up {object_name}")
@@ -858,8 +864,8 @@ elif action == 'clean-branches':
         if len(result['records']) > 0:
             logger.warning(f"Deleting {len(result['records'])} {object_name} records without external ids")
             ids = [{'Id': record['Id']} for record in result['records']]
-            result = sfpu.hsf.sf.bulk.__getattr__(object_name).delete(ids)
-            logger.info(f"{result}")
+            # result = sfpu.hsf.sf.bulk.__getattr__(object_name).delete(ids)
+            # logger.info(f"{result}")
 
     logger.info(f"clean-branches action finished")
 elif action == 'remove-all-contacts':
@@ -967,7 +973,9 @@ elif action == "test":
 
     # sfpu.remove_defunct_accounts()
     ids = sfpu.check_for_defunct_accounts()
-    
+
+    exit()
+
     children = []
     # find children
     batch = 500
@@ -996,6 +1004,17 @@ elif action == "test":
             affiliations.append(record['Id'])
     
     logger.info(f"Found {len(affiliations)} affiliations")
+
+    # clear affiliation account references
+    logger.info(f"Clearing account references from affiliations")
+    batch = 10000
+    for i in range(0, len(affiliations), batch):
+        batch_ids = affiliations[i:i+batch]
+        batch_objects = []
+        for id in batch_ids:
+            batch_objects.append({'Id': id, 'hed__Account__c': None})
+        sfpu.hsf.sf.bulk.hed__Affiliation__c.update(batch_objects)
+    logger.info(f"finished clearing account references from affiliations")
 
 
     # sfpu.check_duplicates('Account', dry_run=True)
