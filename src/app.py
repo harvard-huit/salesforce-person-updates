@@ -63,6 +63,8 @@ class SalesforcePersonUpdates:
 
             self.action = os.getenv("action", None)
 
+            logger.info(f"Starting PDC {self.action} action on: {self.salesforce_instance_id}")
+
             current_time_mash = datetime.now().strftime('%Y%m%d%H%M')
             self.run_id = f"{self.action}_{current_time_mash}"
 
@@ -390,6 +392,9 @@ class SalesforcePersonUpdates:
                 for i, v in d.items():
                     if i not in data:
                         data[i] = []
+                    if 'updatedFlag' in self.app_config.config[i]:
+                        updated_flag = self.app_config.config[i]['updatedFlag']
+                        v[updated_flag] = True
                     data[i].append(v)
 
             contact_external_id = self.app_config.config['Contact']['Id']['salesforce']
@@ -407,6 +412,7 @@ class SalesforcePersonUpdates:
             self.transformer.hashed_ids[object_name] = hashed_ids[object_name]
 
         data = {}
+        # data is a dict where the keys are the object names and the values are lists of records
 
         # data = self.transformer.transform(source_data=people, target_object='Contact')
         data_gen = self.transformer.transform(source_data=people, source_name='pds', exclude_target_objects=['Contact'])
@@ -426,7 +432,9 @@ class SalesforcePersonUpdates:
         self.push_records(data=data)
         data = {}
 
-    def push_records(self, data):
+    def push_records(self, data: dict):
+        # this will push each object's data to Salesforce in a separate thread
+        # the data is a dict where the keys are the object names and the values are lists of records
         branch_threads = []
 
         for object, object_data in data.items():
@@ -605,9 +613,14 @@ class SalesforcePersonUpdates:
                 if current_count >= total_count:
                     break
 
+            # get current timestamp
+            current_time = datetime.now()
+            reasonable_duration = 60 * 60 * 2 # 2 hours
             if len(self.batch_threads) > 0:
                 logger.info(f"Finishing remaining processing threads: {len(self.batch_threads)}")
             while(self.batch_threads):
+                if (datetime.now() - current_time).total_seconds() > reasonable_duration:
+                    raise Exception(f"Something went wrong with the processing. It took too long.")
                 for thread in self.batch_threads.copy():
                     if not thread.is_alive():
                         self.batch_threads.remove(thread)
@@ -968,8 +981,8 @@ elif action == "department test":
 
 
     logger.info("department test action finished")
-elif action == "test":
-    logger.info(f"test action called")
+elif action == "defunct accounts test":
+    logger.info(f"defunct accounts test action called")
 
     # sfpu.remove_defunct_accounts()
     ids = sfpu.check_for_defunct_accounts()
@@ -1031,6 +1044,19 @@ elif action == "test":
     # }
     # ]
     # sfpu.hsf.pushBulk('Account', data, id_name='HUDA__hud_DEPT_ID__c')
+
+    logger.info(f"defunct accounts test action finished")
+elif action == "test":
+    logger.info(f"test action called")
+
+    # get all contacts that have our external id
+    external_id = sfpu.app_config.config['Contact']['Id']['salesforce']
+    result = sfpu.hsf.sf.query_all(f"SELECT Id, {external_id} FROM Contact WHERE {external_id} != null ORDER BY LastModifiedDate DESC") 
+
+    # delete them all (we expect this to fail for those with relationships)
+    ids = [{'Id': record['Id']} for record in result['records']]
+    logger.info(f"Found {len(ids)} Contact records")
+    # result = sfpu.hsf.sf.bulk.Contact.delete(ids)
 
     logger.info(f"test action finished")
 else: 
