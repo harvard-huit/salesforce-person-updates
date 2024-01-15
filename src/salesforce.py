@@ -677,7 +677,7 @@ class HarvardSalesforce:
 
 
 
-                        batch_size = 800
+                        batch_size = 500
                         for i in range(0, len(ids), batch_size):
                             try:
                                 batch = ids[i:i + batch_size]
@@ -894,3 +894,17 @@ class HarvardSalesforce:
         return result_data
 
 
+    def get_all_external_ids(self, object_name: str, external_id: str):
+        # this will return a list of all of the existing contact ids from salesforce
+        logger.info(f"get_all_external_ids getting all {external_id} from {object}")
+        ids = []
+        try:
+            sf_data = self.sf.query_all(f"SELECT {external_id} FROM {object_name} WHERE {external_id} != null")
+            logger.debug(f"got this data from salesforce: {sf_data['records']}")
+            for record in sf_data['records']:
+                ids.append(record[external_id])
+        except Exception as e:
+            logger.error(f"Error: {e}")
+            raise e
+        
+        return ids

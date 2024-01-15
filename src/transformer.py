@@ -188,6 +188,7 @@ class SalesforceTransformer:
                             # if it's a dict, we need to get the piece further in
                             if pieces[1] not in source_data_object[first]:
                                 if first == 'sf':
+                                    # NOTE: this should be deprecated in favor of relying on external ids
                                     source_pieces = pieces[1:]
                                     if source_pieces[0] in salesforce_person:
                                         if isinstance(salesforce_person, (str, bool, int)):
@@ -213,6 +214,7 @@ class SalesforceTransformer:
                             # we are making an assumption here that if it's a sf value, it's required, 
                             #   (otherwise it'll end up orphaned)
                             if first == 'sf' and value in [None, '#N/A']:
+                                # NOTE: this should be deprecated in favor of relying on external ids
                                 raise Exception(f"Error: this value should not be null")
                             
                         elif isinstance(source_data_object[first], list):
@@ -348,8 +350,8 @@ class SalesforceTransformer:
                                 else:
                                     branch_temp = source_data_object
 
-                            # NOTE: this should be deprecated in favor or the ref format
                             if source_pieces[0] == 'sf':
+                                # NOTE: this should be deprecated in favor of relying on external ids
                                 source_pieces = source_pieces[1:]
                                 if source_pieces[0] in salesforce_person:
                                     if isinstance(salesforce_person, (str, bool, int)):

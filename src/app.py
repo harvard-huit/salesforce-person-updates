@@ -473,7 +473,7 @@ class SalesforcePersonUpdates:
 
         logger.info(f"Finished spot data load: {self.run_id}")
 
-    def update_people_data_load(self, watermark: datetime=None):
+    def update_people_data_load(self, watermark: datetime=None, existing_only=False):
         if not watermark:
             watermark = self.app_config.watermarks['person']
 
@@ -481,6 +481,10 @@ class SalesforcePersonUpdates:
 
         pds_query = self.app_config.pds_query
         pds_query['conditions']['updateDate'] = ">" + watermark.strftime('%Y-%m-%dT%H:%M:%S')
+        if existing_only:
+            # This will limit all updates to only those that already exist in Salesforce
+            updated_ids = self.hsf.get_all_external_ids(object_name='Contact', external_id=self.app_config.config['Contact']['Id']['pds'])
+            pds_query['conditions']['univid'] = updated_ids
         self.people_data_load(pds_query=pds_query)
 
         watermark = self.app_config.update_watermark("person")
@@ -521,12 +525,6 @@ class SalesforcePersonUpdates:
         # without the pds_query, it uses the "full" configured query
         if pds_query is None:
             pds_query = self.app_config.pds_query
-
-
-        # logger.debug(f"Getting all department ids")
-        # self.transformer.hashed_ids = self.hsf.getUniqueIds(
-        #     config=self.transformer.getSourceConfig('departments')
-        # )
 
         try:
             self.pds.start_pagination(pds_query)
@@ -569,7 +567,7 @@ class SalesforcePersonUpdates:
 
                 current_count += len(results)
                 if current_count == total_count:
-                    logger.info(f"Finished getting all records from the PDS")
+                    logger.info(f"Finished getting all records from the PDS: {total_count} records")
                 elif current_count > total_count:
                     logger.warning(f"Count exceeds total_count {current_count}/{total_count}. The PDS pagination may have failed.")
                     break
@@ -589,6 +587,7 @@ class SalesforcePersonUpdates:
 
                     if self.action == 'person-updates':
                         # we need a record of updated ids
+                        # NOTE: v1.0.4: this may not be needed anymore since the external_id is now used more directly for the reference
                         external_id = self.app_config.config['Contact']['Ids']['pds']
                         self.updated_ids += [person[external_id] for person in people]
 
@@ -772,7 +771,6 @@ class SalesforcePersonUpdates:
                 response = os.remove(filename)
             workbook.save(filename)
 
-
     def check_for_defunct_accounts(self):
         # get all accounts that have our external id
         external_id = self.app_config.config['Account']['Id']['salesforce']
@@ -805,8 +803,31 @@ class SalesforcePersonUpdates:
 
         logger.info(f"remove_defunct_accounts action finished")
             
+    def check_for_defunct_contacts(self):
+        # get all contacts that have our external id
+        external_id = self.app_config.config['Contact']['Id']['salesforce']
+        result = self.hsf.sf.query_all(f"SELECT Id, {external_id}, LastModifiedDate FROM Contact WHERE {external_id} != null ORDER BY LastModifiedDate DESC")
 
-    
+        ids_to_remove = []
+        seen_external_ids = []
+        for record in result['records']:
+            if record[external_id] in seen_external_ids:
+                ids_to_remove.append(record['Id'])
+            else:
+                seen_external_ids.append(record[external_id])
+
+        # logger.info(f"{ids_to_remove}")
+        logger.info(f"Found {len(ids_to_remove)} contacts")
+        return ids_to_remove
+
+    def remove_defunct_contacts(self):
+        ids_to_remove = self.check_for_defunct_contacts()
+
+
+        self.hsf.delete_records(object_name='Contact', ids=ids_to_remove)
+
+        logger.info(f"remove_defunct_contacts action finished")
+
 
 sfpu = SalesforcePersonUpdates(local=LOCAL)
 
@@ -828,6 +849,8 @@ elif action == 'full-person-load':
     sfpu.full_people_data_load()
 elif action == 'person-updates':
     sfpu.update_people_data_load()
+elif action == 'person-updates-existing-only':
+    sfpu.update_people_data_load(existing_only=True)
 elif action == 'full-department-load':
     hierarchy = False
     if 'hierarchy' in sfpu.app_config.config['Account']:
@@ -881,6 +904,7 @@ elif action == 'clean-branches':
             # logger.info(f"{result}")
 
     logger.info(f"clean-branches action finished")
+
 elif action == 'remove-all-contacts':
     logger.warning("remove-all-contacts")
 
@@ -894,8 +918,6 @@ elif action == 'remove-all-contacts':
     # delete them
     ids = [record['HUDA__hud_UNIV_ID__c'] for record in result['records']]
     sfpu.delete_people(dry_run=True, huids=ids)    
-
-
 elif action == 'notted-test':
     logger.info("notted-test action called")
 
@@ -981,7 +1003,7 @@ elif action == "department test":
 
 
     logger.info("department test action finished")
-elif action == "defunct accounts test":
+elif action == "defunct-accounts-check":
     logger.info(f"defunct accounts test action called")
 
     # sfpu.remove_defunct_accounts()
@@ -1046,8 +1068,8 @@ elif action == "defunct accounts test":
     # sfpu.hsf.pushBulk('Account', data, id_name='HUDA__hud_DEPT_ID__c')
 
     logger.info(f"defunct accounts test action finished")
-elif action == "test":
-    logger.info(f"test action called")
+elif action == "remove people test":
+    logger.info(f"remove people test action called")
 
     # get all contacts that have our external id
     external_id = sfpu.app_config.config['Contact']['Id']['salesforce']
@@ -1057,6 +1079,10 @@ elif action == "test":
     ids = [{'Id': record['Id']} for record in result['records']]
     logger.info(f"Found {len(ids)} Contact records")
     # result = sfpu.hsf.sf.bulk.Contact.delete(ids)
+
+    logger.info(f"remove people test action finished")
+elif action == "test":
+    logger.info(f"test action called")
 
     logger.info(f"test action finished")
 else: 
