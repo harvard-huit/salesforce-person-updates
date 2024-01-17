@@ -140,7 +140,7 @@ class HarvardSalesforce:
                                 dupe_data_batch.append(errored_data)
 
                         # if it's invalid and the message is about an external id not existing, we want to ignore it
-                        if response['errors'][0]['statusCode']] == 'INVALID_FIELD':
+                        if response['errors'][0]['statusCode'] == 'INVALID_FIELD':
                             if response['errors'][0]['message'].startswith("Foreign key external ID"): 
                                 # we want to ignore this error as it happens if the Contact didn't make it
                                 logger.debug(f"Warning: INVALID_FIELD (external id): {response['errors'][0]['message']}")
