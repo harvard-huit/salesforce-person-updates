@@ -600,7 +600,7 @@ class SalesforcePersonUpdates:
                     if self.action == 'person-updates':
                         # we need a record of updated ids
                         # NOTE: v1.0.4: this may not be needed anymore since the external_id is now used more directly for the reference
-                        external_id = self.app_config.config['Contact']['Ids']['pds']
+                        external_id = self.app_config.config['Contact']['Id']['pds']
                         self.updated_ids += [person[external_id] for person in people]
 
 
