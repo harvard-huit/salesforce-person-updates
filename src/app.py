@@ -81,6 +81,9 @@ class SalesforcePersonUpdates:
                 self.app_config.config = config
                 # self.app_config.pds_query = pds_query
 
+            if os.getenv("RECORD_LIMIT"):
+                self.record_limit = int(os.getenv("RECORD_LIMIT"))
+
             self.hsf = HarvardSalesforce(
                 domain = self.app_config.salesforce_domain,
                 username = self.app_config.salesforce_username,
@@ -483,8 +486,8 @@ class SalesforcePersonUpdates:
         pds_query['conditions']['updateDate'] = ">" + watermark.strftime('%Y-%m-%dT%H:%M:%S')
         if existing_only:
             # This will limit all updates to only those that already exist in Salesforce
-            updated_ids = self.hsf.get_all_external_ids(object_name='Contact', external_id=self.app_config.config['Contact']['Id']['pds'])
-            pds_query['conditions']['univid'] = updated_ids
+            updated_ids = self.hsf.get_all_external_ids(object_name='Contact', external_id=self.app_config.config['Contact']['Id']['salesforce'])
+            pds_query['conditions'][self.app_config.config['Contact']['Id']['pds']] = updated_ids
         self.people_data_load(pds_query=pds_query)
 
         watermark = self.app_config.update_watermark("person")
@@ -566,6 +569,11 @@ class SalesforcePersonUpdates:
                     raise Exception(f"total_count changed from {total_count} to {self.pds.total_count}. The PDS pagination failed.")
 
                 current_count += len(results)
+                if self.record_limit:
+                    if current_count > self.record_limit:
+                        logger.info(f"Record limit reached: {self.record_limit}")
+                        break
+
                 if current_count == total_count:
                     logger.info(f"Finished getting all records from the PDS: {total_count} records")
                 elif current_count > total_count:
@@ -828,6 +836,16 @@ class SalesforcePersonUpdates:
 
         logger.info(f"remove_defunct_contacts action finished")
 
+    def get_all_updated_people(self, watermark=None) -> list:
+        # get all updates ids from the pds
+        pds_query = self.app_config.pds_query
+        pds_id_name = self.app_config.config['Contact']['Id']['pds']
+        pds_query['fields'] = [pds_id_name]
+        if not watermark:
+            watermark = self.app_config.watermarks['person']
+
+        pds_query['conditions']['updateDate'] = ">" + watermark.strftime('%Y-%m-%dT%H:%M:%S')
+        people = self.pds.get_people(pds_query)
 
 sfpu = SalesforcePersonUpdates(local=LOCAL)
 
@@ -1083,6 +1101,26 @@ elif action == "remove people test":
     logger.info(f"remove people test action finished")
 elif action == "test":
     logger.info(f"test action called")
+
+    # get all contacts that have our external id
+    external_id = sfpu.app_config.config['Contact']['Id']['salesforce']
+    results = sfpu.hsf.sf.query_all(f"SELECT Id, {external_id} FROM Contact WHERE {external_id} != null ORDER BY LastModifiedDate DESC")
+    logger.info(f"Found {len(results['records'])} Contact records")
+
+    this_many = 40000
+    count = 0
+    ids = []
+    for record in results['records']:
+        # logger.info(f"{count}: {record['Id']} - {record[external_id]}")
+        ids.append(record['Id'])
+        count += 1
+        if count >= this_many:
+            break
+    
+    # delete them all
+    ids = [{'Id': id} for id in ids]
+    logger.info(f"Deleting {len(ids)} Contact records")
+    # result = sfpu.hsf.sf.bulk.Contact.delete(ids)
 
     logger.info(f"test action finished")
 else: 
