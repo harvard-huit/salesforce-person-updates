@@ -957,7 +957,7 @@ elif action == 'notted-test':
     notted_updated_ids = [f"!{id}" for id in sfpu.updated_ids]
 
 
-    external_id = sfpu.app_config.config['Contact']['Ids']['pds']
+    external_id = sfpu.app_config.config['Contact']['Id']['pds']
 
     # create query
     updated_ids_query = {
