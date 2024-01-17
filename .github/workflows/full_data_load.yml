@@ -53,9 +53,11 @@ on:
           - '7168'
           - '8192'
           - '16384'
-          
-                  
-
+      record_limit:
+        type: number
+        required: false
+        default: -1
+                            
 env:
   AWS_REGION: us-east-1
 
@@ -138,6 +140,9 @@ jobs:
                 }, {
                   "name": "BATCH_THREAD_COUNT", 
                   "value": "${{ github.event.inputs.batch_thread_count }}"
+                }, {
+                  "name": "RECORD_LIMIT", 
+                  "value": "${{ github.event.inputs.record_limit }}"
                 }, {
                   "name": "DEBUG", 
                   "value": "${{ github.event.inputs.debug }}"
