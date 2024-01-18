@@ -129,7 +129,7 @@ class HarvardSalesforce:
                     if response['success'] != True: 
                         
                         errored_data = data[index]
-                        logger.error(f"Error in bulk data load: {response['errors']} ({errored_data})")
+                        logger.debug(f"Record failure in bulk data load: {response['errors']} ({errored_data})")
 
                         if response['errors'][0]['statusCode'] == 'DUPLICATES_DETECTED':
 
