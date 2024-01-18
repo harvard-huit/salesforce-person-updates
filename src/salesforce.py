@@ -537,6 +537,9 @@ class HarvardSalesforce:
                 if len(value) > length:
                     value = value[:length]
                 return str(value)
+        elif field_type in ["picklist", "multipicklist"]:
+            # not really sure I want to validate what the picklist values are
+            return str(value)
         elif field_type in ["email"]:
             return str(value)
         elif field_type in ["id", "reference"]:

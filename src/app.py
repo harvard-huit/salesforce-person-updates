@@ -821,12 +821,20 @@ class SalesforcePersonUpdates:
         result = self.hsf.sf.query_all(f"SELECT Id, {external_id}, LastModifiedDate FROM Contact WHERE {external_id} != null ORDER BY LastModifiedDate DESC")
 
         ids_to_remove = []
-        seen_external_ids = []
+        # seen_external_ids = []
+        # for record in result['records']:
+        #     if record[external_id] in seen_external_ids:
+        #         ids_to_remove.append(record['Id'])
+        #     else:
+        #         seen_external_ids.append(record[external_id])
+        # logger.info(f"Found {len(ids_to_remove)} contacts with duplicate external ids")
+
+        # get all contacts that are "huit updated" but have no external id
+        result = self.hsf.sf.query_all(f"SELECT Id, {external_id}, LastModifiedDate FROM Contact WHERE {external_id} = null AND huit__Updated__c = true ORDER BY LastModifiedDate DESC")
         for record in result['records']:
-            if record[external_id] in seen_external_ids:
-                ids_to_remove.append(record['Id'])
-            else:
-                seen_external_ids.append(record[external_id])
+            ids_to_remove.append(record['Id'])
+        logger.info(f"Found {len(result['records'])} (HUIT) contacts with no external id")
+
 
         # logger.info(f"{ids_to_remove}")
         logger.info(f"Found {len(ids_to_remove)} contacts")
@@ -1106,50 +1114,6 @@ elif action == "remove people test":
 elif action == "test":
     logger.info(f"test action called")
 
-    for object_name in sfpu.app_config.config.keys():
-        logger.info(f"Checking {object_name}")
-        # get all records with our external id
-        external_id = sfpu.app_config.config[object_name]['Id']['salesforce']
-        results = sfpu.hsf.sf.query_all(f"SELECT Id, {external_id} FROM {object_name} WHERE {external_id} != null ORDER BY LastModifiedDate DESC")
-        logger.info(f"Found {len(results['records'])} {object_name} records")
-
-        this_many = 100000000
-        count = 0
-        ids = []
-        for record in results['records']:
-            # logger.info(f"{count}: {record['Id']} - {record[external_id]}")
-            ids.append(record['Id'])
-            count += 1
-            if count >= this_many:
-                break
-        
-        # delete them all
-        ids = [{'Id': id} for id in ids]
-        if len(ids) > 0:
-            logger.info(f"Deleting {len(ids)} {object_name} records")
-            result = sfpu.hsf.sf.bulk.__getattr__(object_name).delete(ids)
-
-
-
-    # # get all contacts that have our external id
-    # external_id = sfpu.app_config.config['Contact']['Id']['salesforce']
-    # results = sfpu.hsf.sf.query_all(f"SELECT Id, {external_id} FROM Contact WHERE HUDA__hud_EPPN__c != null ORDER BY LastModifiedDate DESC")
-    # logger.info(f"Found {len(results['records'])} Contact records")
-
-    # this_many = 100000
-    # count = 0
-    # ids = []
-    # for record in results['records']:
-    #     # logger.info(f"{count}: {record['Id']} - {record[external_id]}")
-    #     ids.append(record['Id'])
-    #     count += 1
-    #     if count >= this_many:
-    #         break
-    
-    # # delete them all
-    # ids = [{'Id': id} for id in ids]
-    # logger.info(f"Deleting {len(ids)} Contact records")
-    # result = sfpu.hsf.sf.bulk.Contact.delete(ids)
 
     logger.info(f"test action finished")
 else: 
