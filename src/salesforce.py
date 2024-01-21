@@ -261,7 +261,7 @@ class HarvardSalesforce:
         return all_ids
     
     def flag_field(self, object_name: str, external_id: str, flag_name: str, value: any, ids: list):
-        batch_size = 500
+        batch_size = 800
         for i in range(0, len(ids), batch_size):
             try:
                 batch = ids[i:i + batch_size]
@@ -901,6 +901,27 @@ class HarvardSalesforce:
                 raise e
 
         logger.info(f"got this data from salesforce: {result_data}")
+        return result_data
+
+    def filter_external_ids(self, object_name, external_id, ids: list):
+        # this method will only take in a list of ids and return the ids that exist in salesforce
+
+        logger.info(f"filter_external_ids with the following {external_id} external ids: {ids}")
+        logger.info(f"length of ids: {len(ids)}")
+
+        result_data = []
+        batch = 1000
+        for i in range(0, len(ids), batch):
+            try:
+                batch = ids[i:i + batch]
+                ids_string = "'" + '\',\''.join(batch) + "'"
+                sf_data = self.sf.query_all(f"SELECT {external_id} FROM {object_name} WHERE {external_id} IN({ids_string})")
+                logger.debug(f"got this data from salesforce: {sf_data}")
+                for record in sf_data['records']:
+                    result_data.append(record[external_id])
+            except Exception as e:
+                logger.error(f"Error: {e}")
+                raise e
         return result_data
 
 

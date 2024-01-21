@@ -492,7 +492,64 @@ class SalesforcePersonUpdates:
             # This will limit all updates to only those that already exist in Salesforce
             updated_ids = self.hsf.get_all_external_ids(object_name='Contact', external_id=self.app_config.config['Contact']['Id']['salesforce'])
             pds_query['conditions'][self.app_config.config['Contact']['Id']['pds']] = updated_ids
+
         self.people_data_load(pds_query=pds_query)
+
+        if 'updatedFlag' in self.app_config.config['Contact']:
+            updated_flag = self.app_config.config['Contact']['updatedFlag']
+            # we could do the updated operation here instead of tying it into the update process
+
+            ##################################################################################
+            # updated ids will now exist in self.updated_ids
+            # types of missing data:
+            # 1. data that has moved out of the security level of the customers pds key
+            # 2. data that has is no longer matched by the conditions of the pds query
+            ##################################################################################
+            # possible ways to handle the missing data:
+            # 1. do a new pds run checking against all records in salesforce
+            #   this would get all records that were excluded due to security level
+            #   however, it would be a large query and would take a long time
+            #   this makes the most sense as a daily run as it's a much larger query
+            # 2. do a new pds run using the existing query, excuding the updated ids from this run?
+            #   this would only get records that were excluded due to specialized conditions
+            #   this makes the most sense to be run right after an update
+            # It looks like we need to do both of these things. Unless we can come up with a way to get the data 
+            #   through a single method. Maybe if the PDS provided a list of updated, but invisible ids? 
+            ##################################################################################
+
+            # we only need the external ids and the updateDate condition
+            pds_query = {}
+            external_id = self.app_config.config['Contact']['Id']['salesforce']
+            pds_id = self.app_config.config['Contact']['Id']['pds']
+            pds_query['fields'] = [pds_id]
+            pds_query['conditions'] = {}
+            pds_query['conditions']['updateDate'] = ">" + watermark.strftime('%Y-%m-%dT%H:%M:%S')
+            # add exclusion of updated ids
+            pds_query['conditions'][pds_id] = {
+                "value": self.updated_ids,
+                "exclude": True
+            }
+            # process the query synchronously (for simplicity's sake)
+            self.pds.start_pagination(pds_query, wait=True, type="list")
+            people_list = self.pds.results
+            id_list = [person[pds_id] for person in people_list]
+
+            # now check if those ids exist in salesforce
+            filtered_id_list = self.hsf.filter_external_ids(object_name='Contact', external_id=external_id, ids=id_list)
+            logger.info(f"Filtered ids: {len(filtered_id_list)}")
+
+            # if they do, we need to update their updatedFlag
+            if len(filtered_id_list) > 0:
+                # update the updatedFlag
+                self.hsf.flag_field(object_name='Contact', external_id=external_id, flag_name=updated_flag, value=False, ids=filtered_id_list)
+
+        # if midnight is in between the star
+
+
+
+        # if (datetime.now() - watermark).total_seconds() > 60 * 60 * 24:
+        #     self.cleanup_updateds()
+
 
         watermark = self.app_config.update_watermark("person")
         logger.info(f"Watermark updated: {watermark}")
@@ -657,9 +714,10 @@ class SalesforcePersonUpdates:
 
         logger.info(f"Successfully finished data load: {self.run_id}")
 
-    # This is intended for debug use only.
-    # We should not be deleting any records.
     def delete_people(self, dry_run: bool=True, huids: list=[]):
+        # This is intended for debug use only.
+        # We should not be deleting any records.
+        logger.warning(f"Starting delete of {len(huids)} records")
         pds_query = self.app_config.pds_query
         # clear conditions
         pds_query['conditions'] = {}
@@ -683,43 +741,52 @@ class SalesforcePersonUpdates:
 
         logger.warning(f"Delete Done, I hope you meant to do that.")
 
-    def check_updateds(self):
+    def cleanup_updateds(self, object_name='Contact'):
 
         logger.info(f"Checking PDS for records that are no longer being updated")
 
         # 1. Get all (external) IDs from Salesforce
-        object_name = 'Contact'
         # get the external id we're using in the config for this org
-        external_id = self.app_config.config['Contact']['Id']['salesforce']
-        pds_id = self.app_config.config['Contact']['Id']['pds']
+        external_id = self.app_config.config[object_name]['Id']['salesforce']
+        updated_flag = self.app_config.config[object_name]['updatedFlag']
+        pds_id = self.app_config.config[object_name]['Id']['pds']
         all_sf_ids = self.hsf.get_all_external_ids(object_name=object_name, external_id=external_id)
+        logger.info(f"Found {len(all_sf_ids)} ids in Salesforce")
         
         # 2. Call PDS with those IDs
-
         # we only need to know if these are getttable, 
         #   it doesn't matter what other fields or conditions are in the provided query
         pds_query = {}
         pds_query['fields'] = [pds_id]
         pds_query['conditions'] = {}
-        pds_query['conditions'][pds_id] = all_sf_ids
 
-        people = self.pds.get_people(pds_query)
+        # people = self.pds.start_pagination(pds_query, wait=True, type="list")
+        # all_pds_ids = [person[pds_id] for person in people]
 
-        # make it a list
-        all_pds_ids = []
-        for person in people:
-            all_pds_ids.append(person[pds_id])
-        
-        logger.debug(f"All PDS ids: {all_pds_ids}")
+        try: 
+            all_pds_ids = []
+            results = []
+            self.pds.start_pagination(pds_query)
+            while(len(results) > 0 or self.pds.is_paginating):
+                results = self.pds.next_page_results()
+                all_pds_ids += [person[pds_id] for person in results]
+            logger.info(f"Found {len(all_pds_ids)} ids in PDS")
+        except Exception as e:
+            logger.error(f"Error getting all pds ids: {e}")
+            raise e
 
-        # 3. Diff the lists
+        try:
+            # 3. Diff the lists
+            not_updating_ids = [item for item in all_sf_ids if item not in all_pds_ids]
+            logger.info(f"Found {len(not_updating_ids)} ids that are no longer updating")
+            logger.debug(f"not_updating_ids: {not_updating_ids}")
 
-        not_updating_ids = [item for item in all_sf_ids if item not in all_pds_ids]
+            # 4. Mark the ones that don't show up
+            self.hsf.flag_field(object_name=object_name, external_id=external_id, flag_name=updated_flag, value=False, ids=not_updating_ids)
+        except Exception as e:
+            logger.error(f"Error marking ids as not updated: {e}")
+            raise e
 
-        logger.info(f"These ids ({external_id}) are no longer being updated: {not_updating_ids}. These have been marked as no longer updated.")
-
-        # 4. Mark the ones that don't show up
-        self.hsf.flag_field(object_name=object_name, external_id=external_id, flag_name='huit__Updated__c', value=False, ids=not_updating_ids)
 
     # this method will create xls files with comparisons of data from 2 salesforce sources
     # it can only really be run locally and also requires a second set of salesforce credentials
@@ -839,7 +906,7 @@ class SalesforcePersonUpdates:
         # logger.info(f"{ids_to_remove}")
         logger.info(f"Found {len(ids_to_remove)} contacts")
         return ids_to_remove
-
+    
     def remove_defunct_contacts(self):
         ids_to_remove = self.check_for_defunct_contacts()
 
@@ -890,8 +957,8 @@ elif action == 'department-updates':
     sfpu.departments_data_load(type="update")
 elif action == 'delete-people':
     sfpu.delete_people(dry_run=True, huids=person_ids)
-elif action == 'mark-not-updated':
-    sfpu.check_updateds()
+elif action == 'cleanup-updateds':
+    sfpu.cleanup_updateds()
 elif action == 'compare':
     sfpu.compare_records()
 
