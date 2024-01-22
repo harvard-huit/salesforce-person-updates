@@ -486,11 +486,21 @@ class SalesforcePersonUpdates:
 
         logger.info(f"Processing updates since {watermark}")
 
+        has_conditions = False
+        if 'conditions' not in pds_query:
+            pds_query['conditions'] = {}
+        if len(pds_query['conditions'].keys()) > 0:
+            has_conditions = True
+
         pds_query = self.app_config.pds_query
         pds_query['conditions']['updateDate'] = ">" + watermark.strftime('%Y-%m-%dT%H:%M:%S')
         if existing_only:
             # This will limit all updates to only those that already exist in Salesforce
             updated_ids = self.hsf.get_all_external_ids(object_name='Contact', external_id=self.app_config.config['Contact']['Id']['salesforce'])
+            # NOTE: this is going to fail with large numbers of ids
+            
+            # TODO: this needs to be done with multiple pds queries
+
             pds_query['conditions'][self.app_config.config['Contact']['Id']['pds']] = updated_ids
 
         self.people_data_load(pds_query=pds_query)
@@ -517,39 +527,44 @@ class SalesforcePersonUpdates:
             #   through a single method. Maybe if the PDS provided a list of updated, but invisible ids? 
             ##################################################################################
 
-            # we only need the external ids and the updateDate condition
-            pds_query = {}
-            external_id = self.app_config.config['Contact']['Id']['salesforce']
-            pds_id = self.app_config.config['Contact']['Id']['pds']
-            pds_query['fields'] = [pds_id]
-            pds_query['conditions'] = {}
-            pds_query['conditions']['updateDate'] = ">" + watermark.strftime('%Y-%m-%dT%H:%M:%S')
-            # add exclusion of updated ids
-            pds_query['conditions'][pds_id] = {
-                "value": self.updated_ids,
-                "exclude": True
-            }
-            # process the query synchronously (for simplicity's sake)
-            self.pds.start_pagination(pds_query, wait=True, type="list")
-            people_list = self.pds.results
-            id_list = [person[pds_id] for person in people_list]
+            if has_conditions:
+                # this will handle the case where the data has moved out of the conditions for the query
+                #   we don't need to do this if the query has no conditions
 
-            # now check if those ids exist in salesforce
-            filtered_id_list = self.hsf.filter_external_ids(object_name='Contact', external_id=external_id, ids=id_list)
-            logger.info(f"Filtered ids: {len(filtered_id_list)}")
+                # we only need the external ids and the updateDate condition
+                pds_query = {}
+                external_id = self.app_config.config['Contact']['Id']['salesforce']
+                pds_id = self.app_config.config['Contact']['Id']['pds']
+                pds_query['fields'] = [pds_id]
+                pds_query['conditions'] = {}
+                pds_query['conditions']['updateDate'] = ">" + watermark.strftime('%Y-%m-%dT%H:%M:%S')
+                # add exclusion of updated ids
+                pds_query['conditions'][pds_id] = {
+                    "value": self.updated_ids,
+                    "exclude": True
+                }
+                # process the query synchronously (for simplicity's sake)
+                self.pds.start_pagination(pds_query, wait=True, type="list")
+                people_list = self.pds.results
+                id_list = [person[pds_id] for person in people_list]
 
-            # if they do, we need to update their updatedFlag
-            if len(filtered_id_list) > 0:
-                # update the updatedFlag
-                self.hsf.flag_field(object_name='Contact', external_id=external_id, flag_name=updated_flag, value=False, ids=filtered_id_list)
+                # now check if those ids exist in salesforce
+                filtered_id_list = self.hsf.filter_external_ids(object_name='Contact', external_id=external_id, ids=id_list)
+                logger.info(f"Filtered ids: {len(filtered_id_list)}")
 
-        # if midnight is in between the star
+                # if they do, we need to update their updatedFlag
+                if len(filtered_id_list) > 0:
+                    # update the updatedFlag
+                    self.hsf.flag_field(object_name='Contact', external_id=external_id, flag_name=updated_flag, value=False, ids=filtered_id_list)
 
 
-
-        # if (datetime.now() - watermark).total_seconds() > 60 * 60 * 24:
-        #     self.cleanup_updateds()
-
+            # This will handle the case where the data has moved out of the security level of the customers pds key
+            today = datetime.now().weekday()
+            watermark_day = watermark.weekday()
+            if today != watermark_day:
+                # if this is a new day, go through the cleanup process
+                logger.info(f"New day, running cleanup")
+                self.cleanup_updateds()
 
         watermark = self.app_config.update_watermark("person")
         logger.info(f"Watermark updated: {watermark}")
