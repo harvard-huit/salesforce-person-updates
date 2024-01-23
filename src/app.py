@@ -117,9 +117,6 @@ class SalesforcePersonUpdates:
             # validate the config
             self.hsf.validateConfig(self.app_config.config)
 
-            # TODO: implement updates_only
-            self.updates_only = os.getenv('UPDATES_ONLY') or False
-
             # initialize storage for updated ids
             self.updated_ids = []
 
@@ -480,7 +477,7 @@ class SalesforcePersonUpdates:
 
         logger.info(f"Finished spot data load: {self.run_id}")
 
-    def update_people_data_load(self, watermark: datetime=None, existing_only=False):
+    def update_people_data_load(self, watermark: datetime=None, updates_only=False):
         if not watermark:
             watermark = self.app_config.watermarks['person']
 
@@ -495,7 +492,7 @@ class SalesforcePersonUpdates:
             has_conditions = True
 
         pds_query['conditions']['updateDate'] = ">" + watermark.strftime('%Y-%m-%dT%H:%M:%S')
-        if existing_only:
+        if updates_only:
             # This will limit all updates to only those that already exist in Salesforce
             updated_ids = self.hsf.get_all_external_ids(object_name='Contact', external_id=self.app_config.config['Contact']['Id']['salesforce'])
             # NOTE: this is going to fail with large numbers of ids
@@ -528,7 +525,7 @@ class SalesforcePersonUpdates:
             #   through a single method. Maybe if the PDS provided a list of updated, but invisible ids? 
             ##################################################################################
 
-            if has_conditions and not existing_only:
+            if has_conditions and not updates_only:
                 # this will handle the case where the data has moved out of the conditions for the query
                 #   we don't need to do this if the query has no conditions
                 #   we also don't need to do this if we're only updating existing records
@@ -971,9 +968,12 @@ if action == 'single-person-update' and len(person_ids) > 0:
 elif action == 'full-person-load':
     sfpu.full_people_data_load()
 elif action == 'person-updates':
-    sfpu.update_people_data_load()
-elif action == 'person-updates-existing-only':
-    sfpu.update_people_data_load(existing_only=True)
+    updates_only = False
+    if 'Contact' in sfpu.app_config.config and 'updateOnlyFlag' in sfpu.app_config.config['Contact'] and sfpu.app_config.config['Contact']['updateOnlyFlag'] == True:
+        updates_only = True
+    sfpu.update_people_data_load(updates_only=updates_only)
+elif action == 'person-updates-updates-only':
+    sfpu.update_people_data_load(updates_only=True)
 elif action == 'full-department-load':
     hierarchy = False
     if 'hierarchy' in sfpu.app_config.config['Account']:
@@ -1001,32 +1001,6 @@ elif action == 'remove-unaffiliated-affiliations':
 
     if len(ids) > 0:
         logger.warning(f"Deleted {len(ids)} unaffiliated Affiliation records")
-elif action == 'clean-branches':
-    logger.info(f"clean-branches action called")
-    
-    object_id_map = {
-        'HUDA__hud_Name__c': 'HUDA__PERSON_NAMES_KEY__c',
-        'HUDA__hud_Email__c': 'HUDA__CONTACT_EMAIL_ADDRESS_KEY__c',
-        'HUDA__hud_Phone__c': 'HUDA__CONTACT_DATA_KEY__c',
-        'HUDA__hud_Address__c': 'HUDA__CONTACT_ADDRESS_KEY__c',
-        'HUDA__hud_Location__c': 'HUDA__CONTACT_LOCATION_KEY__c',
-        # 'hed__Affiliation__c': 'HUDA__hud_PERSON_ROLES_KEY__c'
-    }
-    for object_name in object_id_map.keys():
-        logger.info(f"Cleaning up {object_name}")
-        object_external_id = object_id_map[object_name]
-
-        result = sfpu.hsf.sf.query_all(f"SELECT Id FROM {object_name} WHERE {object_external_id} = null")
-        logger.info(f"Found {len(result['records'])} {object_name} records without external ids")
-
-        # delete them
-        if len(result['records']) > 0:
-            logger.warning(f"Deleting {len(result['records'])} {object_name} records without external ids")
-            ids = [{'Id': record['Id']} for record in result['records']]
-            # result = sfpu.hsf.sf.bulk.__getattr__(object_name).delete(ids)
-            # logger.info(f"{result}")
-
-    logger.info(f"clean-branches action finished")
 
 elif action == 'remove-all-contacts':
     logger.warning("remove-all-contacts")
@@ -1041,53 +1015,6 @@ elif action == 'remove-all-contacts':
     # delete them
     ids = [record['HUDA__hud_UNIV_ID__c'] for record in result['records']]
     sfpu.delete_people(dry_run=True, huids=ids)    
-elif action == 'notted-test':
-    logger.info("notted-test action called")
-
-    # isTaskRunning()
-
-    # force action
-    sfpu.action = 'person-updates'
-
-    # do the updates
-    sfpu.update_people_data_load()
-
-    # we should now have updated_ids populated
-    logger.info(sfpu.updated_ids)
-    # not the ids
-    notted_updated_ids = [f"!{id}" for id in sfpu.updated_ids]
-
-
-    external_id = sfpu.app_config.config['Contact']['Id']['pds']
-
-    # create query
-    updated_ids_query = {
-        'fields': ["univid"],
-        'conditions': {
-            'updateDate': ">" + sfpu.app_config.watermarks['pds'].strftime('%Y-%m-%dT%H:%M:%S')
-        }
-    }
-    updated_ids_query['conditions'][external_id] = notted_updated_ids
-
-    # get all possible updated ids
-    sfpu.pds.start_pagination(query=updated_ids_query, type='list', wait=True)
-
-    id_list = sfpu.pds.results
-    logger.info(id_list)
-    id_list_string = "'" + '\',\''.join(id_list) + "'"
-
-    # now select from Contact with this id list and if we have any hits filter list
-    sf_data = sfpu.hsf.sf.query_all(f"SELECT {external_id} FROM Contact WHERE {external_id} IN({id_list_string})")
-
-    new_id_list = []
-    for record in sf_data['records']:
-        new_id_list.append(record[external_id])
-
-    
-
-
-
-    logger.info("notted-test action finished")
 elif action == "department test":
     logger.info("department test action called")
 
@@ -1204,8 +1131,8 @@ elif action == "remove people test":
     # result = sfpu.hsf.sf.bulk.Contact.delete(ids)
 
     logger.info(f"remove people test action finished")
-elif action == "test":
-    logger.info(f"test action called")
+elif action == "delete-all-data":
+    logger.warning(f"delete-all-data action called")
     for object_name in sfpu.app_config.config.keys():
         logger.info(f"{object_name}")
         external_id = sfpu.app_config.config[object_name]['Id']['salesforce']
@@ -1213,9 +1140,13 @@ elif action == "test":
         logger.info(f"Found {len(result['records'])} {object_name} records")
         # delete them all
         ids = [{'Id': record['Id']} for record in result['records']]
-        logger.info(f"attempting delete")
-        sfpu.hsf.sf.bulk.__getattr__(object_name).delete(ids)
-        logger.info(f"delete complete")
+        logger.warning(f"attempting delete")
+        # sfpu.hsf.sf.bulk.__getattr__(object_name).delete(ids)
+        logger.warning(f"delete complete")
+
+    logger.info(f"delete-all-data action finished")
+elif action == "test":
+    logger.info(f"test action called")
 
     logger.info(f"test action finished")
 else: 
