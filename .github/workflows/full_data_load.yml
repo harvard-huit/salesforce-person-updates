@@ -18,14 +18,18 @@ on:
         type: string
         required: true
         default: 'huit-full-sandbox'
+      record_limit:
+        type: number
+        required: false
+        default: -1
       batch_size:
         type: number
         required: false
-        default: 500
+        default: 800
       batch_thread_count: 
         type: number
         required: false
-        default: 3
+        default: 5
       debug:
         type: choice
         required: false
@@ -53,10 +57,6 @@ on:
           - '7168'
           - '8192'
           - '16384'
-      record_limit:
-        type: number
-        required: false
-        default: -1
                             
 env:
   AWS_REGION: us-east-1
