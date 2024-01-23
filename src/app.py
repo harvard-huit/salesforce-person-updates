@@ -487,12 +487,13 @@ class SalesforcePersonUpdates:
         logger.info(f"Processing updates since {watermark}")
 
         has_conditions = False
+
+        pds_query = self.app_config.pds_query
         if 'conditions' not in pds_query:
             pds_query['conditions'] = {}
         if len(pds_query['conditions'].keys()) > 0:
             has_conditions = True
 
-        pds_query = self.app_config.pds_query
         pds_query['conditions']['updateDate'] = ">" + watermark.strftime('%Y-%m-%dT%H:%M:%S')
         if existing_only:
             # This will limit all updates to only those that already exist in Salesforce
@@ -1195,7 +1196,16 @@ elif action == "remove people test":
     logger.info(f"remove people test action finished")
 elif action == "test":
     logger.info(f"test action called")
-
+    for object_name in sfpu.app_config.config.keys():
+        logger.info(f"{object_name}")
+        external_id = sfpu.app_config.config[object_name]['Id']['salesforce']
+        result = sfpu.hsf.sf.query_all(f"SELECT Id, {external_id} FROM {object_name} WHERE {external_id} != null ORDER BY LastModifiedDate DESC")
+        logger.info(f"Found {len(result['records'])} {object_name} records")
+        # delete them all
+        ids = [{'Id': record['Id']} for record in result['records']]
+        logger.info(f"attempting delete")
+        sfpu.hsf.sf.bulk.__getattr__(object_name).delete(ids)
+        logger.info(f"delete complete")
 
     logger.info(f"test action finished")
 else: 
