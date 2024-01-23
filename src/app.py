@@ -528,9 +528,10 @@ class SalesforcePersonUpdates:
             #   through a single method. Maybe if the PDS provided a list of updated, but invisible ids? 
             ##################################################################################
 
-            if has_conditions:
+            if has_conditions and not existing_only:
                 # this will handle the case where the data has moved out of the conditions for the query
                 #   we don't need to do this if the query has no conditions
+                #   we also don't need to do this if we're only updating existing records
 
                 # we only need the external ids and the updateDate condition
                 pds_query = {}
@@ -553,10 +554,10 @@ class SalesforcePersonUpdates:
                 filtered_id_list = self.hsf.filter_external_ids(object_name='Contact', external_id=external_id, ids=id_list)
                 logger.info(f"Filtered ids: {len(filtered_id_list)}")
 
-
-
                 # if they do, we need to update them
                 if len(filtered_id_list) > 0:
+                    logger.info(f"Updating existing people who don't fit conditions")
+                    logger.debug(f"Existing people who don't fit conditions: {len(filtered_id_list)}")
                     # update the updatedFlag
                     # self.hsf.flag_field(object_name='Contact', external_id=external_id, flag_name=updated_flag, value=False, ids=filtered_id_list)
                     try:
