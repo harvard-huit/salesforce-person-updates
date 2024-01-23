@@ -553,11 +553,20 @@ class SalesforcePersonUpdates:
                 filtered_id_list = self.hsf.filter_external_ids(object_name='Contact', external_id=external_id, ids=id_list)
                 logger.info(f"Filtered ids: {len(filtered_id_list)}")
 
-                # if they do, we need to update their updatedFlag
+
+
+                # if they do, we need to update them
                 if len(filtered_id_list) > 0:
                     # update the updatedFlag
-                    self.hsf.flag_field(object_name='Contact', external_id=external_id, flag_name=updated_flag, value=False, ids=filtered_id_list)
-
+                    # self.hsf.flag_field(object_name='Contact', external_id=external_id, flag_name=updated_flag, value=False, ids=filtered_id_list)
+                    try:
+                        pds_query['conditions'] = {}
+                        pds_query['conditions'][pds_id] = filtered_id_list
+                        # NOTE: this can fail if the id list is too large (due to elastic search limitations)
+                        self.people_data_load(pds_query=pds_query)
+                    except Exception as e:
+                        logger.error(f"Error updating filtered ids: {e}")
+                        raise e
 
             # This will handle the case where the data has moved out of the security level of the customers pds key
             today = datetime.now().weekday()
