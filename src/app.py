@@ -142,8 +142,6 @@ class SalesforcePersonUpdates:
         except Exception as e:
             logger.error(f"Run failed with error: {e}")
             raise e
-        
-    
 
     # this will make logs come out as json and send logs elsewhere
     def setup_logging(self, logger=logging.getLogger(__name__)):
@@ -496,8 +494,6 @@ class SalesforcePersonUpdates:
             # This will limit all updates to only those that already exist in Salesforce
             updated_ids = self.hsf.get_all_external_ids(object_name='Contact', external_id=self.app_config.config['Contact']['Id']['salesforce'])
             # NOTE: this is going to fail with large numbers of ids
-            
-            # TODO: this needs to be done with multiple pds queries
 
             pds_query['conditions'][self.app_config.config['Contact']['Id']['pds']] = updated_ids
 
@@ -971,6 +967,10 @@ elif action == 'person-updates':
     updates_only = False
     if 'Contact' in sfpu.app_config.config and 'updateOnlyFlag' in sfpu.app_config.config['Contact'] and sfpu.app_config.config['Contact']['updateOnlyFlag'] == True:
         updates_only = True
+    
+    # disabling updates_ony for now
+    updates_only = False
+
     sfpu.update_people_data_load(updates_only=updates_only)
 elif action == 'person-updates-updates-only':
     sfpu.update_people_data_load(updates_only=True)

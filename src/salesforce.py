@@ -927,7 +927,7 @@ class HarvardSalesforce:
 
     def get_all_external_ids(self, object_name: str, external_id: str):
         # this will return a list of all of the existing contact ids from salesforce
-        logger.info(f"get_all_external_ids getting all {external_id} from {object}")
+        logger.info(f"get_all_external_ids getting all {external_id} from {object_name}")
         ids = []
         try:
             sf_data = self.sf.query_all(f"SELECT {external_id} FROM {object_name} WHERE {external_id} != null")
