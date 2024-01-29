@@ -101,5 +101,5 @@ jobs:
           #   if the checkout was done without a path, this is not needed
           app_root: salesforce
           schedules: ${{ github.event.inputs.schedules }}
-          infrastructure_branch: feature/disabled-schedules
+          infrastructure_branch: develop
      
