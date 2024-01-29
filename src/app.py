@@ -481,20 +481,22 @@ class SalesforcePersonUpdates:
 
         logger.info(f"Processing updates since {watermark}")
 
-        has_conditions = False
-
         pds_query = self.app_config.pds_query
         if 'conditions' not in pds_query:
             pds_query['conditions'] = {}
         if len(pds_query['conditions'].keys()) > 0:
             has_conditions = True
+        else: 
+            has_conditions = False
 
         pds_query['conditions']['updateDate'] = ">" + watermark.strftime('%Y-%m-%dT%H:%M:%S')
         if updates_only:
+            # if we are only doing updates, we should clear the conditions
+            pds_query['conditions'] = {}
+            has_conditions = False
+
             # This will limit all updates to only those that already exist in Salesforce
             updated_ids = self.hsf.get_all_external_ids(object_name='Contact', external_id=self.app_config.config['Contact']['Id']['salesforce'])
-            # NOTE: this is going to fail with large numbers of ids
-
             pds_query['conditions'][self.app_config.config['Contact']['Id']['pds']] = updated_ids
 
         self.people_data_load(pds_query=pds_query)
@@ -525,6 +527,7 @@ class SalesforcePersonUpdates:
                 # this will handle the case where the data has moved out of the conditions for the query
                 #   we don't need to do this if the query has no conditions
                 #   we also don't need to do this if we're only updating existing records
+                # NOTE: we might be able to get away here with simply running it through an updates_only run
 
                 # we only need the external ids and the updateDate condition
                 pds_query = {}
@@ -643,7 +646,7 @@ class SalesforcePersonUpdates:
                         memory_use_percent = psutil.virtual_memory().percent  # percentage of memory use
 
                     if (memory_use_percent > 55) and not LOCAL:
-                        raise Exception(f"Out of memory ({memory_use_percent}).")
+                        raise Exception(f"Out of memory ({memory_use_percent}): Kicking job before Fargate silently kicks it.")
                 
                 if total_count != self.pds.total_count:
                     raise Exception(f"total_count changed from {total_count} to {self.pds.total_count}. The PDS pagination failed.")
