@@ -85,3 +85,18 @@ schedules:
       - name: "action"
         value: "person-updates"
     schedule_rule_state: "DISABLED"
+
+    ####### Transportation Sandbox ####################################################################
+  - schedule_rule_name: "transp-updates" # this will be appended to the task definition name, e.g my-cluster-dev-feed-my-dataload-half-hourly
+    schedule_expression: "rate(1 minutes)" # rate or cron expression
+    # optional
+    schedule_rule_description: "Updates for the Transportation sandbox"
+    # environment variable overrides
+    schedule_env_overrides:
+      - name: "TABLE_NAME"
+        value: "aais-services-salesforce-person-updates-dev"
+      - name: "SALESFORCE_INSTANCE_ID"
+        value: "transp-sandbox"
+      - name: "action"
+        value: "person-updates"
+    schedule_rule_state: "DISABLED"
