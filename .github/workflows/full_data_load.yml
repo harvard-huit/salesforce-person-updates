@@ -98,7 +98,7 @@ jobs:
           echo "account_name=admints" >> $GITHUB_ENV
           echo "security_group=sg-0d4440255bb6c7b71" >> $GITHUB_ENV
           echo "subnet=subnet-152e3063" >> $GITHUB_ENV
-          echo "TABLE_NAME=aais-services-salesforce-person-updates-prod" >> $GITHUB_ENV
+          echo "TABLE_NAME=aais-services-salesforce-person-updates-${{ github.event.inputs.environment }}" >> $GITHUB_ENV
   
       - name: Login to AWS with a service account / iam user
         uses: HUIT/configure-aws-credentials@13d241b293754004c80624b5567555c4a39ffbe3
