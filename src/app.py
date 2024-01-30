@@ -1,5 +1,5 @@
 from logging import LogRecord
-from common import isTaskRunning, logger, stack, AppConfig
+from common import isTaskRunning, setTaskRunning, logger, stack, AppConfig
 import pds
 from salesforce import HarvardSalesforce
 from transformer import SalesforceTransformer
@@ -50,14 +50,6 @@ LOCAL = os.getenv("LOCAL") or False
 class SalesforcePersonUpdates:
     def __init__(self, local=False):
         try:
-            if(stack != "developer" and False):
-                # NOTE: this doesn't work / make sense as is
-                #       this also needs to check if it's running on a particular SF instance
-                logger.info("Checking if task is already running")
-                if isTaskRunning() and stack != 'developer':
-                    logger.warning("WARNING: application already running")
-                    exit()
-
             self.salesforce_instance_id = os.getenv("SALESFORCE_INSTANCE_ID", None)
             self.table_name = os.getenv("TABLE_NAME", None)
 
@@ -76,7 +68,7 @@ class SalesforcePersonUpdates:
                     raise Exception("ERROR: SALESFORCE_INSTANCE_ID and TABLE_NAME are required env vars, these tell us where to get the configuration.")
 
                 self.app_config = AppConfig(id=self.salesforce_instance_id, table_name=self.table_name)
-            
+
             if os.getenv("FORCE_LOCAL_CONFIG"):
                 self.app_config.config = config
                 # self.app_config.pds_query = pds_query
@@ -135,8 +127,6 @@ class SalesforcePersonUpdates:
             self.batch_threads = []
 
             self.transformer = SalesforceTransformer(config=self.app_config.config, hsf=self.hsf)
-
-
 
 
         except Exception as e:
@@ -962,6 +952,25 @@ if os.getenv("FORCE_LOCAL_CONFIG"):
     sfpu.app_config.config = config
     # sfpu.app_config.pds_query = pds_query
 
+task_running = isTaskRunning(sfpu.app_config)
+WAIT_LIMIT = 20
+if task_running:
+    if action in ['single-person-update','person-updates','person-updates-updates-only','department-updates','delete-people','cleanup-updateds','remove-unaffiliated-affiliations','remove-all-contacts','department test','defunct-accounts-check','remove people test','delete-all-data']:
+        logger.warning(f"The current task is actively running.")
+        exit()
+    elif action in ['full-person-load','full-department-load']:
+        wait_count = 1
+        while (task_running and wait_count <= WAIT_LIMIT):
+            logger.warning(f"The current task is actively running. (Currently on try {wait_count}/{WAIT_LIMIT})")
+            time.sleep(30)
+            task_running = isTaskRunning(sfpu.app_config)
+            wait_count += 1
+        if task_running and wait_count > WAIT_LIMIT:
+            logger.warning(f"The current task is actively running and the wait limit of {WAIT_LIMIT} has been exceeded.")
+            exit()
+
+setTaskRunning(sfpu.app_config, True)
+            
 if action == 'single-person-update' and len(person_ids) > 0:
     sfpu.update_single_person(person_ids)
 elif action == 'full-person-load':
@@ -1155,5 +1164,4 @@ elif action == "test":
 else: 
     logger.warning(f"App triggered without a valid action: {action}, please see documentation for more information.")
 
-
-
+setTaskRunning(sfpu.app_config, False)
