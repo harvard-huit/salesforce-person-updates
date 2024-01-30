@@ -12,6 +12,7 @@ This is coupled loosely with / build alongside the [HUD Salesforce Package](http
    - get as much or as little data as each customer wants
    - this was the main feature this project is delivering on
    - ability to flatten (or unflatten) data as needed
+   - ability to only update existing records
  - Log transparency 
    - when python throws a log, it is mirrored in the system (assuming they have the HUD package installed)
  - Mark records that are no longer being updated via this system
@@ -213,7 +214,13 @@ This indicates that that field will have a single, unchanging value. (In this ca
       },
 ```
 
+#### `updatedFlag`
 
+This should be the name of a boolean field in Salesforce. This is only tested for Contact records. It will set to true when it's being updated. If the record is no longer gettable in the PDS level, it will set the value of this flag to false. 
+
+#### `updateOnlyFlag`
+
+This is only available in the context of a Contact. Set this to `true`` to have it only update Contacts (and branch data) that exist in the org already. 
 
 
 ## Deployment Notes

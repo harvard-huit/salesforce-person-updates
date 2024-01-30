@@ -6,11 +6,6 @@
             "departments": "hrDeptId",
             "salesforce": "HUDA__hud_DEPT_ID__c"
         },
-        "hierarchy": {
-            "code_field": "HUDA__hud_DEPT_OFFICIAL_DESC__c",
-            "description_field": "HUDA__hud_DEPT_LONG_DESC__c",
-            "simplify_codes": true
-        },
         "fields": {
             "HUDA__hud_DEPT_ID__c": "hrDeptId",
             "Name": "hrDeptDesc",
@@ -46,10 +41,6 @@
         },
         "updatedFlag": "huit__Updated__c",
         "fields": {
-            "huit__Updated__c": {
-                "value": true,
-                "static": true
-            },
             "HUDA__hud_EFF_STATUS__c": "effectiveStatus.code",
             "HUDA__hud_DECEASED_FLAG__c": "deceasedFlag",
             "HUDA__hud_EPPN__c": "eppn",
@@ -98,6 +89,7 @@
             "salesforce": "HUDA__PERSON_NAMES_KEY__c"
         },
         "fields": {
+            "HUDA__PERSON_NAMES_KEY__c": "names.personNameKey",
             "HUDA__Name_Contact__r": {
                 "ref": {
                     "object": "Contact",
@@ -113,7 +105,6 @@
             "HUDA__NAME_MIDDLE__c": "names.middleName",
             "HUDA__MULE_UNIQUE_PERSON_KEY__c": "personKey",
             "HUDA__NAME_TYPE__c": "names.personNameType.code",
-            "HUDA__PERSON_NAMES_KEY__c": "names.personNameKey",
             "HUDA__NAME_PREFIX__c": "names.prefix",
             "HUDA__NAME_SUFFIX__c": "names.suffix",
             "HUDA__UPDATE_SOURCE__c": "",
@@ -128,6 +119,7 @@
             "salesforce": "HUDA__CONTACT_EMAIL_ADDRESS_KEY__c"
         },
         "fields": {
+            "HUDA__CONTACT_EMAIL_ADDRESS_KEY__c": "emails.personEmailKey",
             "HUDA__Email_Contact__r": {
                 "ref": {
                     "object": "Contact",
@@ -135,7 +127,6 @@
                     "source_value_ref": "personKey"
                 }
             },
-            "HUDA__CONTACT_EMAIL_ADDRESS_KEY__c": "emails.personEmailKey",
             "HUDA__EFF_STATUS__c": "emails.effectiveStatus.code",
             "HUDA__EFFDT__c": "emails.effectiveDate",
             "HUDA__EMAIL_ADDR_SOURCE__c": "emails.emailAddressSource",
@@ -158,6 +149,7 @@
             "salesforce": "HUDA__CONTACT_ADDRESS_KEY__c"
         },
         "fields": {
+            "HUDA__CONTACT_ADDRESS_KEY__c": "addresses.addressKey",
             "HUDA__Address_Contact__r": {
                 "ref": {
                     "object": "Contact",
@@ -165,7 +157,6 @@
                     "source_value_ref": "personKey"
                 }
             },
-            "HUDA__CONTACT_ADDRESS_KEY__c": "addresses.addressKey",
             "HUDA__ADDR_CATEGORY_CD__c": "addresses.addressCategory.code",
             "HUDA__ADDR_CITY__c": "addresses.addressCity",
             "HUDA__ADDR_ISO_COUNTRY_CD__c": "addresses.addressCountry.code",
@@ -192,6 +183,7 @@
             "salesforce": "HUDA__CONTACT_DATA_KEY__c"
         },
         "fields": {
+            "HUDA__CONTACT_DATA_KEY__c": "phones.phoneKey",
             "HUDA__Phone_Contact__r": {
                 "ref": {
                     "object": "Contact",
@@ -199,7 +191,6 @@
                     "source_value_ref": "personKey"
                 }
             },
-            "HUDA__CONTACT_DATA_KEY__c": "phones.phoneKey",
             "HUDA__CONTACT_DATA__c": "phones.dataValue",
             "HUDA__CONTACT_DATA_EXT__c": "phones.dataExtension",
             "HUDA__CONTACT_DATA_SUBTYPE_CD__c": "phones.dataSubtype",
@@ -220,6 +211,7 @@
             "salesforce": "HUDA__CONTACT_LOCATION_KEY__c"
         },
         "fields": {
+            "HUDA__CONTACT_LOCATION_KEY__c": "locations.personLocationKey",
             "HUDA__Location_Contact__r": {
                 "ref": {
                     "object": "Contact",
@@ -227,7 +219,6 @@
                     "source_value_ref": "personKey"
                 }
             },
-            "HUDA__CONTACT_LOCATION_KEY__c": "locations.personLocationKey",
             "HUDA__BLDG_LOC__c": "locations.location",
             "HUDA__BLDG_LOC_IDENTIFIER__c": "locations.locationIdentifier",
             "HUDA__EFF_STATUS__c": "locations.effectiveStatus.code",
@@ -248,20 +239,6 @@
             "salesforce": "HUDA__hud_PERSON_ROLES_KEY__c"
         },
         "fields": {
-            "hed__Contact__r": {
-                "ref": {
-                    "object": "Contact",
-                    "ref_external_id": "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c",
-                    "source_value_ref": "personKey"
-                }
-            },
-            "hed__Account__r": {
-                "ref": {
-                    "object": "Account",
-                    "ref_external_id": "HUDA__hud_DEPT_ID__c",
-                    "source_value_ref": "employeeRoles.hrDeptId"
-                }
-            },
             "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c": "personKey",
             "HUDA__hud_PERSON_ROLES_KEY__c": ["employeeRoles.personRoleKey", "poiRoles.personRoleKey", "studentRoles.personRoleKey"],
             "HUDA__hud_EFF_STATUS__c": ["employeeRoles.effectiveStatus.code", "poiRoles.effectiveStatus.code", "studentRoles.effectiveStatus.code"],
@@ -316,8 +293,22 @@
             "HUDA__hud_POI_COMPANY__c": "poiRoles.poiCompany",
             "HUDA__hud_POI_FACULTY_CD__c": "poiRoles.faculty.code",
             "HUDA__hud_POI_SHORT_DESC_LINE1__c": "poiRoles.shortDescriptionLine1",
-            "HUDA__hud_POI_SHORT_DESC_LINE2__c": "poiRoles.shortDescriptionLine2"
-                        
+            "HUDA__hud_POI_SHORT_DESC_LINE2__c": "poiRoles.shortDescriptionLine2",
+
+            "hed__Contact__r": {
+                "ref": {
+                    "object": "Contact",
+                    "ref_external_id": "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c",
+                    "source_value_ref": "personKey"
+                }
+            },
+            "hed__Account__r": {
+                "ref": {
+                    "object": "Account",
+                    "ref_external_id": "HUDA__hud_DEPT_ID__c",
+                    "source_value_ref": "employeeRoles.hrDeptId"
+                }
+            }           
 
         }
     }
