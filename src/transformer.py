@@ -2,6 +2,8 @@ from common import logger
 from datetime import datetime
 import re
 
+from departments import Departments
+
 
 class SalesforceTransformer:
     def __init__(self, config, hsf):
@@ -139,6 +141,28 @@ class SalesforceTransformer:
                                         current_record[object_name] = {}
                                     current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value, identifier=source_data_object)
                                     continue
+                            if 'ref' in source_object:
+                                # process salesforce internal reference
+                                ref_object = source_object['ref']['object']
+                                ref_external_id_name = source_object['ref']['ref_external_id']
+                                source_value_ref = source_object['ref']['source_value_ref']
+                                if '.' in source_value_ref and is_flat:
+                                    (obj, val) = source_value_ref.split(".")
+                                    source_value = source_data_object[obj][val]
+                                else:
+                                    source_value = source_data_object[source_value_ref]
+                                if 'simplify_code' in source_object['ref']:
+                                    if source_object['ref']['simplify_code'] == True:
+                                        source_value = Departments.simplify_code(source_value)
+                                # salesforce_id = self.hashed_ids[ref_object]['Ids'][external_id]
+                                if source_value is None:
+                                    continue
+                                if object_name not in current_record:
+                                    current_record[object_name] = {}
+                                current_record[object_name][target] = {}
+                                current_record[object_name][target][ref_external_id_name] = source_value
+                                
+                                continue
                         elif isinstance(source_object, (str)):
                             value_references = [source_object]
                         else:
@@ -164,6 +188,7 @@ class SalesforceTransformer:
                             # if it's a dict, we need to get the piece further in
                             if pieces[1] not in source_data_object[first]:
                                 if first == 'sf':
+                                    # NOTE: this should be deprecated in favor of relying on external ids
                                     source_pieces = pieces[1:]
                                     if source_pieces[0] in salesforce_person:
                                         if isinstance(salesforce_person, (str, bool, int)):
@@ -189,6 +214,7 @@ class SalesforceTransformer:
                             # we are making an assumption here that if it's a sf value, it's required, 
                             #   (otherwise it'll end up orphaned)
                             if first == 'sf' and value in [None, '#N/A']:
+                                # NOTE: this should be deprecated in favor of relying on external ids
                                 raise Exception(f"Error: this value should not be null")
                             
                         elif isinstance(source_data_object[first], list):
@@ -305,7 +331,12 @@ class SalesforceTransformer:
                             # for source in sources:
                             # logger.debug(f"source: {source}")
                             value = None
-                            source_pieces = source.split(".")
+                            if isinstance(source, dict):
+                                if 'ref' in source:
+                                    # current_record[object_name][target] = source['ref']
+                                    source_pieces = source['ref']['source_value_ref'].split(".")
+                            else:
+                                source_pieces = source.split(".")
 
                             # this might be needed for affiliations
                             if (source_pieces[0] not in [branch_name, 'sf']) and isinstance(source_value, list):
@@ -320,6 +351,7 @@ class SalesforceTransformer:
                                     branch_temp = source_data_object
 
                             if source_pieces[0] == 'sf':
+                                # NOTE: this should be deprecated in favor of relying on external ids
                                 source_pieces = source_pieces[1:]
                                 if source_pieces[0] in salesforce_person:
                                     if isinstance(salesforce_person, (str, bool, int)):
@@ -339,8 +371,19 @@ class SalesforceTransformer:
                                 else:
                                     current_record[object_name][target] = None
                                     continue
-
-                                current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value, identifier=source_data_object)
+                                
+                                if isinstance(source, dict) and 'ref' in source:
+                                    if 'simplify_code' in source['ref']:
+                                        if source['ref']['simplify_code'] == True:
+                                            value = Departments.simplify_code(value)
+                                    if value is None:
+                                        continue
+                                    value_obj = {}
+                                    value_obj[source['ref']['ref_external_id']] = value
+                                    
+                                    current_record[object_name][target] = value_obj
+                                else:
+                                    current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value, identifier=source_data_object)
                                 # break out of the sources, we already found the one for this target
                                 break
 
@@ -354,12 +397,12 @@ class SalesforceTransformer:
 
                 if not skip_object:
                     if is_flat:
-                        current_record = self.setId(source_data_object=source_data_object, object_name=object_name, current_record=current_record)
+                        # current_record = self.setId(source_data_object=source_data_object, object_name=object_name, current_record=current_record)
                         # data[object_name].append(current_record[object_name])
                         if current_record and salesforce_id_name in current_record[object_name]:
                             yield { object_name: current_record[object_name] }
                     elif not is_branched:
-                        current_record = self.setId(source_data_object=source_data_object, object_name=object_name, current_record=current_record)
+                        # current_record = self.setId(source_data_object=source_data_object, object_name=object_name, current_record=current_record)
                         # data[object_name].append(current_record[object_name])
                         if current_record and salesforce_id_name in current_record[object_name]:
                             if current_record[object_name][salesforce_id_name] is not None:
@@ -443,7 +486,9 @@ class SalesforceTransformer:
             return {}
 
         return current_record
-                        
+
+    # def process_ref(self, object_name, external_id):
+    #     return 
         
     def handle_when(self, when, branch, best_branch):
         is_best = True

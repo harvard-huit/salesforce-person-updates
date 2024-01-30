@@ -7,7 +7,7 @@
 
 # target_desired_task_count: 2
 target_app_context: "/salesforce-person-updates"
-target_app_version: "v1.0.3"
+target_app_version: "v1.0.4"
 create_service: false
 
 # this is the lowest for fargate?
@@ -45,52 +45,56 @@ schedules:
     # environment variable overrides
     schedule_env_overrides:
       - name: "TABLE_NAME"
-        value: "aais-services-salesforce-person-updates-prod"
+        value: "aais-services-salesforce-person-updates-stage"
       - name: "SALESFORCE_INSTANCE_ID"
         value: "huit-full-sandbox"
       - name: "action"
         value: "person-updates"
   # - schedule_rule_name: "mon-fri" # this will be appended to the task definition name, e.g my-cluster-dev-feed-my-dataload-mon-fri
   #   schedule_expression: "cron(5 * * * 1-5)" # rate or cron expression
+    schedule_rule_state: "DISABLED"
 
     ####### HMS Full Sandbox ####################################################################
   - schedule_rule_name: "hms-updates" # this will be appended to the task definition name, e.g my-cluster-dev-feed-my-dataload-half-hourly
-    schedule_expression: "rate(10 minutes)" # rate or cron expression
+    schedule_expression: "rate(30 minutes)" # rate or cron expression
     # optional
     schedule_rule_description: "Updates for the HMS full sandbox"
     # environment variable overrides
     schedule_env_overrides:
       - name: "TABLE_NAME"
-        value: "aais-services-salesforce-person-updates-prod"
+        value: "aais-services-salesforce-person-updates-stage"
       - name: "SALESFORCE_INSTANCE_ID"
         value: "hms-full-sandbox"
       - name: "action"
         value: "person-updates"
+    schedule_rule_state: "DISABLED"
 
     ####### HKS Partial Sandbox ####################################################################
   - schedule_rule_name: "hks-updates" # this will be appended to the task definition name, e.g my-cluster-dev-feed-my-dataload-half-hourly
-    schedule_expression: "rate(15 minutes)" # rate or cron expression
+    schedule_expression: "rate(30 minutes)" # rate or cron expression
     # optional
     schedule_rule_description: "Updates for the HKS partial sandbox"
     # environment variable overrides
     schedule_env_overrides:
       - name: "TABLE_NAME"
-        value: "aais-services-salesforce-person-updates-prod"
+        value: "aais-services-salesforce-person-updates-stage"
       - name: "SALESFORCE_INSTANCE_ID"
         value: "hks-partial-sandbox"
       - name: "action"
         value: "person-updates"
+    schedule_rule_state: "DISABLED"
 
     ####### CS Full Sandbox ####################################################################
   - schedule_rule_name: "cs-updates" # this will be appended to the task definition name, e.g my-cluster-dev-feed-my-dataload-half-hourly
-    schedule_expression: "rate(15 minutes)" # rate or cron expression
+    schedule_expression: "rate(30 minutes)" # rate or cron expression
     # optional
     schedule_rule_description: "Updates for the CS full sandbox"
     # environment variable overrides
     schedule_env_overrides:
       - name: "TABLE_NAME"
-        value: "aais-services-salesforce-person-updates-prod"
+        value: "aais-services-salesforce-person-updates-stage"
       - name: "SALESFORCE_INSTANCE_ID"
         value: "cs-full-sandbox"
       - name: "action"
         value: "person-updates"
+    schedule_rule_state: "DISABLED"

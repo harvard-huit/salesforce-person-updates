@@ -12,6 +12,7 @@ This is coupled loosely with / build alongside the [HUD Salesforce Package](http
    - get as much or as little data as each customer wants
    - this was the main feature this project is delivering on
    - ability to flatten (or unflatten) data as needed
+   - ability to only update existing records
  - Log transparency 
    - when python throws a log, it is mirrored in the system (assuming they have the HUD package installed)
  - Mark records that are no longer being updated via this system
@@ -160,9 +161,31 @@ There will be times when we have 2 values for a single field. For instance, a `C
 
 When we have multiple values for the same target field, sometimes we can't know if we'll get one, even with a defined `when`. For example, if we're looking for the email that has the `primaryEmailIndicator` set, because we don't have any kind of real MDM, we need to make a decision. As such, the default when is the value that has the latest updated date associated with it. 
 
-#### `sf.*` References
+#### `sf.*` References (DEPRECATED)
+
+_Deprecated in favor of the more generic "Lookup References" below_
 
 The `sf` reference identifies source data that comes from Salesforce itself. This is necessary for gathering and defining reference fields. For example, relationship objects will have a reference to a `Contact` record. A query is done before relationship objects are processed to create a mapping of existing Contacts and the relationship fields they have. This is built from the `Id`s associated with the mapping. When a `Contact` reference is not found, it means it's a new relationship. 
+
+#### Lookup References `ref`
+
+The `ref` object is used to declare a lookup reference that we're linking through an external id. This is being used moving forward isntead of the `sf` format (as that was too hardcoded). 
+
+ - `object`: not functionally used, but denotes the object being linked
+ - `ref_external_id`: the salesforce external id fieldname in the object being linked
+ - `source_value_ref`: the value in the source data (ex: fieldname from the PDS)
+
+**Example:**
+```
+{
+  "HUDA__hud_Name__c": {
+    "ref": {
+      "object": "Contact",
+      "ref_external_id": "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c",
+      "source_value_ref": "personKey"
+    }
+  }
+```
 
 #### Multiple Potential Sources
 
@@ -191,7 +214,13 @@ This indicates that that field will have a single, unchanging value. (In this ca
       },
 ```
 
+#### `updatedFlag`
 
+This should be the name of a boolean field in Salesforce. This is only tested for Contact records. It will set to true when it's being updated. If the record is no longer gettable in the PDS level, it will set the value of this flag to false. 
+
+#### `updateOnlyFlag`
+
+This is only available in the context of a Contact. Set this to `true`` to have it only update Contacts (and branch data) that exist in the org already. 
 
 
 ## Deployment Notes
@@ -276,6 +305,30 @@ The way the Bulk functions work in simple-salesforce (by default) is they abstra
 This makes some of the logic easier, but it could lead to issues with performance unless we wrap the bulk calls in asyncio so we can be waiting on multiple jobs. 
 
 **NOTE:** In earlier versions of the API, setting a value to `null` required setting it to `#N/A`. (This might show up in different places and is not easy to find in SF documentation.)
+
+#### Referencing Lookup's with External Ids
+
+All "branch" objects (names/emails/addresses/affiliations/etc) need to have an "external id" that corresponds to a unique value on our end and a lookup field that links the object to a Contact (and sometimes Account). Originally, we were making a SOQL call to get the Ids of the Contact/Account, but that wasn't strictly necessary, as the API does permit referencing a lookup with an external id. 
+
+The call to the API needs to look like this:
+
+```py
+{
+  "Object_Name__c": [
+    "lookup_field_name__r": {
+      "external_id__c": "12345"
+    }
+    "other_field__c": "other field's value"
+  ]  
+}
+```
+
+The part that is not documented well (read: at all) in Salesforce docs is that the reference field needs to have a `__r` on the end of it (for custom lookup fields), not `__c`. As far as I've seen, you can't find "`lookup_field_name__r`" anywhere in Salesforce, you just have to know to replace the `c` with an `r`. See the [docs for simple-salesforce](https://github.com/simple-salesforce/simple-salesforce#using-bulk) to see the literal only place I found this referenced.
+
+
+#### Aggregate queries
+
+Aggregate queries are not supported for large data sets (larger than the LIMIT). The bulk api can be enabled to use aggregate queries, but a REST call will fail if there isn't a limit (if it relies on a queryMore() in the simple-salesforce)
 
 #### Examples
 
@@ -362,7 +415,7 @@ In order to mitigate this, we are checking for that trigger and automatically di
 
 Most of the Objects in Salesforce are going to have a relationship to the Contact record of the person. Relationships are set and updated by simply sending the `Id` of the Contact (or other relationship). 
 
-NOTE: this does NOT determine if someone sees a hud_Name when viewing a Contact record, that is determined by the external id on the Contact record. 
+**NOTE:** this does NOT determine if someone sees a hud_Name when viewing a Contact record, that is determined by the external id on the Contact record. 
 
 ### Types
 

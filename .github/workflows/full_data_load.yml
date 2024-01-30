@@ -18,14 +18,18 @@ on:
         type: string
         required: true
         default: 'huit-full-sandbox'
+      record_limit:
+        type: number
+        required: false
+        default: -1
       batch_size:
         type: number
         required: false
-        default: 500
+        default: 800
       batch_thread_count: 
         type: number
         required: false
-        default: 3
+        default: 5
       debug:
         type: choice
         required: false
@@ -53,9 +57,7 @@ on:
           - '7168'
           - '8192'
           - '16384'
-          
-                  
-
+                            
 env:
   AWS_REGION: us-east-1
 
@@ -96,7 +98,7 @@ jobs:
           echo "account_name=admints" >> $GITHUB_ENV
           echo "security_group=sg-0d4440255bb6c7b71" >> $GITHUB_ENV
           echo "subnet=subnet-152e3063" >> $GITHUB_ENV
-          echo "TABLE_NAME=aais-services-salesforce-person-updates-prod" >> $GITHUB_ENV
+          echo "TABLE_NAME=aais-services-salesforce-person-updates-${{ github.event.inputs.environment }}" >> $GITHUB_ENV
   
       - name: Login to AWS with a service account / iam user
         uses: HUIT/configure-aws-credentials@13d241b293754004c80624b5567555c4a39ffbe3
@@ -138,6 +140,9 @@ jobs:
                 }, {
                   "name": "BATCH_THREAD_COUNT", 
                   "value": "${{ github.event.inputs.batch_thread_count }}"
+                }, {
+                  "name": "RECORD_LIMIT", 
+                  "value": "${{ github.event.inputs.record_limit }}"
                 }, {
                   "name": "DEBUG", 
                   "value": "${{ github.event.inputs.debug }}"

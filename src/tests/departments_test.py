@@ -26,7 +26,7 @@ class DepartmentsTest(unittest.TestCase):
 
     @mock.patch('departments.Departments.getDepartments', side_effect=mocked_get_departments)
     def test_hash(self, mock_get):
-        departments = Departments(apikey='fakekey').departments
+        departments = Departments(apikey='fakekey').department_hash
         self.assertEqual(departments[1]['hrDeptId'], 1)
         self.assertEqual(departments[2]['hrDeptId'], 2)
 

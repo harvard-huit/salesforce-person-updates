@@ -47,6 +47,20 @@ class HarvardSalesforce:
         # through self.getTypeMap()
         self.type_data = {}
 
+    def get_record_type_ids(self, object_name):
+        """
+        This returns a hash of record type ids name: id for a given object
+        """
+        record_type_ids = {}
+        try:
+            description = self.sf.__getattr__(object_name).describe()
+            for record_type in description['recordTypeInfos']:
+                record_type_ids[record_type['name']] = record_type['recordTypeId']
+        except Exception as e:
+            logger.error(f"Error: {e}")
+            raise e
+        return record_type_ids
+
     # NOTE: this uses the Salesforce Bulk API
     # this API is generally async, but the way I'm using it, it will wait (synchronously) for the job to finish 
     # this allows us to get the error logs without having to wait/check
@@ -98,18 +112,24 @@ class HarvardSalesforce:
                 error_count = 0
                 dupe_data_batch = []
                 errored_data_batch = []
+                created_ids = {}
 
-                pds_external_id_name = self.unique_ids[object]['id_name']
-                created_ids = {
-                    "object": object,
-                    "external_id_field": pds_external_id_name,
-                    "ids": []
-                }
+                if object not in self.unique_ids or 'id_name' not in self.unique_ids[object]:
+                    logger.warning(f"Warning: no unique ids found for {object}")
+                    self.unique_ids[object] = self.getUniqueIds({object: data})
+                else:
+                    pds_external_id_name = self.unique_ids[object]['id_name']
+
+                    created_ids = {
+                        "object": object,
+                        "external_id_field": pds_external_id_name,
+                        "ids": []
+                    }
                 for index, response in enumerate(responses):
                     if response['success'] != True: 
                         
                         errored_data = data[index]
-                        logger.error(f"Error in bulk data load: {response['errors']} ({errored_data})")
+                        logger.debug(f"Record failure in bulk data load: {response['errors']} ({errored_data})")
 
                         if response['errors'][0]['statusCode'] == 'DUPLICATES_DETECTED':
 
@@ -119,6 +139,13 @@ class HarvardSalesforce:
                                 logger.error(f"Error: DUPLICATE DETECTED -- Errored Data: {errored_data}")
                                 dupe_data_batch.append(errored_data)
 
+                        # if it's invalid and the message is about an external id not existing, we want to ignore it
+                        if response['errors'][0]['statusCode'] == 'INVALID_FIELD':
+                            if response['errors'][0]['message'].startswith("Foreign key external ID"): 
+                                # we want to ignore this error as it happens if the Contact didn't make it
+                                logger.debug(f"Warning: INVALID_FIELD (external id): {response['errors'][0]['message']}")
+                            else:
+                                logger.warning(f"Warning: INVALID_FIELD: {response['errors'][0]['message']}")
                         else: 
                             logger.error(f"Error: {response['errors'][0]['statusCode']}: {errored_data}")
                             errored_data_batch.append(errored_data)
@@ -152,7 +179,7 @@ class HarvardSalesforce:
                     #     logger.info(f"Retry successful")
 
 
-                if len(created_ids['ids']) > 0:
+                if 'ids' in created_ids and len(created_ids['ids']) > 0:
                     logger.info(created_ids)
 
                 if updated_count > 0:
@@ -234,7 +261,7 @@ class HarvardSalesforce:
         return all_ids
     
     def flag_field(self, object_name: str, external_id: str, flag_name: str, value: any, ids: list):
-        batch_size = 500
+        batch_size = 800
         for i in range(0, len(ids), batch_size):
             try:
                 batch = ids[i:i + batch_size]
@@ -259,6 +286,7 @@ class HarvardSalesforce:
         sf_data = self.sf.query_all(f"SELECT Fields(ALL) FROM {object_name} WHERE {contact_ref} IN({ids_string}) LIMIT 100")
         logger.debug(f"got this data from salesforce: {sf_data}")
         return sf_data
+    
     
     # this is meant to take the output from compare_records and push it to a tsv file
     # with no output_file, it will just return the data as a string
@@ -431,7 +459,9 @@ class HarvardSalesforce:
                         # in here we check that all fields we're trying to push to exist in the target salesforce
                         for config_field in config[object]['fields'].keys():
                             if config_field not in [f['name'] for f in description.get('fields')]:
-                                raise Exception(f"Error: {config_field} not found in {object}")
+                                # also make sure it's not a relationship name
+                                if config_field not in [f['relationshipName'] for f in description.get('fields')]:
+                                    raise Exception(f"Error: {config_field} not found in {object}")
 
 
                 except Exception as e:
@@ -507,6 +537,9 @@ class HarvardSalesforce:
                 if len(value) > length:
                     value = value[:length]
                 return str(value)
+        elif field_type in ["picklist", "multipicklist"]:
+            # not really sure I want to validate what the picklist values are
+            return str(value)
         elif field_type in ["email"]:
             return str(value)
         elif field_type in ["id", "reference"]:
@@ -561,7 +594,7 @@ class HarvardSalesforce:
     # getUniqueIds 
     # output format should look like:
     #   { "SF OBJECT NAME": { "id_name": "PDS ID NAME", "Ids": { "HARVARD ID": "SALESFORCE ID", ... } } }
-    def getUniqueIds(self, config, source_data, target_object=None):
+    def getUniqueIds(self, config, source_data=None, target_object=None):
                     
         for object in config.keys():
             if target_object is not None and target_object != object:
@@ -599,6 +632,7 @@ class HarvardSalesforce:
                 self.unique_ids[object]['id_name'] = full_source_id_value
                 self.unique_ids[object]['Ids'] = {}
                 
+
                 for full_source_data_id_name in id_names:
 
                     source_data_object_branch = None
@@ -611,47 +645,75 @@ class HarvardSalesforce:
                     else:
                         source_data_id_name = full_source_data_id_name
 
-                    ids = []
 
-                    # example: person in people
-                    for source_data_object in source_data:
-
-                        # if it's a branch
-                        if source_data_object_branch is not None:
-                            if source_data_object_branch in source_data_object:
-                                for b in source_data_object[source_data_object_branch]:
-                                    ids.append(str(b[source_data_id_name]))
-                        # if it's not a branch
-                        else:
-                            ids.append(str(source_data_object[source_data_id_name]))
-    
-                    batch_size = 500
-                    for i in range(0, len(ids), batch_size):
+                    if source_data is None:
+                        logger.debug(f"There is no source data that matches the config for {object}, getting all ids from salesforce")
+                        # ids = self.get_all_external_ids(object, full_source_data_id_name)
                         try:
-                            batch = ids[i:i + batch_size]
-
-                            # fields_string = ','.join(unique_object_fields)
-                            ids_string = "'" + '\',\''.join(batch) + "'"
-                            # select_string = f"SELECT {object}.Id, {fields_string} FROM {object} WHERE {salesforce_id_name} IN({ids_string})"
-                            select_string = f"SELECT {object}.Id, {salesforce_id_name} FROM {object} WHERE {salesforce_id_name} IN({ids_string})"
+                            select_string = f"SELECT {object}.Id, {salesforce_id_name} FROM {object}"
                             logger.debug(select_string)
                             sf_data = self.sf.query_all(select_string)
                             logger.debug(f"got this data from salesforce: {sf_data['records']}")
 
                             # go through each record?
                             for record in sf_data['records']:
-                                
                                 if 'Ids' not in self.unique_ids[object]:
                                     self.unique_ids[object]['Ids'] = {}
                                 self.unique_ids[object]['Ids'][str(record[salesforce_id_name])] = record['Id']
 
-
-
                         except exceptions.SalesforceGeneralError as e:
                             logger.error(f"Error: {e} with {select_string}")
-                            raise e             
+                            raise e
                         except Exception as e:
-                            raise Exception(f"Error: {e} with {select_string}")                     
+                            logger.error(f"Error in full get query in getUniqueIds: {e}")
+                            raise e
+                        
+                    else:
+                        logger.debug(f"Getting ids from source data for {object}")
+    
+                        ids = []
+
+                        # example: person in people
+                        for source_data_object in source_data:
+
+                            # if it's a branch
+                            if source_data_object_branch is not None:
+                                if source_data_object_branch in source_data_object:
+                                    for b in source_data_object[source_data_object_branch]:
+                                        ids.append(str(b[source_data_id_name]))
+                            # if it's not a branch
+                            else:
+                                ids.append(str(source_data_object[source_data_id_name]))
+
+
+
+                        batch_size = 500
+                        for i in range(0, len(ids), batch_size):
+                            try:
+                                batch = ids[i:i + batch_size]
+
+                                # fields_string = ','.join(unique_object_fields)
+                                ids_string = "'" + '\',\''.join(batch) + "'"
+                                # select_string = f"SELECT {object}.Id, {fields_string} FROM {object} WHERE {salesforce_id_name} IN({ids_string})"
+                                select_string = f"SELECT {object}.Id, {salesforce_id_name} FROM {object} WHERE {salesforce_id_name} IN({ids_string})"
+                                logger.debug(select_string)
+                                sf_data = self.sf.query_all(select_string)
+                                logger.debug(f"got this data from salesforce: {sf_data['records']}")
+
+                                # go through each record?
+                                for record in sf_data['records']:
+                                    
+                                    if 'Ids' not in self.unique_ids[object]:
+                                        self.unique_ids[object]['Ids'] = {}
+                                    self.unique_ids[object]['Ids'][str(record[salesforce_id_name])] = record['Id']
+
+
+
+                            except exceptions.SalesforceGeneralError as e:
+                                logger.error(f"Error: {e} with {select_string}")
+                                raise e             
+                            except Exception as e:
+                                raise Exception(f"Error: {e} with {select_string}")                     
 
         logger.debug(f"unique_ids: {self.unique_ids}")
         return self.unique_ids
@@ -805,3 +867,75 @@ class HarvardSalesforce:
             #   select Id from object_name where externalid1 = X || externalid2 = Y || email = Z and firstname and lastname ....
         
 
+    def get_accounts_hash(self, id_name, ids: list):
+        logger.info(f"get_accounts with the following {id_name} external ids: {ids}")
+        logger.info(f"length of ids: {len(ids)}")
+
+        result_data = {}
+
+        batch_size = 1000
+        for i in range(0, len(ids), batch_size):
+            try:
+                batch = ids[i:i + batch_size]
+
+                if ids is not None or len(ids) > 0:
+                    where_string = f"WHERE {id_name} IN ('" + '\',\''.join(batch) + "')"
+                else:
+                    if id_name is None:
+                        where_string = ""
+                    else:
+                        where_string = f"WHERE {id_name} != null"
+                
+
+
+
+                sf_data = self.sf.query_all(f"SELECT Id, {id_name}, ParentId FROM Account {where_string} LIMIT 1000")
+                logger.debug(f"got this data from salesforce: {sf_data}")
+                for record in sf_data['records']:
+                    result_data[record[id_name]] = {
+                        "Id": record['Id'],
+                        "ParentId": record['ParentId']
+                    }
+            except Exception as e:
+                logger.error(f"Error: {e}")
+                raise e
+
+        logger.info(f"got this data from salesforce: {result_data}")
+        return result_data
+
+    def filter_external_ids(self, object_name, external_id, ids: list):
+        # this method will only take in a list of ids and return the ids that exist in salesforce
+
+        logger.info(f"filter_external_ids with the following {external_id} external ids: {ids}")
+        logger.info(f"length of ids: {len(ids)}")
+
+        result_data = []
+        batch = 1000
+        for i in range(0, len(ids), batch):
+            try:
+                batch = ids[i:i + batch]
+                ids_string = "'" + '\',\''.join(batch) + "'"
+                sf_data = self.sf.query_all(f"SELECT {external_id} FROM {object_name} WHERE {external_id} IN({ids_string})")
+                logger.debug(f"got this data from salesforce: {sf_data}")
+                for record in sf_data['records']:
+                    result_data.append(record[external_id])
+            except Exception as e:
+                logger.error(f"Error: {e}")
+                raise e
+        return result_data
+
+
+    def get_all_external_ids(self, object_name: str, external_id: str):
+        # this will return a list of all of the existing contact ids from salesforce
+        logger.info(f"get_all_external_ids getting all {external_id} from {object_name}")
+        ids = []
+        try:
+            sf_data = self.sf.query_all(f"SELECT {external_id} FROM {object_name} WHERE {external_id} != null")
+            logger.debug(f"got this data from salesforce: {sf_data['records']}")
+            for record in sf_data['records']:
+                ids.append(record[external_id])
+        except Exception as e:
+            logger.error(f"Error: {e}")
+            raise e
+        
+        return ids

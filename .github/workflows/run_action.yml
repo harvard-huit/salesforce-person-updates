@@ -1,5 +1,5 @@
-name: Spot Data Update
-run-name: Spot data update on ${{ github.event.inputs.environment }} for for ${{ github.event.inputs.salesforce_instance_id }} (${{ github.event.inputs.people }})
+name: Default Action Run
+run-name: ${{github.event.inputs.environment}} run on ${{ github.event.inputs.environment }} for ${{ github.event.inputs.salesforce_instance_id }}
 
 on:
   workflow_dispatch:
@@ -13,24 +13,50 @@ on:
           - 'stage'
           - 'prod'
         required: true
-      people:
-        description: HUIDs (comma separated list?) 
-        type: string
-        required: true
-        default: '<HUID>, <HUID>, <HUID>'
       salesforce_instance_id:
         description: the salesforce instance id (from dynamo)
         type: string
         required: true
         default: 'huit-full-sandbox'
-      task_version:
-        type: string
+      action:
+        type: choice
+        required: true
+        default: 'test'
+        options: 
+          - 'test'
+          - 'cleanup-updateds'
+          - 'defunct-accounts-check'
+          - 'remove-unaffiliated-affiliations'
+      debug:
+        type: choice
         required: false
-        default: ''
-        
+        default: 'False'
+        options:
+          - 'True'
+          - 'False'
+      cpu:
+        type: choice
+        required: false
+        default: '1024'
+        options:
+          - '1024'
+          - '2048'
+      memory:
+        type: choice
+        required: false
+        default: '4096'
+        options:
+          - '2048'
+          - '3072'
+          - '4096'
+          - '5120'
+          - '6144'
+          - '7168'
+          - '8192'
+          - '16384'
+                            
 env:
   AWS_REGION: us-east-1
-
 
 defaults:
   run:
@@ -38,7 +64,7 @@ defaults:
 
 jobs:
   data_load: 
-    name: Spot data update on ${{ github.event.inputs.environment }} for ${{ github.event.inputs.people }} on ${{ github.event.inputs.salesforce_instance_id }}
+    name: ${{ github.event.inputs.action }} on ${{ github.event.inputs.environment }} for ${{ github.event.inputs.salesforce_instance_id }}
     runs-on: [ ubuntu-latest ]
 
     steps:
@@ -51,6 +77,7 @@ jobs:
     #     run: |
     #       echo "task_version=:${{ github.event.inputs.task_version }}" >> $GITHUB_ENV
 
+
       - name: Set admints-dev environment vars
         if: ${{ github.event.inputs.environment == 'dev' || github.event.inputs.environment == 'test' }}
         run: |
@@ -60,6 +87,7 @@ jobs:
           echo "subnet=subnet-b1d4cac7" >> $GITHUB_ENV
           echo "TABLE_NAME=aais-services-salesforce-person-updates-dev" >> $GITHUB_ENV
 
+
       - name: Set admints environment vars
         if: ${{ github.event.inputs.environment == 'stage' || github.event.inputs.environment == 'prod' }}
         run: |
@@ -68,8 +96,7 @@ jobs:
           echo "security_group=sg-0d4440255bb6c7b71" >> $GITHUB_ENV
           echo "subnet=subnet-152e3063" >> $GITHUB_ENV
           echo "TABLE_NAME=aais-services-salesforce-person-updates-${{ github.event.inputs.environment }}" >> $GITHUB_ENV
-
-
+  
       - name: Login to AWS with a service account / iam user
         uses: HUIT/configure-aws-credentials@13d241b293754004c80624b5567555c4a39ffbe3
         with:
@@ -82,7 +109,9 @@ jobs:
           role-skip-session-tagging: true
           role-external-id: ${{ secrets.EXTERNAL_ID }}
 
-      - name: get current identity
+
+
+      - name: get current identity again
         run: aws sts get-caller-identity
 
       - name: Create Overrides
@@ -90,6 +119,8 @@ jobs:
           CONTAINER_OVERRIDES='[ 
             {
               "name": "aais-services-${{ github.event.inputs.environment }}-feed-salesforce-person-updates", 
+              "cpu": ${{ github.event.inputs.cpu }},
+              "memory": ${{ github.event.inputs.memory }},
               "environment": [ 
                 {
                   "name": "SALESFORCE_INSTANCE_ID", 
@@ -99,10 +130,10 @@ jobs:
                   "value": "${{ env.TABLE_NAME }}"
                 }, {
                   "name": "action", 
-                  "value": "single-person-update"
+                  "value": "${{ github.event.inputs.action }}"
                 }, {
-                  "name": "person_ids", 
-                  "value": "[${{ github.event.inputs.people }}]"
+                  "name": "DEBUG", 
+                  "value": "${{ github.event.inputs.debug }}"
                 }
               ]
             } 
@@ -110,17 +141,12 @@ jobs:
           CONTAINER_OVERRIDES=$(echo "$CONTAINER_OVERRIDES" | tr -d '\n')
           echo "CONTAINER_OVERRIDES=$CONTAINER_OVERRIDES" >> $GITHUB_ENV
 
-      - name: Run ${{ github.event.inputs.environment }} spot update on [${{ github.event.inputs.people }}]
+      - name: Run ${{ github.event.inputs.environment }} ${{ github.event.inputs.action }} on [${{ github.event.inputs.people }}]
         run: |
           aws ecs run-task \
             --cluster aais-services-${{ github.event.inputs.environment }}-cluster \
-            --overrides '{"containerOverrides": ${{ env.CONTAINER_OVERRIDES }} }' \
+            --overrides '{"cpu": "${{ github.event.inputs.cpu }}", "memory": "${{ github.event.inputs.memory }}", "containerOverrides": ${{ env.CONTAINER_OVERRIDES }} }' \
             --task-definition arn:aws:ecs:us-east-1:${{ env.account }}:task-definition/aais-services-${{ github.event.inputs.environment }}-feed-salesforce-person-updates${{ env.task_version }} \
             --network-configuration '{ "awsvpcConfiguration": { "assignPublicIp":"DISABLED", "securityGroups": ["${{ env.security_group }}"], "subnets": ["${{ env.subnet }}"]}}' \
             --launch-type FARGATE
-
-        # Above Command without vars
-        # aws ecs run-task \
-        #   --cluster aais-ecs-dev-cluster \
-        #   --overrides '{"containerOverrides": [ {"name": "aais-ecs-dev-feed-salesforce-person-updates", "environment": [ {"name": "action", "value": "full"} ] } ] }' \
-        #   --task-definition arn:aws:ecs:us-east-1:001980101248:task-definition/aais-ecs-dev-feed-salesforce-person-updates:99
+  

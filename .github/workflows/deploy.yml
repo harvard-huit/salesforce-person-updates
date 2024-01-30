@@ -26,7 +26,6 @@ on:
           - 'false'
         required: true
 
-
 env:
   version: ${{ github.event.inputs.version }}
   AWS_REGION: us-east-1
@@ -91,7 +90,7 @@ jobs:
           docker manifest inspect artifactory.huit.harvard.edu/ats-docker/salesforce-person-updates:$version
           
       - name: Run AAIS Deploy Container Action
-        uses: HUIT/aais-ecs-deploy-action@v1.0.2
+        uses: HUIT/aais-ecs-deploy-action@dev
         with:
           # Required
           common_config: aais-services-config/aais_services_${{ github.event.inputs.environment }}.yml
@@ -102,4 +101,5 @@ jobs:
           #   if the checkout was done without a path, this is not needed
           app_root: salesforce
           schedules: ${{ github.event.inputs.schedules }}
+          infrastructure_branch: develop
      

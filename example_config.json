@@ -1,7 +1,7 @@
 {
     "Account": {
         "source": "departments",
-        "flat": false,
+        "flat": true,
         "Id": {
             "departments": "hrDeptId",
             "salesforce": "HUDA__hud_DEPT_ID__c"
@@ -21,7 +21,15 @@
             "HUDA__hud_SUB_AFFILIATION_CD__c": "subAffiliation.code",
             "HUDA__hud_SUB_AFFILIATION_DESC__c": "subAffiliation.description",
             "HUDA__hud_UPDATE_SOURCE__c": "updateSource",
-            "HUDA__hud_UPDATE_DT__c": "updateDate"
+            "HUDA__hud_UPDATE_DT__c": "updateDate",
+            "Parent": {
+                "ref": {
+                    "object": "Account",
+                    "ref_external_id": "HUDA__hud_DEPT_ID__c",
+                    "source_value_ref": "subAffiliation.code",
+                    "simplify_code": true
+                }    
+            }
         }
     },
     "Contact": {
@@ -33,10 +41,6 @@
         },
         "updatedFlag": "huit__Updated__c",
         "fields": {
-            "huit__Updated__c": {
-                "value": true,
-                "static": true
-            },
             "HUDA__hud_EFF_STATUS__c": "effectiveStatus.code",
             "HUDA__hud_DECEASED_FLAG__c": "deceasedFlag",
             "HUDA__hud_EPPN__c": "eppn",
@@ -85,7 +89,14 @@
             "salesforce": "HUDA__PERSON_NAMES_KEY__c"
         },
         "fields": {
-            "HUDA__Name_Contact__c": "sf.contact.id",
+            "HUDA__PERSON_NAMES_KEY__c": "names.personNameKey",
+            "HUDA__Name_Contact__r": {
+                "ref": {
+                    "object": "Contact",
+                    "ref_external_id": "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c",
+                    "source_value_ref": "personKey"
+                }
+            },
             "HUDA__EFF_STATUS__c": "names.effectiveStatus.code",
             "HUDA__EFFDT__c": "names.effectiveDate",
             "HUDA__NAME_FIRST__c": "names.firstName",
@@ -94,7 +105,6 @@
             "HUDA__NAME_MIDDLE__c": "names.middleName",
             "HUDA__MULE_UNIQUE_PERSON_KEY__c": "personKey",
             "HUDA__NAME_TYPE__c": "names.personNameType.code",
-            "HUDA__PERSON_NAMES_KEY__c": "names.personNameKey",
             "HUDA__NAME_PREFIX__c": "names.prefix",
             "HUDA__NAME_SUFFIX__c": "names.suffix",
             "HUDA__UPDATE_SOURCE__c": "",
@@ -109,8 +119,14 @@
             "salesforce": "HUDA__CONTACT_EMAIL_ADDRESS_KEY__c"
         },
         "fields": {
-            "HUDA__Email_Contact__c": "sf.contact.id",
             "HUDA__CONTACT_EMAIL_ADDRESS_KEY__c": "emails.personEmailKey",
+            "HUDA__Email_Contact__r": {
+                "ref": {
+                    "object": "Contact",
+                    "ref_external_id": "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c",
+                    "source_value_ref": "personKey"
+                }
+            },
             "HUDA__EFF_STATUS__c": "emails.effectiveStatus.code",
             "HUDA__EFFDT__c": "emails.effectiveDate",
             "HUDA__EMAIL_ADDR_SOURCE__c": "emails.emailAddressSource",
@@ -133,8 +149,14 @@
             "salesforce": "HUDA__CONTACT_ADDRESS_KEY__c"
         },
         "fields": {
-            "HUDA__Address_Contact__c": "sf.contact.id",
             "HUDA__CONTACT_ADDRESS_KEY__c": "addresses.addressKey",
+            "HUDA__Address_Contact__r": {
+                "ref": {
+                    "object": "Contact",
+                    "ref_external_id": "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c",
+                    "source_value_ref": "personKey"
+                }
+            },
             "HUDA__ADDR_CATEGORY_CD__c": "addresses.addressCategory.code",
             "HUDA__ADDR_CITY__c": "addresses.addressCity",
             "HUDA__ADDR_ISO_COUNTRY_CD__c": "addresses.addressCountry.code",
@@ -161,8 +183,14 @@
             "salesforce": "HUDA__CONTACT_DATA_KEY__c"
         },
         "fields": {
-            "HUDA__Phone_Contact__c": "sf.contact.id",
             "HUDA__CONTACT_DATA_KEY__c": "phones.phoneKey",
+            "HUDA__Phone_Contact__r": {
+                "ref": {
+                    "object": "Contact",
+                    "ref_external_id": "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c",
+                    "source_value_ref": "personKey"
+                }
+            },
             "HUDA__CONTACT_DATA__c": "phones.dataValue",
             "HUDA__CONTACT_DATA_EXT__c": "phones.dataExtension",
             "HUDA__CONTACT_DATA_SUBTYPE_CD__c": "phones.dataSubtype",
@@ -183,8 +211,14 @@
             "salesforce": "HUDA__CONTACT_LOCATION_KEY__c"
         },
         "fields": {
-            "HUDA__Location_Contact__c": "sf.contact.id",
             "HUDA__CONTACT_LOCATION_KEY__c": "locations.personLocationKey",
+            "HUDA__Location_Contact__r": {
+                "ref": {
+                    "object": "Contact",
+                    "ref_external_id": "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c",
+                    "source_value_ref": "personKey"
+                }
+            },
             "HUDA__BLDG_LOC__c": "locations.location",
             "HUDA__BLDG_LOC_IDENTIFIER__c": "locations.locationIdentifier",
             "HUDA__EFF_STATUS__c": "locations.effectiveStatus.code",
@@ -205,7 +239,6 @@
             "salesforce": "HUDA__hud_PERSON_ROLES_KEY__c"
         },
         "fields": {
-            "hed__Contact__c": "sf.contact.id",
             "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c": "personKey",
             "HUDA__hud_PERSON_ROLES_KEY__c": ["employeeRoles.personRoleKey", "poiRoles.personRoleKey", "studentRoles.personRoleKey"],
             "HUDA__hud_EFF_STATUS__c": ["employeeRoles.effectiveStatus.code", "poiRoles.effectiveStatus.code", "studentRoles.effectiveStatus.code"],
@@ -260,8 +293,22 @@
             "HUDA__hud_POI_COMPANY__c": "poiRoles.poiCompany",
             "HUDA__hud_POI_FACULTY_CD__c": "poiRoles.faculty.code",
             "HUDA__hud_POI_SHORT_DESC_LINE1__c": "poiRoles.shortDescriptionLine1",
-            "HUDA__hud_POI_SHORT_DESC_LINE2__c": "poiRoles.shortDescriptionLine2"
-                        
+            "HUDA__hud_POI_SHORT_DESC_LINE2__c": "poiRoles.shortDescriptionLine2",
+
+            "hed__Contact__r": {
+                "ref": {
+                    "object": "Contact",
+                    "ref_external_id": "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c",
+                    "source_value_ref": "personKey"
+                }
+            },
+            "hed__Account__r": {
+                "ref": {
+                    "object": "Account",
+                    "ref_external_id": "HUDA__hud_DEPT_ID__c",
+                    "source_value_ref": "employeeRoles.hrDeptId"
+                }
+            }           
 
         }
     }
