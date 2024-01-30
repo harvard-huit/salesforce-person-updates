@@ -289,6 +289,7 @@ def setTaskRunning(app_config: AppConfig, running: bool):
             UpdateExpression=update_expression,
             ExpressionAttributeValues=expression_attribute_values
         )
+        logger.info(f"Info: Setting task_running variable to {running} for {app_config.name}")
     except Exception as e:
         logger.error(f"Error: failure to set task status for id:{app_config.id} on table: {app_config.table_name}")
         raise e
