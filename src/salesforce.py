@@ -2,7 +2,7 @@ import os
 import json
 import jsonschema
 import logging
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from simple_salesforce import Salesforce, exceptions
 
 import psutil
@@ -575,7 +575,17 @@ class HarvardSalesforce:
             except ValueError as e:
                 logger.error(f"Error: {e}. Indentifier: {identifier}")
                 return None
+
+            # check if the date has a timezone qualifier
+            if value[-1] != "Z":
+                # if it doesn't, we assume it's in EST
+                # convert this date from an assumed EST timezone to UTC
+                valid_date = valid_date - timedelta(hours=5)
+            # convert to iso-8601
+            value = valid_date.isoformat()
+
             return value
+
         elif field_type in ["double"]:
             try: 
                 return float(value)
