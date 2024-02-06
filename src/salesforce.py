@@ -575,14 +575,18 @@ class HarvardSalesforce:
             except ValueError as e:
                 logger.error(f"Error: {e}. Indentifier: {identifier}")
                 return None
+            
+            # if valid_date has a time of exactly midnight (T00:00:00)
+            if valid_date.time() == datetime.min.time():
+                # we want to move the time forward 5 hours to make it 5am
+                # this is because salesforce will assume the date is in UTC if it doesn't have a timezone qualifier
+                # and we want to make sure it's in EST
+                # Open to suggestions if someone has a better way to handle this
+                valid_date = valid_date + timedelta(hours=5)
 
-            # check if the date has a timezone qualifier
-            if value[-1] != "Z":
-                # if it doesn't, we assume it's in EST
-                # convert this date from an assumed EST timezone to UTC
-                valid_date = valid_date - timedelta(hours=5)
             # convert to iso-8601
             value = valid_date.isoformat()
+
 
             return value
 
