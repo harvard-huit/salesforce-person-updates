@@ -4,6 +4,7 @@ import jsonschema
 import logging
 from datetime import datetime, date, timedelta
 from simple_salesforce import Salesforce, exceptions
+import re
 
 import psutil
 
@@ -69,7 +70,7 @@ class HarvardSalesforce:
     # NOTE: the Bulk API can take a max of 10000 records at a time
     # a single record will take anywhere from 2-50 seconds
     # dupe: this makes sure we don't keep retrying a dupe check
-    def pushBulk(self, object, data, dupe=False, id_name='Id', retries=3):
+    def pushBulk(self, object, data, dupe=False, id_name='Id', retries=1):
 
 
         # check memory usage
@@ -541,7 +542,13 @@ class HarvardSalesforce:
             # not really sure I want to validate what the picklist values are
             return str(value)
         elif field_type in ["email"]:
-            return str(value)
+            # if the value is a valid email, return it
+            # otherwise, log the error and return None
+            if re.match(r"[^@]+@[^@]+\.[^@]+", value):
+                return str(value)
+            else:
+                logger.warning(f"Warning: {value} is not a valid email. Identifier: {identifier}")
+                return None
         elif field_type in ["id", "reference"]:
             return value
         elif field_type in ["date"]:
@@ -576,16 +583,13 @@ class HarvardSalesforce:
                 logger.error(f"Error: {e}. Indentifier: {identifier}")
                 return None
             
-            # if valid_date has a time of exactly midnight (T00:00:00)
-            if valid_date.time() == datetime.min.time():
-                # we want to move the time forward 5 hours to make it 5am
-                # this is because salesforce will assume the date is in UTC if it doesn't have a timezone qualifier
-                # and we want to make sure it's in EST
-                # Open to suggestions if someone has a better way to handle this
-                valid_date = valid_date + timedelta(hours=5)
-
-            # convert to iso-8601
-            value = valid_date.isoformat()
+            # # if valid_date has a time of exactly midnight (T00:00:00)
+            # if valid_date.time() == datetime.min.time():
+            #     # we want to move the time forward 5 hours to make it 5am
+            #     # this is because salesforce will assume the date is in UTC if it doesn't have a timezone qualifier
+            #     # and we want to make sure it's in EST
+            #     # Open to suggestions if someone has a better way to handle this
+            #     valid_date = valid_date + timedelta(hours=5)
 
 
             return value
