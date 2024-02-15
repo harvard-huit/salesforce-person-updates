@@ -70,7 +70,7 @@ class HarvardSalesforce:
     # NOTE: the Bulk API can take a max of 10000 records at a time
     # a single record will take anywhere from 2-50 seconds
     # dupe: this makes sure we don't keep retrying a dupe check
-    def pushBulk(self, object, data, dupe=False, id_name='Id', retries=1):
+    def pushBulk(self, object, data, id_name='Id', dupe=False, retries=1):
 
 
         # check memory usage

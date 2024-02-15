@@ -435,7 +435,7 @@ class SalesforcePersonUpdates:
             # unthreaded:
             # self.hsf.pushBulk(object, object_data)    
 
-            thread = threading.Thread(target=self.hsf.pushBulk, args=(object, object_data))
+            thread = threading.Thread(target=self.hsf.pushBulk, args=(object, object_data, external_id))
             thread.start()
             branch_threads.append(thread)
         
