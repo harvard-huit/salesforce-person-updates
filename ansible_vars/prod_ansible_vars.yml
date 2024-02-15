@@ -7,7 +7,7 @@
 
 # target_desired_task_count: 2
 target_app_context: "/salesforce-person-updates"
-target_app_version: "v1.0.4"
+target_app_version: "v1.0.5-r1"
 create_service: false
 
 # this is the lowest for fargate?
@@ -52,18 +52,19 @@ schedules:
         value: "person-updates"
 
     ####### HMS Prod ####################################################################
-  # - schedule_rule_name: "hms-updates" # this will be appended to the task definition name, e.g my-cluster-dev-feed-my-dataload-half-hourly
-  #   schedule_expression: "rate(15 minutes)" # rate or cron expression
-  #   # optional
-  #   schedule_rule_description: "Updates for the HMS prod. (hms-prod)"
-  #   # environment variable overrides
-  #   schedule_env_overrides:
-  #     - name: "TABLE_NAME"
-  #       value: "aais-services-salesforce-person-updates-prod"
-  #     - name: "SALESFORCE_INSTANCE_ID"
-  #       value: "hms-prod"
-  #     - name: "action"
-  #       value: "person-updates"
+  - schedule_rule_name: "hms-updates" # this will be appended to the task definition name, e.g my-cluster-dev-feed-my-dataload-half-hourly
+    schedule_expression: "rate(15 minutes)" # rate or cron expression
+    # optional
+    schedule_rule_description: "Updates for the HMS prod. (hms-prod)"
+    # environment variable overrides
+    schedule_env_overrides:
+      - name: "TABLE_NAME"
+        value: "aais-services-salesforce-person-updates-prod"
+      - name: "SALESFORCE_INSTANCE_ID"
+        value: "hms-prod"
+      - name: "action"
+        value: "person-updates"
+    schedule_rule_state: "DISABLED"
 
     ####### HKS Prod ####################################################################
   # - schedule_rule_name: "hks-updates" # this will be appended to the task definition name, e.g my-cluster-dev-feed-my-dataload-half-hourly
