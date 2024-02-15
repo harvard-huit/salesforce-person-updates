@@ -431,6 +431,7 @@ class SalesforcePersonUpdates:
 
         for object, object_data in data.items():
             logger.debug(f"Upserting to {object} with {len(object_data)} records")
+            external_id = self.app_config.config[object]['Id']['salesforce']
 
             # unthreaded:
             # self.hsf.pushBulk(object, object_data)    
