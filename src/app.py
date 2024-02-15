@@ -114,10 +114,10 @@ class SalesforcePersonUpdates:
 
             # self.pds_apikey = os.getenv("PDS_APIKEY")
             # initialize pds
-            # if batch_size_override:
-            #     batch_size = int(batch_size_override)
-            # else:
-            batch_size = 500
+            if batch_size_override:
+                batch_size = int(batch_size_override)
+            else:
+                batch_size = 500
             self.pds = pds.People(apikey=self.app_config.pds_apikey, batch_size=batch_size)
 
             if batch_thread_count_override:
