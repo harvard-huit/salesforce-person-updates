@@ -163,7 +163,9 @@ class HarvardSalesforce:
                         logger.debug(response)
 
                 if len(dupe_data_batch) > 0:
-                    dupe_errors = self.check_duplicate(object, dupe_data_batch)
+                    # let's only deal with duplicates on Contact
+                    if object == 'Contact':
+                        dupe_errors = self.check_duplicate(object, dupe_data_batch)
                     error_count += dupe_errors
 
                 if len(errored_data_batch) > 0:
@@ -195,7 +197,7 @@ class HarvardSalesforce:
                 return False
 
         except Exception as e:
-            logger.error(f"Error with data push: {e}")
+            # logger.error(f"Error with data push: {e}")
             raise e
 
         return True
