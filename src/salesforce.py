@@ -168,6 +168,16 @@ class HarvardSalesforce:
                         dupe_errors = self.check_duplicate(object, dupe_data_batch, id_name=id_name)
                     error_count += dupe_errors
 
+                if 'ids' in created_ids and len(created_ids['ids']) > 0:
+                    logger.info(created_ids)
+
+                if updated_count > 0:
+                    logger.info(f"Updated {object} Records: {updated_count}")
+                if created_count > 0:
+                    logger.info(f"Created {object} Records: {created_count}")
+                if error_count > 0:
+                    logger.info(f"Errored {object} Records: {error_count}")
+
                 if len(errored_data_batch) > 0 and retries > 0:
 
                     data = errored_data_batch
@@ -181,15 +191,6 @@ class HarvardSalesforce:
                     #     logger.info(f"Retry successful")
                 else:
 
-                    if 'ids' in created_ids and len(created_ids['ids']) > 0:
-                        logger.info(created_ids)
-
-                    if updated_count > 0:
-                        logger.info(f"Updated {object} Records: {updated_count}")
-                    if created_count > 0:
-                        logger.info(f"Created {object} Records: {created_count}")
-                    if error_count > 0:
-                        logger.info(f"Errored {object} Records: {error_count}")
                     break
 
             if retries == 0:
