@@ -168,29 +168,28 @@ class HarvardSalesforce:
                         dupe_errors = self.check_duplicate(object, dupe_data_batch, id_name=id_name)
                     error_count += dupe_errors
 
-                if len(errored_data_batch) > 0:
+                if len(errored_data_batch) > 0 and retries > 0:
 
                     retries -= 1
                     logger.info(f"Trying errored records again {retries} more times")
-                    continue
                     # retry_response = self.pushBulk(object, errored_data_batch, retries=retries)
 
                     # if isinstance(retry_response, int):
                     #     error_count += retry_response
                     # else:
                     #     logger.info(f"Retry successful")
+                else:
 
+                    if 'ids' in created_ids and len(created_ids['ids']) > 0:
+                        logger.info(created_ids)
 
-                if 'ids' in created_ids and len(created_ids['ids']) > 0:
-                    logger.info(created_ids)
-
-                if updated_count > 0:
-                    logger.info(f"Updated {object} Records: {updated_count}")
-                if created_count > 0:
-                    logger.info(f"Created {object} Records: {created_count}")
-                if error_count > 0:
-                    logger.info(f"Errored {object} Records: {error_count}")
-                break
+                    if updated_count > 0:
+                        logger.info(f"Updated {object} Records: {updated_count}")
+                    if created_count > 0:
+                        logger.info(f"Created {object} Records: {created_count}")
+                    if error_count > 0:
+                        logger.info(f"Errored {object} Records: {error_count}")
+                    break
 
             if retries == 0:
                 logger.warning(f"Failure to push these records: {errored_data_batch}")
@@ -277,7 +276,7 @@ class HarvardSalesforce:
 
             except Exception as e:
                 logger.error("Failure to flag fields")
-                raise
+                raise e
 
 
 
