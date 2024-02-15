@@ -836,6 +836,11 @@ class HarvardSalesforce:
                     if field in errored_data_object:
                         field_value = errored_data_object[field]
                         whereses.append(f"{field} = '{field_value}'")
+                
+                where_clause = "(" + " and ".join(whereses) + ")"
+                
+                # reset whereses
+                whereses = []
 
                 # this is to handle the standard contact duplicate matching rule, or at least the most common breaking of it
                 # see: https://help.salesforce.com/s/articleView?language=en_US&id=sf.matching_rules_standard_contact_rule.htm&type=5
@@ -852,7 +857,7 @@ class HarvardSalesforce:
                         
                         whereses.append(f"{standard_contact_rule_string}")
                 
-                where_clause = " or ".join(whereses)
+                where_clause += " or ".join(whereses)
 
                 select_string = f"SELECT {object_name}.Id FROM {object_name} WHERE {where_clause}"
                 logger.debug(select_string)
@@ -860,7 +865,9 @@ class HarvardSalesforce:
                 logger.debug(f"got this data from salesforce: {sf_data['records']}")
 
                 if len(sf_data['records']) > 1:
-                    logger.error(f"DUPLICATES DETECTED: {sf_data} -- too many records found on object {object_name} with this select: {select_string} and this data: {errored_data_object}")
+                    found_ids = [record['Id'] for record in sf_data['records']]
+
+                    logger.error(f"Failed resolving duplicate! : too many records found on object {object_name} with this select: {select_string}")
                 elif len(sf_data['records']) < 1:
                     logger.error(f"Error: no records found on object {object_name} with this data: {errored_data_object}")
                 else:
