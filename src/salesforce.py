@@ -127,7 +127,7 @@ class HarvardSalesforce:
                         "ids": []
                     }
                 for index, response in enumerate(responses):
-                    if response['success'] != True: 
+                    if response['success'] != True:
                         
                         errored_data = data[index]
                         logger.debug(f"Record failure in bulk data load: {response['errors']} ({errored_data})")
@@ -137,7 +137,7 @@ class HarvardSalesforce:
                             if dupe:
                                 logger.error(f"Error: DUPLICATE DETECTED (unresoved): {errored_data}")
                             else:
-                                logger.error(f"Error: DUPLICATE DETECTED -- Errored Data: {errored_data}")
+                                logger.error(f"Error: DUPLICATE DETECTED Errored Data: {errored_data}")
                                 dupe_data_batch.append(errored_data)
                         # if it's invalid and the message is about an external id not existing, we want to ignore it
                         elif ['errors'][0]['statusCode'] == 'INVALID_FIELD':
@@ -165,7 +165,7 @@ class HarvardSalesforce:
                 if len(dupe_data_batch) > 0:
                     # let's only deal with duplicates on Contact
                     if object == 'Contact':
-                        dupe_errors = self.check_duplicate(object, dupe_data_batch)
+                        dupe_errors = self.check_duplicate(object, dupe_data_batch, id_name=id_name)
                     error_count += dupe_errors
 
                 if len(errored_data_batch) > 0:
@@ -816,7 +816,7 @@ class HarvardSalesforce:
 
     # this method is trying to find an Id for a record that failed as a dupe
     # the `errored_data_object` should be of the same record that triggered the error
-    def check_duplicate(self, object_name, errored_data_objects, dry_run=False):
+    def check_duplicate(self, object_name, errored_data_objects, id_name='Id', dry_run=False):
 
 
         error_count = len(errored_data_objects)
@@ -879,7 +879,7 @@ class HarvardSalesforce:
                     retryable_data_objects.append(errored_data_object)
 
             if not dry_run and len(retryable_data_objects) > 0:
-                self.pushBulk(object_name, retryable_data_objects, dupe=True)
+                self.pushBulk(object_name, retryable_data_objects, dupe=True, id_name=id_name)
             return error_count
 
         except Exception as e:
