@@ -251,32 +251,47 @@ class AppConfig():
 # Other
 #============================================================================================
 
-# returns True when the person-updates task is running in the configured 
-# TODO: this needs to be tested for fargates
-def isTaskRunning():
-    
-    ecs = boto3.client('ecs')
+# returns True when the person-updates task is running 
+def isTaskRunning(app_config: AppConfig):
+    """
+    Retrieves task running status from DynamoDB 
+    """
+    task_running = False
+    try:
+        dynamo = boto3.client('dynamodb')
+        response = dynamo.get_item(
+            Key={'id': {'S': app_config.id}, 'name': {'S': app_config.name}},
+            TableName=app_config.table_name
+        )
+        if 'Item' in response:
+            task_running = response.get('Item').get('task_running').get('BOOL')
+        else:
+            raise Exception(f"Error: unable to retrieve table values for table {app_config.table_name}: {response}")
+    except Exception as e:
+        logger.error(f"Error: failure to get task status for id:{id} on table: {app_config.table_name}")
+        raise e
 
-    metadata_url=os.getenv("ECS_CONTAINER_METADATA_URI_V4")
-    f = urllib.request.urlopen(metadata_url)
-    metadata = json.loads(f.read())
-    
-    cluster_name = metadata["Labels"]["com.amazonaws.ecs.cluster"]
-    task_family = metadata["Labels"]["com.amazonaws.ecs.task-definition-family"]    
+    return task_running
 
-    # list tasks returns tasks that are currently running on the given cluster
-    # family refers to the task "family" which is the task definition (sans version)
-    mylist = ecs.list_tasks(
-        cluster=cluster_name,
-        family=task_family,
-    )['taskArns']
+# sets the status of the task_running variable
+def setTaskRunning(app_config: AppConfig, running: bool):
+    """
+    Sets task running status in DynamoDB 
+    """
+    try:
+        dynamo = boto3.resource('dynamodb')
+        table = dynamo.Table(app_config.table_name)
 
-    logger.info(mylist)
+        update_expression = 'SET task_running = :val1'
+        expression_attribute_values = {':val1': running }
+        table.update_item(
+            Key={'id': app_config.id, 'name': app_config.name},
+            UpdateExpression=update_expression,
+            ExpressionAttributeValues=expression_attribute_values
+        )
+        logger.info(f"Info: Setting task_running variable to {running} for {app_config.name}")
+    except Exception as e:
+        logger.error(f"Error: failure to set task status for id:{app_config.id} on table: {app_config.table_name}")
+        raise e
 
-    # note that it will retrieve itself, so we need to make sure more than one is running
-    # to determine if it's "already" running
-    if len(mylist) > 1:
-        return True
-    else:
-        return False
 
