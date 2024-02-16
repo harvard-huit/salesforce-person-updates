@@ -492,7 +492,7 @@ class SalesforcePersonUpdates:
 
         self.people_data_load(pds_query=pds_query)
 
-        if 'updatedFlag' in self.app_config.config['Contact']:
+        if 'updatedFlag' in self.app_config.config['Contact'] and False:
             updated_flag = self.app_config.config['Contact']['updatedFlag']
             # we could do the updated operation here instead of tying it into the update process
 
