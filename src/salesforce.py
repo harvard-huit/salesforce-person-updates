@@ -147,10 +147,10 @@ class HarvardSalesforce:
                             else:
                                 logger.warning(f"Warning: INVALID_FIELD: {response['errors'][0]['message']}")
                         elif response['errors'][0]['statusCode'] == 'FIELD_CUSTOM_VALIDATION_EXCEPTION':
-                            logger.warning(f"Warning: FIELD_CUSTOM_VALIDATION_EXCEPTION: {object}.{id_name}: {errored_data[id_name]}")
+                            logger.error(f"Error: FIELD_CUSTOM_VALIDATION_EXCEPTION: {object}.{id_name}: {errored_data[id_name]}")
                         else: 
                             logger.error(f"Error: {response['errors'][0]['statusCode']}: {errored_data}")
-                            errored_data_batch.append(errored_data)
+                            # errored_data_batch.append(errored_data)
 
                         # if response['errors'][0]['statusCode'] == 'CANNOT_INSERT_UPDATE_ACTIVATE_ENTITY':
                         #     # get errored ids
