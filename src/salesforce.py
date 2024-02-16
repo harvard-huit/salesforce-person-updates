@@ -146,6 +146,8 @@ class HarvardSalesforce:
                                 logger.debug(f"Warning: INVALID_FIELD (external id): {response['errors'][0]['message']}")
                             else:
                                 logger.warning(f"Warning: INVALID_FIELD: {response['errors'][0]['message']}")
+                        elif response['errors'][0]['statusCode'] == 'FIELD_CUSTOM_VALIDATION_EXCEPTION':
+                            logger.warning(f"Warning: FIELD_CUSTOM_VALIDATION_EXCEPTION: {object}.{id_name}: {errored_data[id_name]}")
                         else: 
                             logger.error(f"Error: {response['errors'][0]['statusCode']}: {errored_data}")
                             errored_data_batch.append(errored_data)
