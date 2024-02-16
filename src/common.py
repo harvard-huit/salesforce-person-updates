@@ -264,7 +264,11 @@ def isTaskRunning(app_config: AppConfig):
             TableName=app_config.table_name
         )
         if 'Item' in response:
-            task_running = response.get('Item').get('task_running').get('BOOL')
+            task_running_attribute = response.get('Item').get('task_running')
+            if task_running_attribute:
+                task_running = task_running_attribute.get('BOOL',False)
+            else:
+                setTaskRunning(app_config, False)
         else:
             raise Exception(f"Error: unable to retrieve table values for table {app_config.table_name}: {response}")
     except Exception as e:
