@@ -148,6 +148,8 @@ class HarvardSalesforce:
                                 logger.warning(f"Warning: INVALID_FIELD: {response['errors'][0]['message']}")
                         elif response['errors'][0]['statusCode'] == 'FIELD_CUSTOM_VALIDATION_EXCEPTION':
                             logger.error(f"Error: FIELD_CUSTOM_VALIDATION_EXCEPTION: {object}.{id_name}: {errored_data[id_name]}")
+                        elif response['errors'][0]['statusCode'] == 'STRING_TOO_LONG':
+                            logger.error(f"Error: STRING_TOO_LONG: {object}.{id_name}: {errored_data[id_name]}")
                         else: 
                             logger.error(f"Error: {response['errors'][0]['statusCode']}: {errored_data}")
                             # errored_data_batch.append(errored_data)
