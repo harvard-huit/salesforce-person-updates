@@ -183,7 +183,6 @@ class HarvardSalesforce:
                 if len(errored_data_batch) > 0 and retries > 0:
 
                     data = errored_data_batch
-                    retries -= 1
                     logger.info(f"Trying errored records again {retries} more times")
                     # retry_response = self.pushBulk(object, errored_data_batch, retries=retries)
 
@@ -195,6 +194,7 @@ class HarvardSalesforce:
 
                     break
 
+            retries -= 1
             if retries == 0:
                 logger.warning(f"Failure to push these records: {errored_data_batch}")
                 return False
