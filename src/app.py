@@ -40,7 +40,11 @@ if stack == 'developer':
     config = json.load(f)
     f.close()
 
-    f = open('../example_pds_query.json')
+    query_filename = '../example_pds_query.json'
+    if is_unittest():
+        query_filename = '../' + query_filename
+
+    f = open(query_filename, 'r')
     pds_query = json.load(f)
     f.close()
 ####################################
@@ -647,14 +651,14 @@ class SalesforcePersonUpdates:
 
                 results = self.pds.next_page_results()
 
+                if len(backlog) > 0:
+                    # if we have a backlog, we need to add it to the results
+                    results = backlog + results
+                    backlog = []
                 if len(results) > 0 and len(results) < self.batch_size:
                     # if we have less than a full batch, we need to keep the results for the next batch
                     backlog = results
                     continue
-                elif len(backlog) > 0:
-                    # if we have a backlog, we need to add it to the results
-                    results = backlog + results
-                    backlog = []
                 
                 # if the results are larger than the batch size, we need to keep the overflow for next run
                 if len(results) > self.batch_size:
