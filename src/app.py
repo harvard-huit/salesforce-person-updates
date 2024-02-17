@@ -17,6 +17,13 @@ from datetime import datetime
 from pprint import pformat
 import psutil
 
+import inspect
+def is_unittest():
+    for frame in inspect.stack():
+        if 'unittest' in frame.filename:
+            return True
+    return False
+
 if stack == 'developer':
     from dotenv import load_dotenv
     load_dotenv() 
@@ -25,6 +32,9 @@ if stack == 'developer':
     
     if os.getenv("CONFIG_FILENAME") is not None:
         config_filename = os.getenv("CONFIG_FILENAME")
+
+    if is_unittest():
+        config_filename = '../' + config_filename
 
     f = open(config_filename, 'r')
     config = json.load(f)
