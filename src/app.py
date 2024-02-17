@@ -22,6 +22,7 @@ if stack == 'developer':
     load_dotenv() 
 
     config_filename = '../example_config.json'
+    
     if os.getenv("CONFIG_FILENAME") is not None:
         config_filename = os.getenv("CONFIG_FILENAME")
 
@@ -42,6 +43,7 @@ if os.getenv("person_ids"):
 else:
     person_ids = []
 
+pds_batch_size_override = os.getenv("PDS_BATCH_SIZE") or None
 batch_size_override = os.getenv("BATCH_SIZE") or None
 batch_thread_count_override = os.getenv("BATCH_THREAD_COUNT") or None
 LOCAL = os.getenv("LOCAL") or False
@@ -112,13 +114,26 @@ class SalesforcePersonUpdates:
             # initialize storage for updated ids
             self.updated_ids = []
 
+            # if batch_size_override:
+            #     batch_size = int(batch_size_override)
+            # else:
+            #     batch_size = 500
+
+
+
             # self.pds_apikey = os.getenv("PDS_APIKEY")
             # initialize pds
-            if batch_size_override:
-                batch_size = int(batch_size_override)
+            if pds_batch_size_override:
+                self.pds_batch_size = int(pds_batch_size_override)
             else:
-                batch_size = 500
-            self.pds = pds.People(apikey=self.app_config.pds_apikey, batch_size=batch_size)
+                self.pds_batch_size = 500
+            self.pds = pds.People(apikey=self.app_config.pds_apikey, batch_size=self.pds_batch_size)
+
+            if batch_size_override:
+                self.batch_size = int(batch_size_override)
+            else:
+                self.batch_size = 1000
+
 
             if batch_thread_count_override:
                 self.batch_thread_count = int(batch_thread_count_override)
@@ -612,53 +627,80 @@ class SalesforcePersonUpdates:
             batch_count = 1
             max_count = math.ceil(total_count / size)
 
-            logger.info(f"batch: {size}, total_count: {total_count}, max_count: {max_count}")
+            logger.info(f"pds_batch_size: {size}, total_count: {total_count}, max_count: {max_count}")
 
+            if self.record_limit:
+                total_count = self.record_limit
+
+            backlog = []
             while True:
 
                 results = self.pds.next_page_results()
 
-                if len(results) < 1:
-                    break
-                people = self.pds.make_people(results)
-
-                # check memory usage
-                memory_use_percent = psutil.virtual_memory().percent  # percentage of memory use
-                # memory_avail = psutil.virtual_memory().available * 0.000001  # memory available in MB
-                # memory_total = psutil.virtual_memory().total * 0.000001
-
-                # this will get the current backlog of pds results
-                current_pds_backlog = self.pds.result_queue.qsize() * self.pds.batch_size
-                logger.info(f"Memory usage: {memory_use_percent}%  current pds backlog: {current_pds_backlog}/{self.pds.max_backlog} pds records {current_count}/{self.pds.total_count}")
+                if len(results) > 0 and len(results) < self.batch_size:
+                    # if we have less than a full batch, we need to keep the results for the next batch
+                    backlog = results
+                    continue
+                elif len(backlog) > 0:
+                    # if we have a backlog, we need to add it to the results
+                    results = backlog + results
+                    backlog = []
                 
-                if stack != "developer":
-                    if (memory_use_percent > 50) and not LOCAL:
-                        time.sleep(60)
-                        memory_use_percent = psutil.virtual_memory().percent  # percentage of memory use
-
-                    if (memory_use_percent > 55) and not LOCAL:
-                        raise Exception(f"Out of memory ({memory_use_percent}): Kicking job before Fargate silently kicks it.")
+                # if the results are larger than the batch size, we need to keep the overflow for next run
+                if len(results) > self.batch_size:
+                    backlog = results[self.batch_size:]
+                    results = results[:self.batch_size]
                 
-                if total_count != self.pds.total_count:
-                    raise Exception(f"total_count changed from {total_count} to {self.pds.total_count}. The PDS pagination failed.")
-
                 current_count += len(results)
                 if self.record_limit:
                     if current_count > self.record_limit:
+                        # if we hit the record limit, we need to cut off the results, 
+                        #   otherwise they'll just be the next multiple of the batch size
                         logger.info(f"Record limit reached: {self.record_limit}")
-                        break
+                        difference = current_count - self.record_limit
+                        results = results[:-difference]
 
-                if current_count == total_count:
-                    logger.info(f"Finished getting all records from the PDS: {total_count} records")
-                elif current_count > total_count:
+                if len(results) == 0:
+                    logger.info(f"Finished getting all records from the PDS: {current_count}/{total_count} records")
+
+                if len(results) > 0:
+
+                    people = self.pds.make_people(results)
+
+                    # check memory usage
+                    memory_use_percent = psutil.virtual_memory().percent  # percentage of memory use
+                    # memory_avail = psutil.virtual_memory().available * 0.000001  # memory available in MB
+                    # memory_total = psutil.virtual_memory().total * 0.000001
+
+                    # this will get the current backlog of pds results
+                    current_pds_backlog = self.pds.result_queue.qsize() * self.pds.batch_size
+                    logger.info(f"Memory usage: {memory_use_percent}%  current pds backlog: {current_pds_backlog}/{self.pds.max_backlog} pds records {current_count}/{self.pds.total_count}")
+                    
+                    if stack != "developer":
+                        if (memory_use_percent > 50) and not LOCAL:
+                            logger.warning(f"Memory usage is high: {memory_use_percent}%")
+                            memory_use_percent = psutil.virtual_memory().percent  # percentage of memory use
+
+                        if (memory_use_percent > 55) and not LOCAL:
+                            raise Exception(f"Out of memory ({memory_use_percent}): Kicking job before Fargate silently kicks it.")
+                
+
+                if total_count != self.pds.total_count:
+                    raise Exception(f"total_count changed from {total_count} to {self.pds.total_count}. The PDS pagination failed.")
+
+                if len(results) == 0:
+                    logger.info(f"Finished getting records from the PDS: {current_count}/{total_count} records")
+                    break
+
+                if current_count > total_count:
                     logger.warning(f"Count exceeds total_count {current_count}/{total_count}. The PDS pagination may have failed.")
                     break
-                else: 
-                    logger.info(f"Starting batch {batch_count}: {current_count}/{total_count} ({len(self.batch_threads)} threads in process).")
-                    batch_count += 1
-                    if batch_count > (max_count + 50):
-                        logger.error(f"Something may have wrong with the batching. Max estimated batch count ({max_count}) exceeded current batch count: {batch_count}")
-                        raise Exception(f"estimated max_count: {max_count}, batch_size: {size}, batch_count: {batch_count}, total_count: {total_count}")
+                
+                logger.info(f"Starting batch {batch_count}: {current_count}/{total_count} ({len(self.batch_threads)} threads in process).")
+                batch_count += 1
+                if batch_count > (max_count + 50):
+                    logger.error(f"Something may have wrong with the batching. Max estimated batch count ({max_count}) exceeded current batch count: {batch_count}")
+                    raise Exception(f"estimated max_count: {max_count}, batch_size: {size}, batch_count: {batch_count}, total_count: {total_count}")
 
                 if not dry_run:
                     # self.process_people_batch(people)
