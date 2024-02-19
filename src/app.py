@@ -650,14 +650,24 @@ class SalesforcePersonUpdates:
             backlog = []
             while True:
 
+                # logger.debug(f"Getting next batch: {batch_count} ({current_count}/{total_count}) -- backlog: {len(backlog)}")
+                # logger.debug(f"is_paginating: {self.pds.is_paginating}")
+
                 results = self.pds.next_page_results()
+                current_run_result_count = len(results)
+
+                # logger.info(f"got results... {current_run_result_count} records")
 
                 if len(backlog) > 0:
                     # if we have a backlog, we need to add it to the results
+                    logger.debug(f"Adding backlog to results: {len(backlog)}")
                     results = backlog + results
                     backlog = []
-                if len(results) > 0 and len(results) < self.batch_size:
+
+                current_count += current_run_result_count
+                if current_run_result_count > 0 and len(results) < self.batch_size and current_count < total_count:
                     # if we have less than a full batch, we need to keep the results for the next batch
+                    logger.debug(f"Adding results to backlog: {len(results)}")
                     backlog = results
                     continue
                 
@@ -666,7 +676,6 @@ class SalesforcePersonUpdates:
                     backlog = results[self.batch_size:]
                     results = results[:self.batch_size]
                 
-                current_count += len(results)
                 if self.record_limit:
                     if current_count > self.record_limit:
                         # if we hit the record limit, we need to cut off the results, 
@@ -675,7 +684,8 @@ class SalesforcePersonUpdates:
                         difference = current_count - self.record_limit
                         results = results[:-difference]
 
-                if len(results) == 0:
+                logger.debug(f"Processing batch {batch_count}: {len(results)} records")
+                if current_run_result_count == 0:
                     logger.info(f"Finished getting all records from the PDS: {current_count}/{total_count} records")
 
                 if len(results) > 0:
