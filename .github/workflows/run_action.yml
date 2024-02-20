@@ -27,6 +27,7 @@ on:
           - 'cleanup-updateds'
           - 'defunct-accounts-check'
           - 'remove-unaffiliated-affiliations'
+          - 'static-query'
       debug:
         type: choice
         required: false
