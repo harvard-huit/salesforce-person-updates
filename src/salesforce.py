@@ -20,6 +20,11 @@ class HarvardSalesforce:
         # list of job references
         self.jobs = []
         self.unique_ids = {}
+
+        # set of unresolved errors encountered
+        self.errors = {}
+        self.error_count = 0
+
         try: 
             logger.debug(f"Salesforce initializing to {self.domain} as {self.username}")
             if(token is not None):
@@ -132,32 +137,36 @@ class HarvardSalesforce:
                         errored_data = data[index]
                         logger.debug(f"Record failure in bulk data load: {response['errors']} ({errored_data})")
 
-                        if response['errors'][0]['statusCode'] == 'DUPLICATES_DETECTED':
+                        error_name = response['errors'][0]['statusCode']
 
+                        if error_name == 'DUPLICATES_DETECTED':
                             if dupe:
                                 logger.error(f"Error: DUPLICATE DETECTED (unresoved): {errored_data}")
                             else:
                                 logger.error(f"Error: DUPLICATE DETECTED Errored Data: {errored_data}")
                                 dupe_data_batch.append(errored_data)
                         # if it's invalid and the message is about an external id not existing, we want to ignore it
-                        elif response['errors'][0]['statusCode'] == 'INVALID_FIELD':
+                        elif error_name == 'INVALID_FIELD':
                             if response['errors'][0]['message'].startswith("Foreign key external ID"): 
                                 # we want to ignore this error as it happens if the Contact didn't make it
                                 logger.debug(f"Warning: INVALID_FIELD (external id): {response['errors'][0]['message']}")
                             else:
                                 logger.warning(f"Warning: INVALID_FIELD: {response['errors'][0]['message']}")
-                        elif response['errors'][0]['statusCode'] == 'FIELD_CUSTOM_VALIDATION_EXCEPTION':
-                            logger.error(f"Error: FIELD_CUSTOM_VALIDATION_EXCEPTION: {object}.{id_name}: {errored_data[id_name]}")
-                        elif response['errors'][0]['statusCode'] == 'STRING_TOO_LONG':
-                            logger.error(f"Error: STRING_TOO_LONG: {object}.{id_name}: {errored_data[id_name]}")
-                        else: 
-                            logger.error(f"Error: {response['errors'][0]['statusCode']}: {errored_data}")
-                            # errored_data_batch.append(errored_data)
 
-                        # if response['errors'][0]['statusCode'] == 'CANNOT_INSERT_UPDATE_ACTIVATE_ENTITY':
-                        #     # get errored ids
-                        #     pass
-                        #     # self.pushBulk(object_name, [errored_data_object], retry=True)
+                        else:
+                        
+                            if error_name == 'FIELD_CUSTOM_VALIDATION_EXCEPTION':
+                                logger.error(f"Error: FIELD_CUSTOM_VALIDATION_EXCEPTION: {object}.{id_name}: {errored_data[id_name]}")
+                            elif error_name == 'STRING_TOO_LONG':
+                                logger.error(f"Error: STRING_TOO_LONG: {object}.{id_name}: {errored_data[id_name]}")
+                            else: 
+                                logger.error(f"Error: {response['errors'][0]['statusCode']}: {errored_data}")
+                                # errored_data_batch.append(errored_data)
+
+                            # if response['errors'][0]['statusCode'] == 'CANNOT_INSERT_UPDATE_ACTIVATE_ENTITY':
+                            #     # get errored ids
+                            #     pass
+                            #     # self.pushBulk(object_name, [errored_data_object], retry=True)
                             
                     else:
                         if response['created']:
@@ -165,6 +174,7 @@ class HarvardSalesforce:
                         else:
                             updated_count += 1
                         logger.debug(response)
+
 
                 if len(dupe_data_batch) > 0:
                     # let's only deal with duplicates on Contact

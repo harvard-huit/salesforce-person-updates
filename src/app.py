@@ -231,7 +231,6 @@ class SalesforcePersonUpdates:
         """
         logger.info(f"Starting department hierarchy setup")
 
-
         # get the record type ids for Account
         account_record_type_ids = self.hsf.get_record_type_ids('Account')
 
@@ -243,21 +242,24 @@ class SalesforcePersonUpdates:
 
             if 'hierarchy' not in self.app_config.config['Account']:
                 raise Exception(f"Error: hierarchy config not found in Account config")
+            if 'fields' not in self.app_config.config['Account']['hierarchy']:
+                raise Exception(f"Error: fields not found in hierarchy config")
+            
+            account_type_map = self.hsf.getTypeMap(['Account'])
+            for field in self.app_config.config['Account']['hierarchy']['fields']:
+                if field not in account_type_map['Account']:
+                    raise Exception(f"Error: field {field} not found in Account Object")
             
             simplify_codes = False
             if 'simplify_codes' in self.app_config.config['Account']['hierarchy']:
                 simplify_codes = self.app_config.config['Account']['hierarchy']['simplify_codes']
 
             # check length of the external id
-            account_type_map = self.hsf.getTypeMap(['Account'])
             if external_id not in account_type_map['Account']:
                 raise Exception(f"Error: external_id {external_id} not found in Account Object")
             if account_type_map['Account'][external_id]['externalId'] is False:
                 raise Exception(f"Error: external_id {external_id} is not an external id")
-            if code_field not in account_type_map['Account']:
-                raise Exception(f"Error: code_field {code_field} not found in Account Object")
-            if description_field not in account_type_map['Account']:
-                raise Exception(f"Error: description_field {description_field} not found in Account Object")
+
             if account_type_map['Account'][external_id]['length'] < 10:
                 raise Exception(f"Error: external_id {external_id} is too short ({account_type_map['Account'][external_id]['length']} characters)")
             if account_type_map['Account'][external_id]['length'] >= 20:
@@ -1226,6 +1228,19 @@ try:
             logger.warning(f"delete complete")
 
         logger.info(f"delete-all-data action finished")
+    elif action == "static-query":
+        logger.info(f"static-query action called")
+        # query_filename = '../examples/example_pds_query_hms.json'
+        # f = open(query_filename, 'r')
+        # pds_query = json.load(f)
+        # f.close()
+        pds_query = sfpu.app_config.pds_query
+        pds_query['conditions'] = {
+            "cacheUpdateDate": "2024-02-14T05:00:00>2024-02-16T16:30:00"
+        }
+        sfpu.people_data_load(pds_query=pds_query)
+
+        logger.info(f"static-query action finished")
     elif action == "test":
         logger.info(f"test action called")
 
