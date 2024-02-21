@@ -281,12 +281,16 @@ class SalesforcePersonUpdates:
                 simplified_codes.append(simplified_code)
 
                 data_obj = {
-                    'Name': description,
-                    external_id: simplified_code,
-                    code_field: code,
-                    description_field: description
+                    external_id: simplified_code
                 }
 
+                for field_name, val in self.app_config.config['Account']['hierarchy']['fields']:
+                    if val == 'code':
+                        data_obj[field_name] = code
+                    if val == 'description':
+                        data_obj[field_name] = description
+
+                # TODO: make this a config
                 if 'Major Affiliation' in account_record_type_ids.keys():
                     record_type_id = account_record_type_ids['Major Affiliation']
                     data_obj['RecordTypeId'] = record_type_id
@@ -317,14 +321,18 @@ class SalesforcePersonUpdates:
                 simplified_codes.append(simplified_code)
 
                 data_obj = {
-                    'Name': description,
                     external_id: simplified_code,
                     'Parent': {
                         external_id: simplified_parent_code
-                    },
-                    code_field: code,
-                    description_field: description
+                    }
                 }
+
+                for field_name, val in self.app_config.config['Account']['hierarchy']['fields']:
+                    if val == 'code':
+                        data_obj[field_name] = code
+                    if val == 'description':
+                        data_obj[field_name] = description
+
                 if 'Sub Affiliation' in account_record_type_ids.keys():
                     record_type_id = account_record_type_ids['Sub Affiliation']
                     data_obj['RecordTypeId'] = record_type_id
