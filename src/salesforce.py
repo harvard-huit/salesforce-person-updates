@@ -208,8 +208,10 @@ class HarvardSalesforce:
 
             retries -= 1
             if retries == 0:
-                logger.warning(f"Failure to push these records: {errored_data_batch}")
-                return False
+                if len(errored_data_batch) > 0:
+                    logger.warning(f"Warning: failed to push these records: {errored_data_batch}")
+                    return False
+                return True
 
         except Exception as e:
             # logger.error(f"Error with data push: {e}")
@@ -980,3 +982,4 @@ class HarvardSalesforce:
             raise e
         
         return ids
+    

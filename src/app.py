@@ -220,9 +220,7 @@ class SalesforcePersonUpdates:
 
     def setup_department_hierarchy(self, 
                                    department_hash: dict, 
-                                   external_id: str, 
-                                   code_field: str, 
-                                   description_field: str):
+                                   external_id: str):
         """
         NOTE on simplifying codes: we had to do this because codes are more than 10 characters and the current id field is 
           limited to 10 characters
@@ -284,7 +282,7 @@ class SalesforcePersonUpdates:
                     external_id: simplified_code
                 }
 
-                for field_name, val in self.app_config.config['Account']['hierarchy']['fields']:
+                for field_name, val in self.app_config.config['Account']['hierarchy']['fields'].items():
                     if val == 'code':
                         data_obj[field_name] = code
                     if val == 'description':
@@ -327,7 +325,7 @@ class SalesforcePersonUpdates:
                     }
                 }
 
-                for field_name, val in self.app_config.config['Account']['hierarchy']['fields']:
+                for field_name, val in self.app_config.config['Account']['hierarchy']['fields'].items():
                     if val == 'code':
                         data_obj[field_name] = code
                     if val == 'description':
@@ -378,9 +376,7 @@ class SalesforcePersonUpdates:
 
         external_id = self.app_config.config['Account']['Id']['salesforce']
         if hierarchy:
-            code_field = self.app_config.config['Account']['hierarchy']['code_field']
-            description_field = self.app_config.config['Account']['hierarchy']['description_field']
-            self.setup_department_hierarchy(department_hash=hashed_departments, external_id=external_id, code_field=code_field, description_field=description_field)
+            self.setup_department_hierarchy(department_hash=hashed_departments, external_id=external_id)
 
 
         # data will have the structure of { "OBJECT": [{"FIELD": "VALUE"}, ...]}
