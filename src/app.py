@@ -524,11 +524,13 @@ class SalesforcePersonUpdates:
 
             # This will limit all updates to only those that already exist in Salesforce
             updated_ids = self.hsf.get_all_external_ids(object_name='Contact', external_id=self.app_config.config['Contact']['Id']['salesforce'])
+            if len(updated_ids) > 100000:
+                logger.warning(f"Updated id list may be too large for the PDS to handle: {len(updated_ids)}")
             pds_query['conditions'][self.app_config.config['Contact']['Id']['pds']] = updated_ids
 
         self.people_data_load(pds_query=pds_query)
 
-        if 'updatedFlag' in self.app_config.config['Contact'] and False:
+        if 'updatedFlag' in self.app_config.config['Contact']:
             updated_flag = self.app_config.config['Contact']['updatedFlag']
             # we could do the updated operation here instead of tying it into the update process
 
@@ -582,7 +584,11 @@ class SalesforcePersonUpdates:
                     logger.info(f"Updating existing people who don't fit conditions")
                     logger.debug(f"Existing people who don't fit conditions: {len(filtered_id_list)}")
                     # update the updatedFlag
-                    # self.hsf.flag_field(object_name='Contact', external_id=external_id, flag_name=updated_flag, value=False, ids=filtered_id_list)
+                    if len(filtered_id_list) > 10000 and self.record_limit is None:
+                        logger.warning(f"Filtered id list may be too large: {len(filtered_id_list)}, consider adding a record_limit")
+                    if len(filtered_id_list) > 50000 and self.record_limit is None:
+                        raise Exception(f"Filtered id list is too large: {len(filtered_id_list)} or add a record_limit")
+                    self.hsf.flag_field(object_name='Contact', external_id=external_id, flag_name=updated_flag, value=False, ids=filtered_id_list)
                     try:
                         pds_query['conditions'] = {}
                         pds_query['conditions'][pds_id] = filtered_id_list
@@ -1059,8 +1065,6 @@ try:
         updates_only = False
 
         sfpu.update_people_data_load(updates_only=updates_only)
-    elif action == 'person-updates-updates-only':
-        sfpu.update_people_data_load(updates_only=True)
     elif action == 'full-department-load':
         hierarchy = False
         if 'hierarchy' in sfpu.app_config.config['Account']:
