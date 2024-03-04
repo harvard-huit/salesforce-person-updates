@@ -645,6 +645,8 @@ class SalesforcePersonUpdates:
         if pds_query is None:
             pds_query = self.app_config.pds_query
 
+        logger.info(f"{pds_query}")
+
         try:
             self.pds.start_pagination(pds_query)
 
