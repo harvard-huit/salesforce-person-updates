@@ -23,10 +23,12 @@ target_app_name: "salesforce-person-updates"
 # target_app_hostname: "person-api"
 # target_app_zone: "dev.ats.cloud.huit.harvard.edu"
 
-target_container_image: "artifactory.huit.harvard.edu/ats-docker/salesforce-person-updates"
+# target_container_image: "001980101248.dkr.ecr.us-east-1.amazonaws.com/aais-services-dev-feed-salesforce-person-updates"
 
+target_container_image: "artifactory.huit.harvard.edu/ats-docker/salesforce-person-updates"
 target_container_credentials: "arn:aws:secretsmanager:us-east-1:001980101248:secret:aais-services-artifactory-creds-sEMlXO"
 target_container_host: "artifactory.huit.harvard.edu:443"
+use_cache: true
 
 target_launchtype: "FARGATE"
 target_alb_name: "def"
