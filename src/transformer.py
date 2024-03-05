@@ -129,7 +129,10 @@ class SalesforceTransformer:
                     else: 
                         if isinstance(source_object, (dict)):
                             if 'value' in source_object:
-                                value_references = [source_object['value']]
+                                if isinstance(source_object['value'], list):
+                                    value_references = source_object['value']
+                                else:
+                                    value_references = [source_object['value']]
                             if 'when' in source_object:
                                 when = source_object['when']
                             if 'static' in source_object:
@@ -298,6 +301,9 @@ class SalesforceTransformer:
 
                         if object_name not in current_record:
                             current_record[object_name] = {}
+                        
+                        # if 'picklist' in source_object:
+                        #     value = self.picklist_transform(object_name, target, value)
 
                         if not is_branched:
                             current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value, identifier=source_data_object)
@@ -331,6 +337,8 @@ class SalesforceTransformer:
                                 sources = source_value['ref']['source_value_ref']
                                 if not isinstance(sources, list):
                                     sources = [sources]
+                            elif 'picklist' in source_value.keys():
+                                sources = source_value['value']
                         elif isinstance(source_value, list):
                             sources = source_value
                         else: 
@@ -388,7 +396,10 @@ class SalesforceTransformer:
                                     value_obj[source_value['ref']['ref_external_id']] = value
                                     
                                     current_record[object_name][target] = value_obj
+
                                 else:
+                                    if isinstance(source_value, dict) and 'picklist' in source_value:
+                                        value = self.picklist_transform(object_name, target, value)
                                     current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value, identifier=source_data_object)
                                 # break out of the sources, we already found the one for this target
                                 break
@@ -552,4 +563,16 @@ class SalesforceTransformer:
                 
         return is_best
 
-
+    def picklist_transform(self, object_name, field_name, value):
+        if self.config[object_name]['fields'][field_name]['picklist']:
+            picklist_mapping = self.config[object_name]['fields'][field_name]['picklist']
+            default_value = value
+            for key, val in picklist_mapping.items():
+                if value in val:
+                    return key
+                if "default" in val:
+                    default_value = key
+            return default_value
+        else:
+            logger.warning(f"Warning: picklist_transform called on non-picklist field ({object_name}.{field_name})")
+            return value
