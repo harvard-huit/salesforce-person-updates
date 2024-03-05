@@ -558,6 +558,14 @@ class HarvardSalesforce:
                 return str(value)
         elif field_type in ["picklist", "multipicklist"]:
             # not really sure I want to validate what the picklist values are
+            if object == "Affiliation__c" and field == "Role__c":
+                # this is a special case to handle a specfic picklist in HUIT Sales and transp
+                if value in ["STUDENT", "CLASPART"]:
+                    return "Student"
+                elif value in ["EMPLOYEE", "INTERAFF"]:
+                    return "Employee"
+                else: 
+                    return "HSR"
             return str(value)
         elif field_type in ["email"]:
             # if the value is a valid email, return it

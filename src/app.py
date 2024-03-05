@@ -609,10 +609,21 @@ class SalesforcePersonUpdates:
         watermark = self.app_config.update_watermark("person")
         logger.info(f"Watermark updated: {watermark}")
 
-    def full_people_data_load(self, dry_run=False):
+    def full_people_data_load(self, dry_run=False, updates_only=False):
         logger.info(f"Processing full data load")
 
         try:
+
+            pds_query = self.app_config.pds_query
+            if updates_only and False:
+                # if we are updating only, we need to add ids to the query..
+                if 'conditions' not in pds_query:
+                    pds_query['conditions'] = {}
+                all_ids = self.hsf.get_all_external_ids(object_name='Contact', external_id=self.app_config.config['Contact']['Id']['salesforce'])
+                pds_query['conditions'][self.app_config.config['Contact']['Id']['pds']] = all_ids
+                # this may fail if the id list is too large ... this requires testing
+                # TODO: test this!
+
             self.people_data_load(dry_run=dry_run)
 
             logger.debug(f"Waiting for batch jobs to finish.")
@@ -1057,7 +1068,15 @@ try:
     if action == 'single-person-update' and len(person_ids) > 0:
         sfpu.update_single_person(person_ids)
     elif action == 'full-person-load':
-        sfpu.full_people_data_load()
+        updates_only = False
+        if 'Contact' in sfpu.app_config.config and 'updateOnlyFlag' in sfpu.app_config.config['Contact'] and sfpu.app_config.config['Contact']['updateOnlyFlag'] == True:
+            updates_only = True
+
+        # disabling updates_ony for now
+        updates_only = False
+
+        sfpu.full_people_data_load(updates_only=updates_only)
+
     elif action == 'person-updates':
         updates_only = False
         if 'Contact' in sfpu.app_config.config and 'updateOnlyFlag' in sfpu.app_config.config['Contact'] and sfpu.app_config.config['Contact']['updateOnlyFlag'] == True:
