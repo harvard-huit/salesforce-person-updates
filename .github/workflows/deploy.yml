@@ -54,13 +54,6 @@ jobs:
         with:
           path: ./salesforce
 
-      # Checking out the cluster config to provide it for the Deploy Action
-      - name: Checkout cluster config
-        uses: actions/checkout@v3
-        with:
-          repository: HUIT/aais-services-config
-          path: ./aais-services-config
-
       - name: Login to artifactory
         run: |
           docker login artifactory.huit.harvard.edu --username "${{ secrets.ARTIFACTORY_USER }}" --password "${{ secrets.ARTIFACTORY_PWD }}"
@@ -100,6 +93,6 @@ jobs:
           # Optional
           #   this needs to match the directory the main repository was checked out into
           #   if the checkout was done without a path, this is not needed
-          app_root: checkout
+          app_root: salesforce
 
      
