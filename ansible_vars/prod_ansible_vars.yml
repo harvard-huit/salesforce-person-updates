@@ -25,6 +25,7 @@ target_container_image: "artifactory.huit.harvard.edu/ats-docker/salesforce-pers
 
 target_container_credentials: "arn:aws:secretsmanager:us-east-1:949726781110:secret:aais-services-prod-artifactory-creds-BVDDOX"
 target_container_host: "artifactory.huit.harvard.edu:443"
+use_cache: true
 
 target_launchtype: "FARGATE"
 target_alb_name: "def"
