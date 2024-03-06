@@ -129,7 +129,10 @@ class SalesforceTransformer:
                     else: 
                         if isinstance(source_object, (dict)):
                             if 'value' in source_object:
-                                value_references = [source_object['value']]
+                                if isinstance(source_object['value'], list):
+                                    value_references = source_object['value']
+                                else:
+                                    value_references = [source_object['value']]
                             if 'when' in source_object:
                                 when = source_object['when']
                             if 'static' in source_object:
@@ -146,11 +149,16 @@ class SalesforceTransformer:
                                 ref_object = source_object['ref']['object']
                                 ref_external_id_name = source_object['ref']['ref_external_id']
                                 source_value_ref = source_object['ref']['source_value_ref']
+                                if isinstance(source_value_ref, list):
+                                    for possible_source_value_ref in source_value_ref:
+                                        if possible_source_value_ref in source_data_object:
+                                            source_value_ref = possible_source_value_ref
+                                            break
                                 if '.' in source_value_ref and is_flat:
                                     (obj, val) = source_value_ref.split(".")
                                     source_value = source_data_object[obj][val]
                                 else:
-                                    source_value = source_data_object[source_value_ref]
+                                    source_value = None
                                 if 'simplify_code' in source_object['ref']:
                                     if source_object['ref']['simplify_code'] == True:
                                         source_value = Departments.simplify_code(source_value)
@@ -293,6 +301,9 @@ class SalesforceTransformer:
 
                         if object_name not in current_record:
                             current_record[object_name] = {}
+                        
+                        # if 'picklist' in source_object:
+                        #     value = self.picklist_transform(object_name, target, value)
 
                         if not is_branched:
                             current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value, identifier=source_data_object)
@@ -321,7 +332,14 @@ class SalesforceTransformer:
                     
                     for target, source_value in source_config[object_name]['fields'].items():
                         
-                        if isinstance(source_value, list):
+                        if isinstance(source_value, dict):
+                            if 'ref' in source_value.keys():
+                                sources = source_value['ref']['source_value_ref']
+                                if not isinstance(sources, list):
+                                    sources = [sources]
+                            elif 'picklist' in source_value.keys():
+                                sources = source_value['value']
+                        elif isinstance(source_value, list):
                             sources = source_value
                         else: 
                             sources = [source_value]
@@ -331,15 +349,10 @@ class SalesforceTransformer:
                             # for source in sources:
                             # logger.debug(f"source: {source}")
                             value = None
-                            if isinstance(source, dict):
-                                if 'ref' in source:
-                                    # current_record[object_name][target] = source['ref']
-                                    source_pieces = source['ref']['source_value_ref'].split(".")
-                            else:
-                                source_pieces = source.split(".")
+                            source_pieces = source.split(".")
 
                             # this might be needed for affiliations
-                            if (source_pieces[0] not in [branch_name, 'sf']) and isinstance(source_value, list):
+                            if (source_pieces[0] not in [branch_name, 'sf']) and len(sources) > 1:
                                 continue
                             
                             branch_temp = branch
@@ -352,6 +365,7 @@ class SalesforceTransformer:
 
                             if source_pieces[0] == 'sf':
                                 # NOTE: this should be deprecated in favor of relying on external ids
+                                logger.warning(f"Warning: source 'sf.*' syntax is deprecated, use external ids")
                                 source_pieces = source_pieces[1:]
                                 if source_pieces[0] in salesforce_person:
                                     if isinstance(salesforce_person, (str, bool, int)):
@@ -372,17 +386,20 @@ class SalesforceTransformer:
                                     current_record[object_name][target] = None
                                     continue
                                 
-                                if isinstance(source, dict) and 'ref' in source:
-                                    if 'simplify_code' in source['ref']:
-                                        if source['ref']['simplify_code'] == True:
+                                if isinstance(source_value, dict) and 'ref' in source_value:
+                                    if 'simplify_code' in source_value['ref']:
+                                        if source_value['ref']['simplify_code'] == True:
                                             value = Departments.simplify_code(value)
                                     if value is None:
                                         continue
                                     value_obj = {}
-                                    value_obj[source['ref']['ref_external_id']] = value
+                                    value_obj[source_value['ref']['ref_external_id']] = value
                                     
                                     current_record[object_name][target] = value_obj
+
                                 else:
+                                    if isinstance(source_value, dict) and 'picklist' in source_value:
+                                        value = self.picklist_transform(object_name, target, value)
                                     current_record[object_name][target] = self.hsf.validate(object=object_name, field=target, value=value, identifier=source_data_object)
                                 # break out of the sources, we already found the one for this target
                                 break
@@ -546,4 +563,16 @@ class SalesforceTransformer:
                 
         return is_best
 
-
+    def picklist_transform(self, object_name, field_name, value):
+        if self.config[object_name]['fields'][field_name]['picklist']:
+            picklist_mapping = self.config[object_name]['fields'][field_name]['picklist']
+            default_value = value
+            for key, val in picklist_mapping.items():
+                if value in val:
+                    return key
+                if "default" in val:
+                    default_value = key
+            return default_value
+        else:
+            logger.warning(f"Warning: picklist_transform called on non-picklist field ({object_name}.{field_name})")
+            return value

@@ -2,8 +2,9 @@ import os
 import json
 import jsonschema
 import logging
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from simple_salesforce import Salesforce, exceptions
+import re
 
 import psutil
 
@@ -19,6 +20,11 @@ class HarvardSalesforce:
         # list of job references
         self.jobs = []
         self.unique_ids = {}
+
+        # set of unresolved errors encountered
+        self.errors = {}
+        self.error_count = 0
+
         try: 
             logger.debug(f"Salesforce initializing to {self.domain} as {self.username}")
             if(token is not None):
@@ -69,7 +75,7 @@ class HarvardSalesforce:
     # NOTE: the Bulk API can take a max of 10000 records at a time
     # a single record will take anywhere from 2-50 seconds
     # dupe: this makes sure we don't keep retrying a dupe check
-    def pushBulk(self, object, data, dupe=False, id_name='Id', retries=3):
+    def pushBulk(self, object, data, id_name='Id', dupe=False, retries=2):
 
 
         # check memory usage
@@ -126,34 +132,41 @@ class HarvardSalesforce:
                         "ids": []
                     }
                 for index, response in enumerate(responses):
-                    if response['success'] != True: 
+                    if response['success'] != True:
                         
                         errored_data = data[index]
                         logger.debug(f"Record failure in bulk data load: {response['errors']} ({errored_data})")
 
-                        if response['errors'][0]['statusCode'] == 'DUPLICATES_DETECTED':
+                        error_name = response['errors'][0]['statusCode']
 
+                        if error_name == 'DUPLICATES_DETECTED':
                             if dupe:
                                 logger.error(f"Error: DUPLICATE DETECTED (unresoved): {errored_data}")
                             else:
-                                logger.error(f"Error: DUPLICATE DETECTED -- Errored Data: {errored_data}")
+                                logger.error(f"Error: DUPLICATE DETECTED Errored Data: {errored_data}")
                                 dupe_data_batch.append(errored_data)
-
                         # if it's invalid and the message is about an external id not existing, we want to ignore it
-                        if response['errors'][0]['statusCode'] == 'INVALID_FIELD':
+                        elif error_name == 'INVALID_FIELD':
                             if response['errors'][0]['message'].startswith("Foreign key external ID"): 
                                 # we want to ignore this error as it happens if the Contact didn't make it
                                 logger.debug(f"Warning: INVALID_FIELD (external id): {response['errors'][0]['message']}")
                             else:
                                 logger.warning(f"Warning: INVALID_FIELD: {response['errors'][0]['message']}")
-                        else: 
-                            logger.error(f"Error: {response['errors'][0]['statusCode']}: {errored_data}")
-                            errored_data_batch.append(errored_data)
 
-                        # if response['errors'][0]['statusCode'] == 'CANNOT_INSERT_UPDATE_ACTIVATE_ENTITY':
-                        #     # get errored ids
-                        #     pass
-                        #     # self.pushBulk(object_name, [errored_data_object], retry=True)
+                        else:
+                        
+                            if error_name == 'FIELD_CUSTOM_VALIDATION_EXCEPTION':
+                                logger.error(f"Error: FIELD_CUSTOM_VALIDATION_EXCEPTION: {object}.{id_name}: {errored_data[id_name]}")
+                            elif error_name == 'STRING_TOO_LONG':
+                                logger.error(f"Error: STRING_TOO_LONG: {object}.{id_name}: {errored_data[id_name]}")
+                            else: 
+                                logger.error(f"Error: {response['errors'][0]['statusCode']}: {errored_data}")
+                                # errored_data_batch.append(errored_data)
+
+                            # if response['errors'][0]['statusCode'] == 'CANNOT_INSERT_UPDATE_ACTIVATE_ENTITY':
+                            #     # get errored ids
+                            #     pass
+                            #     # self.pushBulk(object_name, [errored_data_object], retry=True)
                             
                     else:
                         if response['created']:
@@ -162,22 +175,12 @@ class HarvardSalesforce:
                             updated_count += 1
                         logger.debug(response)
 
+
                 if len(dupe_data_batch) > 0:
-                    dupe_errors = self.check_duplicate(object, dupe_data_batch)
+                    # let's only deal with duplicates on Contact
+                    if object == 'Contact':
+                        dupe_errors = self.check_duplicate(object, dupe_data_batch, id_name=id_name)
                     error_count += dupe_errors
-
-                if len(errored_data_batch) > 0:
-
-                    logger.info(f"Trying errored records again {retries} more times")
-                    retries -= 1
-                    continue
-                    # retry_response = self.pushBulk(object, errored_data_batch, retries=retries)
-
-                    # if isinstance(retry_response, int):
-                    #     error_count += retry_response
-                    # else:
-                    #     logger.info(f"Retry successful")
-
 
                 if 'ids' in created_ids and len(created_ids['ids']) > 0:
                     logger.info(created_ids)
@@ -188,14 +191,30 @@ class HarvardSalesforce:
                     logger.info(f"Created {object} Records: {created_count}")
                 if error_count > 0:
                     logger.info(f"Errored {object} Records: {error_count}")
-                break
 
+                if len(errored_data_batch) > 0 and retries > 0:
+
+                    data = errored_data_batch
+                    logger.info(f"Trying errored records again {retries} more times")
+                    # retry_response = self.pushBulk(object, errored_data_batch, retries=retries)
+
+                    # if isinstance(retry_response, int):
+                    #     error_count += retry_response
+                    # else:
+                    #     logger.info(f"Retry successful")
+                else:
+
+                    break
+
+            retries -= 1
             if retries == 0:
-                logger.error(f"Failure to push these records: {errored_data_batch}")
-                return False
+                if len(errored_data_batch) > 0:
+                    logger.warning(f"Warning: failed to push these records: {errored_data_batch}")
+                    return False
+                return True
 
         except Exception as e:
-            logger.error(f"Error with data push: {e}")
+            # logger.error(f"Error with data push: {e}")
             raise e
 
         return True
@@ -275,7 +294,7 @@ class HarvardSalesforce:
 
             except Exception as e:
                 logger.error("Failure to flag fields")
-                raise
+                raise e
 
 
 
@@ -541,7 +560,13 @@ class HarvardSalesforce:
             # not really sure I want to validate what the picklist values are
             return str(value)
         elif field_type in ["email"]:
-            return str(value)
+            # if the value is a valid email, return it
+            # otherwise, log the error and return None
+            if re.match(r"[^@]+@[^@]+\.[^@]+", value):
+                return str(value)
+            else:
+                logger.warning(f"Warning: {value} is not a valid email. Identifier: {identifier}")
+                return None
         elif field_type in ["id", "reference"]:
             return value
         elif field_type in ["date"]:
@@ -575,7 +600,18 @@ class HarvardSalesforce:
             except ValueError as e:
                 logger.error(f"Error: {e}. Indentifier: {identifier}")
                 return None
+            
+            # # if valid_date has a time of exactly midnight (T00:00:00)
+            # if valid_date.time() == datetime.min.time():
+            #     # we want to move the time forward 5 hours to make it 5am
+            #     # this is because salesforce will assume the date is in UTC if it doesn't have a timezone qualifier
+            #     # and we want to make sure it's in EST
+            #     # Open to suggestions if someone has a better way to handle this
+            #     valid_date = valid_date + timedelta(hours=5)
+
+
             return value
+
         elif field_type in ["double"]:
             try: 
                 return float(value)
@@ -797,7 +833,7 @@ class HarvardSalesforce:
 
     # this method is trying to find an Id for a record that failed as a dupe
     # the `errored_data_object` should be of the same record that triggered the error
-    def check_duplicate(self, object_name, errored_data_objects, dry_run=False):
+    def check_duplicate(self, object_name, errored_data_objects, id_name='Id', dry_run=False):
 
 
         error_count = len(errored_data_objects)
@@ -818,6 +854,11 @@ class HarvardSalesforce:
                     if field in errored_data_object:
                         field_value = errored_data_object[field]
                         whereses.append(f"{field} = '{field_value}'")
+                
+                where_clause = "(" + " and ".join(whereses) + ")"
+                
+                # reset whereses
+                whereses = []
 
                 # this is to handle the standard contact duplicate matching rule, or at least the most common breaking of it
                 # see: https://help.salesforce.com/s/articleView?language=en_US&id=sf.matching_rules_standard_contact_rule.htm&type=5
@@ -834,7 +875,7 @@ class HarvardSalesforce:
                         
                         whereses.append(f"{standard_contact_rule_string}")
                 
-                where_clause = " or ".join(whereses)
+                where_clause += " or ".join(whereses)
 
                 select_string = f"SELECT {object_name}.Id FROM {object_name} WHERE {where_clause}"
                 logger.debug(select_string)
@@ -842,7 +883,9 @@ class HarvardSalesforce:
                 logger.debug(f"got this data from salesforce: {sf_data['records']}")
 
                 if len(sf_data['records']) > 1:
-                    logger.error(f"DUPLICATES DETECTED: {sf_data} -- too many records found on object {object_name} with this select: {select_string} and this data: {errored_data_object}")
+                    found_ids = [record['Id'] for record in sf_data['records']]
+
+                    logger.error(f"Failed resolving duplicate! : too many records found on object {object_name} with this select: {select_string}")
                 elif len(sf_data['records']) < 1:
                     logger.error(f"Error: no records found on object {object_name} with this data: {errored_data_object}")
                 else:
@@ -853,7 +896,7 @@ class HarvardSalesforce:
                     retryable_data_objects.append(errored_data_object)
 
             if not dry_run and len(retryable_data_objects) > 0:
-                self.pushBulk(object_name, retryable_data_objects, dupe=True)
+                self.pushBulk(object_name, retryable_data_objects, dupe=True, id_name=id_name)
             return error_count
 
         except Exception as e:
@@ -939,3 +982,4 @@ class HarvardSalesforce:
             raise e
         
         return ids
+    

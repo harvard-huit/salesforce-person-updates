@@ -6,6 +6,14 @@
             "departments": "hrDeptId",
             "salesforce": "HUDA__hud_DEPT_ID__c"
         },
+        "hierarchy": {
+            "fields": {
+                "Name": "description",
+                "Description": "description",
+                "HUDA__hud_DEPT_SHORT_DESC__c": "code"    
+            },
+            "simplify_codes": true
+        },
         "fields": {
             "HUDA__hud_DEPT_ID__c": "hrDeptId",
             "Name": "hrDeptDesc",

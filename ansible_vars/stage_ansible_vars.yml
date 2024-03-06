@@ -7,7 +7,7 @@
 
 # target_desired_task_count: 2
 target_app_context: "/salesforce-person-updates"
-target_app_version: "v1.0.4"
+target_app_version: "v1.0.5-r3"
 create_service: false
 
 # this is the lowest for fargate?
@@ -69,17 +69,17 @@ schedules:
         value: "person-updates"
     schedule_rule_state: "DISABLED"
 
-    ####### HKS Partial Sandbox ####################################################################
+    ####### HKS Full Sandbox ####################################################################
   - schedule_rule_name: "hks-updates" # this will be appended to the task definition name, e.g my-cluster-dev-feed-my-dataload-half-hourly
     schedule_expression: "rate(30 minutes)" # rate or cron expression
     # optional
-    schedule_rule_description: "Updates for the HKS partial sandbox"
+    schedule_rule_description: "Updates for the HKS full sandbox"
     # environment variable overrides
     schedule_env_overrides:
       - name: "TABLE_NAME"
         value: "aais-services-salesforce-person-updates-stage"
       - name: "SALESFORCE_INSTANCE_ID"
-        value: "hks-partial-sandbox"
+        value: "hks-full-sandbox"
       - name: "action"
         value: "person-updates"
     schedule_rule_state: "DISABLED"
@@ -97,4 +97,42 @@ schedules:
         value: "cs-full-sandbox"
       - name: "action"
         value: "person-updates"
+    schedule_rule_state: "DISABLED"
+
+    ####### New HUIT (Prod?) ####################################################################
+    # required
+    # Note: the full schedule name can only be 64 characters long
+  - schedule_rule_name: "huit2-updates" # this will be appended to the task definition name, e.g my-cluster-dev-feed-my-dataload-half-hourly
+    schedule_expression: "rate(30 minutes)" # rate or cron expression
+    # optional
+    schedule_rule_description: "Updates for the New HUIT Org. Every 30 minutes."
+    # environment variable overrides
+    schedule_env_overrides:
+      - name: "TABLE_NAME"
+        value: "aais-services-salesforce-person-updates-stage"
+      - name: "SALESFORCE_INSTANCE_ID"
+        value: "huit2-prod-temp"
+      - name: "action"
+        value: "person-updates"
+  # - schedule_rule_name: "mon-fri" # this will be appended to the task definition name, e.g my-cluster-dev-feed-my-dataload-mon-fri
+  #   schedule_expression: "cron(5 * * * 1-5)" # rate or cron expression
+    schedule_rule_state: "DISABLED"
+
+    ####### CS Transportation (Prod) ####################################################################
+    # required
+    # Note: the full schedule name can only be 64 characters long
+  - schedule_rule_name: "transp-updates" # this will be appended to the task definition name, e.g my-cluster-dev-feed-my-dataload-half-hourly
+    schedule_expression: "rate(30 minutes)" # rate or cron expression
+    # optional
+    schedule_rule_description: "Updates for the CS Transportation Prod. Every 30 minutes."
+    # environment variable overrides
+    schedule_env_overrides:
+      - name: "TABLE_NAME"
+        value: "aais-services-salesforce-person-updates-stage"
+      - name: "SALESFORCE_INSTANCE_ID"
+        value: "transp-prod-temp"
+      - name: "action"
+        value: "person-updates"
+  # - schedule_rule_name: "mon-fri" # this will be appended to the task definition name, e.g my-cluster-dev-feed-my-dataload-mon-fri
+  #   schedule_expression: "cron(5 * * * 1-5)" # rate or cron expression
     schedule_rule_state: "DISABLED"

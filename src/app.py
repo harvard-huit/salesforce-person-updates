@@ -1,5 +1,5 @@
 from logging import LogRecord
-from common import isTaskRunning, logger, stack, AppConfig
+from common import isTaskRunning, setTaskRunning, logger, stack, AppConfig
 import pds
 from salesforce import HarvardSalesforce
 from transformer import SalesforceTransformer
@@ -17,19 +17,34 @@ from datetime import datetime
 from pprint import pformat
 import psutil
 
+import inspect
+def is_unittest():
+    for frame in inspect.stack():
+        if 'unittest' in frame.filename:
+            return True
+    return False
+
 if stack == 'developer':
     from dotenv import load_dotenv
     load_dotenv() 
 
     config_filename = '../example_config.json'
+    
     if os.getenv("CONFIG_FILENAME") is not None:
         config_filename = os.getenv("CONFIG_FILENAME")
+
+    if is_unittest():
+        config_filename = '../' + config_filename
 
     f = open(config_filename, 'r')
     config = json.load(f)
     f.close()
 
-    f = open('../example_pds_query.json')
+    query_filename = '../example_pds_query.json'
+    if is_unittest():
+        query_filename = '../' + query_filename
+
+    f = open(query_filename, 'r')
     pds_query = json.load(f)
     f.close()
 ####################################
@@ -42,6 +57,7 @@ if os.getenv("person_ids"):
 else:
     person_ids = []
 
+pds_batch_size_override = os.getenv("PDS_BATCH_SIZE") or None
 batch_size_override = os.getenv("BATCH_SIZE") or None
 batch_thread_count_override = os.getenv("BATCH_THREAD_COUNT") or None
 LOCAL = os.getenv("LOCAL") or False
@@ -50,20 +66,13 @@ LOCAL = os.getenv("LOCAL") or False
 class SalesforcePersonUpdates:
     def __init__(self, local=False):
         try:
-            if(stack != "developer" and False):
-                # NOTE: this doesn't work / make sense as is
-                #       this also needs to check if it's running on a particular SF instance
-                logger.info("Checking if task is already running")
-                if isTaskRunning() and stack != 'developer':
-                    logger.warning("WARNING: application already running")
-                    exit()
-
             self.salesforce_instance_id = os.getenv("SALESFORCE_INSTANCE_ID", None)
             self.table_name = os.getenv("TABLE_NAME", None)
 
             self.action = os.getenv("action", None)
+            self.version = os.getenv("APP_VERSION", None)
 
-            logger.info(f"Starting PDC {self.action} action on: {self.salesforce_instance_id}")
+            logger.info(f"Starting PDC {self.action} action on: {self.salesforce_instance_id} with version: {self.version}")
 
             current_time_mash = datetime.now().strftime('%Y%m%d%H%M')
             self.run_id = f"{self.action}_{current_time_mash}"
@@ -76,7 +85,7 @@ class SalesforcePersonUpdates:
                     raise Exception("ERROR: SALESFORCE_INSTANCE_ID and TABLE_NAME are required env vars, these tell us where to get the configuration.")
 
                 self.app_config = AppConfig(id=self.salesforce_instance_id, table_name=self.table_name)
-            
+
             if os.getenv("FORCE_LOCAL_CONFIG"):
                 self.app_config.config = config
                 # self.app_config.pds_query = pds_query
@@ -120,13 +129,26 @@ class SalesforcePersonUpdates:
             # initialize storage for updated ids
             self.updated_ids = []
 
+            # if batch_size_override:
+            #     batch_size = int(batch_size_override)
+            # else:
+            #     batch_size = 500
+
+
+
             # self.pds_apikey = os.getenv("PDS_APIKEY")
             # initialize pds
-            if batch_size_override:
-                batch_size = int(batch_size_override)
+            if pds_batch_size_override:
+                self.pds_batch_size = int(pds_batch_size_override)
             else:
-                batch_size = 500
-            self.pds = pds.People(apikey=self.app_config.pds_apikey, batch_size=batch_size)
+                self.pds_batch_size = 500
+            self.pds = pds.People(apikey=self.app_config.pds_apikey, batch_size=self.pds_batch_size)
+
+            if batch_size_override:
+                self.batch_size = int(batch_size_override)
+            else:
+                self.batch_size = 1000
+
 
             if batch_thread_count_override:
                 self.batch_thread_count = int(batch_thread_count_override)
@@ -135,8 +157,6 @@ class SalesforcePersonUpdates:
             self.batch_threads = []
 
             self.transformer = SalesforceTransformer(config=self.app_config.config, hsf=self.hsf)
-
-
 
 
         except Exception as e:
@@ -200,9 +220,7 @@ class SalesforcePersonUpdates:
 
     def setup_department_hierarchy(self, 
                                    department_hash: dict, 
-                                   external_id: str, 
-                                   code_field: str, 
-                                   description_field: str):
+                                   external_id: str):
         """
         NOTE on simplifying codes: we had to do this because codes are more than 10 characters and the current id field is 
           limited to 10 characters
@@ -210,7 +228,6 @@ class SalesforcePersonUpdates:
         This is hard-coded. The configuration needs to be put in the config file.
         """
         logger.info(f"Starting department hierarchy setup")
-
 
         # get the record type ids for Account
         account_record_type_ids = self.hsf.get_record_type_ids('Account')
@@ -223,21 +240,24 @@ class SalesforcePersonUpdates:
 
             if 'hierarchy' not in self.app_config.config['Account']:
                 raise Exception(f"Error: hierarchy config not found in Account config")
+            if 'fields' not in self.app_config.config['Account']['hierarchy']:
+                raise Exception(f"Error: fields not found in hierarchy config")
+            
+            account_type_map = self.hsf.getTypeMap(['Account'])
+            for field in self.app_config.config['Account']['hierarchy']['fields']:
+                if field not in account_type_map['Account']:
+                    raise Exception(f"Error: field {field} not found in Account Object")
             
             simplify_codes = False
             if 'simplify_codes' in self.app_config.config['Account']['hierarchy']:
                 simplify_codes = self.app_config.config['Account']['hierarchy']['simplify_codes']
 
             # check length of the external id
-            account_type_map = self.hsf.getTypeMap(['Account'])
             if external_id not in account_type_map['Account']:
                 raise Exception(f"Error: external_id {external_id} not found in Account Object")
             if account_type_map['Account'][external_id]['externalId'] is False:
                 raise Exception(f"Error: external_id {external_id} is not an external id")
-            if code_field not in account_type_map['Account']:
-                raise Exception(f"Error: code_field {code_field} not found in Account Object")
-            if description_field not in account_type_map['Account']:
-                raise Exception(f"Error: description_field {description_field} not found in Account Object")
+
             if account_type_map['Account'][external_id]['length'] < 10:
                 raise Exception(f"Error: external_id {external_id} is too short ({account_type_map['Account'][external_id]['length']} characters)")
             if account_type_map['Account'][external_id]['length'] >= 20:
@@ -259,12 +279,16 @@ class SalesforcePersonUpdates:
                 simplified_codes.append(simplified_code)
 
                 data_obj = {
-                    'Name': description,
-                    external_id: simplified_code,
-                    code_field: code,
-                    description_field: description
+                    external_id: simplified_code
                 }
 
+                for field_name, val in self.app_config.config['Account']['hierarchy']['fields'].items():
+                    if val == 'code':
+                        data_obj[field_name] = code
+                    if val == 'description':
+                        data_obj[field_name] = description
+
+                # TODO: make this a config
                 if 'Major Affiliation' in account_record_type_ids.keys():
                     record_type_id = account_record_type_ids['Major Affiliation']
                     data_obj['RecordTypeId'] = record_type_id
@@ -295,14 +319,18 @@ class SalesforcePersonUpdates:
                 simplified_codes.append(simplified_code)
 
                 data_obj = {
-                    'Name': description,
                     external_id: simplified_code,
                     'Parent': {
                         external_id: simplified_parent_code
-                    },
-                    code_field: code,
-                    description_field: description
+                    }
                 }
+
+                for field_name, val in self.app_config.config['Account']['hierarchy']['fields'].items():
+                    if val == 'code':
+                        data_obj[field_name] = code
+                    if val == 'description':
+                        data_obj[field_name] = description
+
                 if 'Sub Affiliation' in account_record_type_ids.keys():
                     record_type_id = account_record_type_ids['Sub Affiliation']
                     data_obj['RecordTypeId'] = record_type_id
@@ -348,9 +376,7 @@ class SalesforcePersonUpdates:
 
         external_id = self.app_config.config['Account']['Id']['salesforce']
         if hierarchy:
-            code_field = self.app_config.config['Account']['hierarchy']['code_field']
-            description_field = self.app_config.config['Account']['hierarchy']['description_field']
-            self.setup_department_hierarchy(department_hash=hashed_departments, external_id=external_id, code_field=code_field, description_field=description_field)
+            self.setup_department_hierarchy(department_hash=hashed_departments, external_id=external_id)
 
 
         # data will have the structure of { "OBJECT": [{"FIELD": "VALUE"}, ...]}
@@ -441,11 +467,12 @@ class SalesforcePersonUpdates:
 
         for object, object_data in data.items():
             logger.debug(f"Upserting to {object} with {len(object_data)} records")
+            external_id = self.app_config.config[object]['Id']['salesforce']
 
             # unthreaded:
             # self.hsf.pushBulk(object, object_data)    
 
-            thread = threading.Thread(target=self.hsf.pushBulk, args=(object, object_data))
+            thread = threading.Thread(target=self.hsf.pushBulk, args=(object, object_data, external_id))
             thread.start()
             branch_threads.append(thread)
         
@@ -497,6 +524,8 @@ class SalesforcePersonUpdates:
 
             # This will limit all updates to only those that already exist in Salesforce
             updated_ids = self.hsf.get_all_external_ids(object_name='Contact', external_id=self.app_config.config['Contact']['Id']['salesforce'])
+            if len(updated_ids) > 100000:
+                logger.warning(f"Updated id list may be too large for the PDS to handle: {len(updated_ids)}")
             pds_query['conditions'][self.app_config.config['Contact']['Id']['pds']] = updated_ids
 
         self.people_data_load(pds_query=pds_query)
@@ -555,7 +584,11 @@ class SalesforcePersonUpdates:
                     logger.info(f"Updating existing people who don't fit conditions")
                     logger.debug(f"Existing people who don't fit conditions: {len(filtered_id_list)}")
                     # update the updatedFlag
-                    # self.hsf.flag_field(object_name='Contact', external_id=external_id, flag_name=updated_flag, value=False, ids=filtered_id_list)
+                    if len(filtered_id_list) > 10000 and self.record_limit is None:
+                        logger.warning(f"Filtered id list may be too large: {len(filtered_id_list)}, consider adding a record_limit")
+                    if len(filtered_id_list) > 50000 and self.record_limit is None:
+                        raise Exception(f"Filtered id list is too large: {len(filtered_id_list)} or add a record_limit")
+                    self.hsf.flag_field(object_name='Contact', external_id=external_id, flag_name=updated_flag, value=False, ids=filtered_id_list)
                     try:
                         pds_query['conditions'] = {}
                         pds_query['conditions'][pds_id] = filtered_id_list
@@ -576,10 +609,21 @@ class SalesforcePersonUpdates:
         watermark = self.app_config.update_watermark("person")
         logger.info(f"Watermark updated: {watermark}")
 
-    def full_people_data_load(self, dry_run=False):
+    def full_people_data_load(self, dry_run=False, updates_only=False):
         logger.info(f"Processing full data load")
 
         try:
+
+            pds_query = self.app_config.pds_query
+            if updates_only and False:
+                # if we are updating only, we need to add ids to the query..
+                if 'conditions' not in pds_query:
+                    pds_query['conditions'] = {}
+                all_ids = self.hsf.get_all_external_ids(object_name='Contact', external_id=self.app_config.config['Contact']['Id']['salesforce'])
+                pds_query['conditions'][self.app_config.config['Contact']['Id']['pds']] = all_ids
+                # this may fail if the id list is too large ... this requires testing
+                # TODO: test this!
+
             self.people_data_load(dry_run=dry_run)
 
             logger.debug(f"Waiting for batch jobs to finish.")
@@ -612,6 +656,8 @@ class SalesforcePersonUpdates:
         if pds_query is None:
             pds_query = self.app_config.pds_query
 
+        logger.info(f"{pds_query}")
+
         try:
             self.pds.start_pagination(pds_query)
 
@@ -621,53 +667,90 @@ class SalesforcePersonUpdates:
             batch_count = 1
             max_count = math.ceil(total_count / size)
 
-            logger.info(f"batch: {size}, total_count: {total_count}, max_count: {max_count}")
+            logger.info(f"pds_batch_size: {size}, total_count: {total_count}, max_count: {max_count}")
 
+            if self.record_limit:
+                total_count = self.record_limit
+
+            backlog = []
             while True:
 
+                # logger.debug(f"Getting next batch: {batch_count} ({current_count}/{total_count}) -- backlog: {len(backlog)}")
+                # logger.debug(f"is_paginating: {self.pds.is_paginating}")
+
                 results = self.pds.next_page_results()
+                current_run_result_count = len(results)
 
-                if len(results) < 1:
-                    break
-                people = self.pds.make_people(results)
+                # logger.info(f"got results... {current_run_result_count} records")
 
-                # check memory usage
-                memory_use_percent = psutil.virtual_memory().percent  # percentage of memory use
-                # memory_avail = psutil.virtual_memory().available * 0.000001  # memory available in MB
-                # memory_total = psutil.virtual_memory().total * 0.000001
+                if len(backlog) > 0:
+                    # if we have a backlog, we need to add it to the results
+                    logger.debug(f"Adding backlog to results: {len(backlog)}")
+                    results = backlog + results
+                    backlog = []
 
-                # this will get the current backlog of pds results
-                current_pds_backlog = self.pds.result_queue.qsize() * self.pds.batch_size
-                logger.info(f"Memory usage: {memory_use_percent}%  current pds backlog: {current_pds_backlog}/{self.pds.max_backlog} pds records {current_count}/{self.pds.total_count}")
+                current_count += current_run_result_count
+                if current_run_result_count > 0 and len(results) < self.batch_size and current_count < total_count:
+                    # if we have less than a full batch, we need to keep the results for the next batch
+                    logger.debug(f"Adding results to backlog: {len(results)}")
+                    backlog = results
+                    continue
                 
-                if stack != "developer":
-                    if (memory_use_percent > 50) and not LOCAL:
-                        time.sleep(60)
-                        memory_use_percent = psutil.virtual_memory().percent  # percentage of memory use
-
-                    if (memory_use_percent > 55) and not LOCAL:
-                        raise Exception(f"Out of memory ({memory_use_percent}): Kicking job before Fargate silently kicks it.")
+                # if the results are larger than the batch size, we need to keep the overflow for next run
+                if len(results) > self.batch_size:
+                    backlog = results[self.batch_size:]
+                    results = results[:self.batch_size]
                 
+                if self.record_limit:
+                    if current_count > self.record_limit:
+                        # if we hit the record limit, we need to cut off the results, 
+                        #   otherwise they'll just be the next multiple of the batch size
+                        logger.info(f"Record limit reached: {self.record_limit}")
+                        difference = current_count - self.record_limit
+                        results = results[:-difference]
+
+                logger.debug(f"Processing batch {batch_count}: {len(results)} records")
+                if current_run_result_count == 0:
+                    logger.info(f"Finished getting all records from the PDS: {current_count}/{total_count} records")
+
+                if len(results) > 0:
+
+                    people = self.pds.make_people(results)
+
+                    # check memory usage
+                    memory_use_percent = psutil.virtual_memory().percent  # percentage of memory use
+                    # memory_avail = psutil.virtual_memory().available * 0.000001  # memory available in MB
+                    # memory_total = psutil.virtual_memory().total * 0.000001
+
+                    # this will get the current backlog of pds results
+                    current_pds_backlog = self.pds.result_queue.qsize() * self.pds.batch_size
+                    logger.info(f"Memory usage: {memory_use_percent}%  current pds backlog: {current_pds_backlog}/{self.pds.max_backlog} pds records {current_count}/{self.pds.total_count}")
+                    
+                    if stack != "developer":
+                        if (memory_use_percent > 50) and not LOCAL:
+                            logger.warning(f"Memory usage is high: {memory_use_percent}%")
+                            memory_use_percent = psutil.virtual_memory().percent  # percentage of memory use
+
+                        if (memory_use_percent > 55) and not LOCAL:
+                            raise Exception(f"Out of memory ({memory_use_percent}): Kicking job before Fargate silently kicks it.")
+                
+
                 if total_count != self.pds.total_count:
                     raise Exception(f"total_count changed from {total_count} to {self.pds.total_count}. The PDS pagination failed.")
 
-                current_count += len(results)
-                if self.record_limit:
-                    if current_count > self.record_limit:
-                        logger.info(f"Record limit reached: {self.record_limit}")
-                        break
+                if len(results) == 0:
+                    logger.info(f"Finished getting records from the PDS: {current_count}/{total_count} records")
+                    break
 
-                if current_count == total_count:
-                    logger.info(f"Finished getting all records from the PDS: {total_count} records")
-                elif current_count > total_count:
+                if current_count > total_count:
                     logger.warning(f"Count exceeds total_count {current_count}/{total_count}. The PDS pagination may have failed.")
                     break
-                else: 
-                    logger.info(f"Starting batch {batch_count}: {current_count}/{total_count} ({len(self.batch_threads)} threads in process).")
-                    batch_count += 1
-                    if batch_count > (max_count + 50):
-                        logger.error(f"Something may have wrong with the batching. Max estimated batch count ({max_count}) exceeded current batch count: {batch_count}")
-                        raise Exception(f"estimated max_count: {max_count}, batch_size: {size}, batch_count: {batch_count}, total_count: {total_count}")
+                
+                logger.info(f"Starting batch {batch_count}: {current_count}/{total_count} ({len(self.batch_threads)} threads in process).")
+                batch_count += 1
+                if batch_count > (max_count + 50):
+                    logger.error(f"Something may have wrong with the batching. Max estimated batch count ({max_count}) exceeded current batch count: {batch_count}")
+                    raise Exception(f"estimated max_count: {max_count}, batch_size: {size}, batch_count: {batch_count}, total_count: {total_count}")
 
                 if not dry_run:
                     # self.process_people_batch(people)
@@ -962,198 +1045,239 @@ if os.getenv("FORCE_LOCAL_CONFIG"):
     sfpu.app_config.config = config
     # sfpu.app_config.pds_query = pds_query
 
-if action == 'single-person-update' and len(person_ids) > 0:
-    sfpu.update_single_person(person_ids)
-elif action == 'full-person-load':
-    sfpu.full_people_data_load()
-elif action == 'person-updates':
-    updates_only = False
-    if 'Contact' in sfpu.app_config.config and 'updateOnlyFlag' in sfpu.app_config.config['Contact'] and sfpu.app_config.config['Contact']['updateOnlyFlag'] == True:
-        updates_only = True
-    
-    # disabling updates_ony for now
-    updates_only = False
+task_running = isTaskRunning(sfpu.app_config)
+WAIT_LIMIT = 20
+if task_running and not stack == "developer":
+    if action in ['single-person-update','person-updates','person-updates-updates-only','department-updates','delete-people','cleanup-updateds','remove-unaffiliated-affiliations','remove-all-contacts','department test','defunct-accounts-check','remove people test','delete-all-data']:
+        logger.warning(f"The current task is actively running.")
+        exit()
+    elif action in ['full-person-load','full-department-load']:
+        wait_count = 1
+        while (task_running and wait_count <= WAIT_LIMIT):
+            logger.warning(f"The current task is actively running. (Currently on try {wait_count}/{WAIT_LIMIT})")
+            time.sleep(30)
+            task_running = isTaskRunning(sfpu.app_config)
+            wait_count += 1
+        if task_running and wait_count > WAIT_LIMIT:
+            logger.warning(f"The current task is actively running and the wait limit of {WAIT_LIMIT} has been exceeded.")
+            exit()
 
-    sfpu.update_people_data_load(updates_only=updates_only)
-elif action == 'person-updates-updates-only':
-    sfpu.update_people_data_load(updates_only=True)
-elif action == 'full-department-load':
-    hierarchy = False
-    if 'hierarchy' in sfpu.app_config.config['Account']:
-        hierarchy = True
-    sfpu.departments_data_load(type="full", hierarchy=hierarchy)
-elif action == 'department-updates':
-    sfpu.departments_data_load(type="update")
-elif action == 'delete-people':
-    sfpu.delete_people(dry_run=True, huids=person_ids)
-elif action == 'cleanup-updateds':
-    sfpu.cleanup_updateds()
-elif action == 'compare':
-    sfpu.compare_records()
+setTaskRunning(sfpu.app_config, True)
 
-elif action == 'remove-unaffiliated-affiliations':
-    logger.info("remove-unaffiliated-affiliations action called")
+try:
+    if action == 'single-person-update' and len(person_ids) > 0:
+        sfpu.update_single_person(person_ids)
+    elif action == 'full-person-load':
+        updates_only = False
+        if 'Contact' in sfpu.app_config.config and 'updateOnlyFlag' in sfpu.app_config.config['Contact'] and sfpu.app_config.config['Contact']['updateOnlyFlag'] == True:
+            updates_only = True
 
-    # get all unaffiliated Affiliation records
-    result = sfpu.hsf.sf.query_all("SELECT Id FROM hed__Affiliation__c WHERE hed__Contact__c = null and HUDA__hud_PERSON_ROLES_KEY__c != null")
-    logger.info(f"Found {len(result['records'])} unaffiliated Affiliation records")
+        # disabling updates_ony for now
+        updates_only = False
 
-    # delete them
-    ids = [{'Id': record['Id']} for record in result['records']]
-    sfpu.hsf.sf.bulk.hed__Affiliation__c.delete(ids)
+        sfpu.full_people_data_load(updates_only=updates_only)
 
-    if len(ids) > 0:
-        logger.warning(f"Deleted {len(ids)} unaffiliated Affiliation records")
-
-elif action == 'remove-all-contacts':
-    logger.warning("remove-all-contacts")
-
-    # get all unaffiliated Affiliation records
-    result = sfpu.hsf.sf.query_all("SELECT Id, HUDA__hud_UNIV_ID__c FROM Contact LIMIT 10000")
-    logger.warning(f"Found {len(result['records'])} Contact records")
-
-    # if len(ids) > 0:
-    #     logger.warning(f"Deleted {len(ids)} Contact records")
-
-    # delete them
-    ids = [record['HUDA__hud_UNIV_ID__c'] for record in result['records']]
-    sfpu.delete_people(dry_run=True, huids=ids)    
-elif action == "department test":
-    logger.info("department test action called")
-
-    departments = Departments(apikey=sfpu.app_config.dept_apikey)
-    department_external_id_name = sfpu.app_config.config['Account']['Id']['salesforce']
-    department_id_name = sfpu.app_config.config['Account']['Id']['departments']
-    department_ids = [department[department_id_name] for department in departments.results]
-
-    result = sfpu.hsf.get_accounts_hash(id_name=department_external_id_name, ids=department_ids)
-    logger.info(f"Found {len(result.keys())} Account records")
-
-    # get all maj affiliations
-    major_affiliations = departments.get_major_affiliations(departments.results)
-
-    object_data = []
-    for major_affiliation in major_affiliations:
-        obj = {
-            'Name': major_affiliation['description'],
-        }
-        obj[department_external_id_name] = major_affiliation['code']
-        if major_affiliation['code'] in result:
-            obj['Id'] = result[major_affiliation['code']]['Id']
-        object_data.append(obj)
-    
-    logger.info(f"Upserting to Account with {len(object_data)} records")
-    sfpu.hsf.pushBulk('Account', object_data)
-
-    # get all sub affiliations
-
-    for department in departments.results:
-        if department[department_id_name] not in result:
-            logger.warning(f"Department {department[department_id_name]} not found in Salesforce")
+    elif action == 'person-updates':
+        updates_only = False
+        if 'Contact' in sfpu.app_config.config and 'updateOnlyFlag' in sfpu.app_config.config['Contact'] and sfpu.app_config.config['Contact']['updateOnlyFlag'] == True:
+            updates_only = True
         
+        # disabling updates_ony for now
+        updates_only = False
 
-    # sfpu.setup_department_hierarchy(departments)
+        sfpu.update_people_data_load(updates_only=updates_only)
+    elif action == 'full-department-load':
+        hierarchy = False
+        if 'hierarchy' in sfpu.app_config.config['Account']:
+            hierarchy = True
+        sfpu.departments_data_load(type="full", hierarchy=hierarchy)
+    elif action == 'department-updates':
+        sfpu.departments_data_load(type="update")
+    elif action == 'delete-people':
+        sfpu.delete_people(dry_run=True, huids=person_ids)
+    elif action == 'cleanup-updateds':
+        sfpu.cleanup_updateds()
+    elif action == 'compare':
+        sfpu.compare_records()
 
+    elif action == 'remove-unaffiliated-affiliations':
+        logger.info("remove-unaffiliated-affiliations action called")
 
-    logger.info("department test action finished")
-elif action == "defunct-accounts-check":
-    logger.info(f"defunct accounts test action called")
+        # get all unaffiliated Affiliation records
+        result = sfpu.hsf.sf.query_all("SELECT Id FROM hed__Affiliation__c WHERE hed__Contact__c = null and HUDA__hud_PERSON_ROLES_KEY__c != null")
+        logger.info(f"Found {len(result['records'])} unaffiliated Affiliation records")
 
-    # sfpu.remove_defunct_accounts()
-    ids = sfpu.check_for_defunct_accounts()
-
-    exit()
-
-    children = []
-    # find children
-    batch = 500
-    for i in range(0, len(ids), batch):
-        batch_ids = ids[i:i+batch]
-        ids_string = "'" + '\',\''.join(batch_ids) + "'"
-        select_statement = f"SELECT Id FROM Account WHERE ParentId IN ({ids_string})"
-        sf_data = sfpu.hsf.sf.query_all(select_statement)
-
-        for record in sf_data['records']:
-            children.append(record['Id'])
-
-    logger.info(f"Found {len(children)} children")
-
-
-    # find affiliations
-    affiliations = []
-    batch = 500
-    for i in range(0, len(ids), batch):
-        batch_ids = ids[i:i+batch]
-        ids_string = "'" + '\',\''.join(batch_ids) + "'"
-        select_statement = f"SELECT Id FROM hed__Affiliation__c WHERE hed__Account__c IN ({ids_string})"
-        sf_data = sfpu.hsf.sf.query_all(select_statement)
-
-        for record in sf_data['records']:
-            affiliations.append(record['Id'])
-    
-    logger.info(f"Found {len(affiliations)} affiliations")
-
-    # clear affiliation account references
-    logger.info(f"Clearing account references from affiliations")
-    batch = 10000
-    for i in range(0, len(affiliations), batch):
-        batch_ids = affiliations[i:i+batch]
-        batch_objects = []
-        for id in batch_ids:
-            batch_objects.append({'Id': id, 'hed__Account__c': None})
-        sfpu.hsf.sf.bulk.hed__Affiliation__c.update(batch_objects)
-    logger.info(f"finished clearing account references from affiliations")
-
-
-    # sfpu.check_duplicates('Account', dry_run=True)
-
-    # sfpu.departments = Departments(apikey=sfpu.app_config.dept_apikey)
-    # sfpu.setup_department_hierarchy(department_hash=sfpu.departments.department_hash, external_id='HUDA__hud_DEPT_ID__c', code_field='HUDA__hud_DEPT_OFFICIAL_DESC__c', description_field='HUDA__hud_DEPT_LONG_DESC__c')
-
-    # data = [
-    # {
-    #     "Name": "Harvard Busn Sch Major Affil",
-    #     "HUDA__hud_DEPT_ID__c": "0BUS1",
-    #     "HUDA__hud_DEPT_OFFICIAL_DESC__c": "BUS^MA",
-    #     "HUDA__hud_DEPT_LONG_DESC__c": "Harvard Busn Sch Major Affil"
-    # }
-    # ]
-    # sfpu.hsf.pushBulk('Account', data, id_name='HUDA__hud_DEPT_ID__c')
-
-    logger.info(f"defunct accounts test action finished")
-elif action == "remove people test":
-    logger.info(f"remove people test action called")
-
-    # get all contacts that have our external id
-    external_id = sfpu.app_config.config['Contact']['Id']['salesforce']
-    result = sfpu.hsf.sf.query_all(f"SELECT Id, {external_id} FROM Contact WHERE {external_id} != null ORDER BY LastModifiedDate DESC") 
-
-    # delete them all (we expect this to fail for those with relationships)
-    ids = [{'Id': record['Id']} for record in result['records']]
-    logger.info(f"Found {len(ids)} Contact records")
-    # result = sfpu.hsf.sf.bulk.Contact.delete(ids)
-
-    logger.info(f"remove people test action finished")
-elif action == "delete-all-data":
-    logger.warning(f"delete-all-data action called")
-    for object_name in sfpu.app_config.config.keys():
-        logger.info(f"{object_name}")
-        external_id = sfpu.app_config.config[object_name]['Id']['salesforce']
-        result = sfpu.hsf.sf.query_all(f"SELECT Id, {external_id} FROM {object_name} WHERE {external_id} != null ORDER BY LastModifiedDate DESC")
-        logger.info(f"Found {len(result['records'])} {object_name} records")
-        # delete them all
+        # delete them
         ids = [{'Id': record['Id']} for record in result['records']]
-        logger.warning(f"attempting delete")
-        # sfpu.hsf.sf.bulk.__getattr__(object_name).delete(ids)
-        logger.warning(f"delete complete")
+        sfpu.hsf.sf.bulk.hed__Affiliation__c.delete(ids)
 
-    logger.info(f"delete-all-data action finished")
-elif action == "test":
-    logger.info(f"test action called")
+        if len(ids) > 0:
+            logger.warning(f"Deleted {len(ids)} unaffiliated Affiliation records")
 
-    logger.info(f"test action finished")
-else: 
-    logger.warning(f"App triggered without a valid action: {action}, please see documentation for more information.")
+    elif action == 'remove-all-contacts':
+        logger.warning("remove-all-contacts")
+
+        # get all unaffiliated Affiliation records
+        result = sfpu.hsf.sf.query_all("SELECT Id, HUDA__hud_UNIV_ID__c FROM Contact LIMIT 10000")
+        logger.warning(f"Found {len(result['records'])} Contact records")
+
+        # if len(ids) > 0:
+        #     logger.warning(f"Deleted {len(ids)} Contact records")
+
+        # delete them
+        ids = [record['HUDA__hud_UNIV_ID__c'] for record in result['records']]
+        sfpu.delete_people(dry_run=True, huids=ids)    
+    elif action == "department test":
+        logger.info("department test action called")
+
+        departments = Departments(apikey=sfpu.app_config.dept_apikey)
+        department_external_id_name = sfpu.app_config.config['Account']['Id']['salesforce']
+        department_id_name = sfpu.app_config.config['Account']['Id']['departments']
+        department_ids = [department[department_id_name] for department in departments.results]
+
+        result = sfpu.hsf.get_accounts_hash(id_name=department_external_id_name, ids=department_ids)
+        logger.info(f"Found {len(result.keys())} Account records")
+
+        # get all maj affiliations
+        major_affiliations = departments.get_major_affiliations(departments.results)
+
+        object_data = []
+        for major_affiliation in major_affiliations:
+            obj = {
+                'Name': major_affiliation['description'],
+            }
+            obj[department_external_id_name] = major_affiliation['code']
+            if major_affiliation['code'] in result:
+                obj['Id'] = result[major_affiliation['code']]['Id']
+            object_data.append(obj)
+        
+        logger.info(f"Upserting to Account with {len(object_data)} records")
+        sfpu.hsf.pushBulk('Account', object_data)
+
+        # get all sub affiliations
+
+        for department in departments.results:
+            if department[department_id_name] not in result:
+                logger.warning(f"Department {department[department_id_name]} not found in Salesforce")
+            
+
+        # sfpu.setup_department_hierarchy(departments)
 
 
+        logger.info("department test action finished")
+    elif action == "defunct-accounts-check":
+        logger.info(f"defunct accounts test action called")
 
+        # sfpu.remove_defunct_accounts()
+        ids = sfpu.check_for_defunct_accounts()
+
+        exit()
+
+        children = []
+        # find children
+        batch = 500
+        for i in range(0, len(ids), batch):
+            batch_ids = ids[i:i+batch]
+            ids_string = "'" + '\',\''.join(batch_ids) + "'"
+            select_statement = f"SELECT Id FROM Account WHERE ParentId IN ({ids_string})"
+            sf_data = sfpu.hsf.sf.query_all(select_statement)
+
+            for record in sf_data['records']:
+                children.append(record['Id'])
+
+        logger.info(f"Found {len(children)} children")
+
+
+        # find affiliations
+        affiliations = []
+        batch = 500
+        for i in range(0, len(ids), batch):
+            batch_ids = ids[i:i+batch]
+            ids_string = "'" + '\',\''.join(batch_ids) + "'"
+            select_statement = f"SELECT Id FROM hed__Affiliation__c WHERE hed__Account__c IN ({ids_string})"
+            sf_data = sfpu.hsf.sf.query_all(select_statement)
+
+            for record in sf_data['records']:
+                affiliations.append(record['Id'])
+        
+        logger.info(f"Found {len(affiliations)} affiliations")
+
+        # clear affiliation account references
+        logger.info(f"Clearing account references from affiliations")
+        batch = 10000
+        for i in range(0, len(affiliations), batch):
+            batch_ids = affiliations[i:i+batch]
+            batch_objects = []
+            for id in batch_ids:
+                batch_objects.append({'Id': id, 'hed__Account__c': None})
+            sfpu.hsf.sf.bulk.hed__Affiliation__c.update(batch_objects)
+        logger.info(f"finished clearing account references from affiliations")
+
+
+        # sfpu.check_duplicates('Account', dry_run=True)
+
+        # sfpu.departments = Departments(apikey=sfpu.app_config.dept_apikey)
+        # sfpu.setup_department_hierarchy(department_hash=sfpu.departments.department_hash, external_id='HUDA__hud_DEPT_ID__c', code_field='HUDA__hud_DEPT_OFFICIAL_DESC__c', description_field='HUDA__hud_DEPT_LONG_DESC__c')
+
+        # data = [
+        # {
+        #     "Name": "Harvard Busn Sch Major Affil",
+        #     "HUDA__hud_DEPT_ID__c": "0BUS1",
+        #     "HUDA__hud_DEPT_OFFICIAL_DESC__c": "BUS^MA",
+        #     "HUDA__hud_DEPT_LONG_DESC__c": "Harvard Busn Sch Major Affil"
+        # }
+        # ]
+        # sfpu.hsf.pushBulk('Account', data, id_name='HUDA__hud_DEPT_ID__c')
+
+        logger.info(f"defunct accounts test action finished")
+    elif action == "remove people test":
+        logger.info(f"remove people test action called")
+
+        # get all contacts that have our external id
+        external_id = sfpu.app_config.config['Contact']['Id']['salesforce']
+        result = sfpu.hsf.sf.query_all(f"SELECT Id, {external_id} FROM Contact WHERE {external_id} != null ORDER BY LastModifiedDate DESC") 
+
+        # delete them all (we expect this to fail for those with relationships)
+        ids = [{'Id': record['Id']} for record in result['records']]
+        logger.info(f"Found {len(ids)} Contact records")
+        # result = sfpu.hsf.sf.bulk.Contact.delete(ids)
+
+        logger.info(f"remove people test action finished")
+    elif action == "delete-all-data":
+        logger.warning(f"delete-all-data action called")
+        for object_name in sfpu.app_config.config.keys():
+            logger.info(f"{object_name}")
+            external_id = sfpu.app_config.config[object_name]['Id']['salesforce']
+            result = sfpu.hsf.sf.query_all(f"SELECT Id, {external_id} FROM {object_name} WHERE {external_id} != null ORDER BY LastModifiedDate DESC")
+            logger.info(f"Found {len(result['records'])} {object_name} records")
+            # delete them all
+            ids = [{'Id': record['Id']} for record in result['records']]
+            logger.warning(f"attempting delete")
+            # sfpu.hsf.sf.bulk.__getattr__(object_name).delete(ids)
+            logger.warning(f"delete complete")
+
+        logger.info(f"delete-all-data action finished")
+    elif action == "static-query":
+        logger.info(f"static-query action called")
+        # query_filename = '../examples/example_pds_query_hms.json'
+        # f = open(query_filename, 'r')
+        # pds_query = json.load(f)
+        # f.close()
+        pds_query = sfpu.app_config.pds_query
+        pds_query['conditions'] = {
+            "cacheUpdateDate": "2024-02-14T05:00:00>2024-02-16T16:30:00"
+        }
+        sfpu.people_data_load(pds_query=pds_query)
+
+        logger.info(f"static-query action finished")
+    elif action == "test":
+        logger.info(f"test action called")
+
+        logger.info(f"test action finished")
+    else: 
+        logger.warning(f"App triggered without a valid action: {action}, please see documentation for more information.")
+except Exception as e:
+    logger.error(e)
+finally:
+    if not stack == "developer":
+        setTaskRunning(sfpu.app_config, False)

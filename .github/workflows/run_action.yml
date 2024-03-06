@@ -1,5 +1,5 @@
 name: Default Action Run
-run-name: ${{github.event.inputs.environment}} run on ${{ github.event.inputs.environment }} for ${{ github.event.inputs.salesforce_instance_id }}
+run-name: ${{github.event.inputs.action}} run on ${{ github.event.inputs.environment }} for ${{ github.event.inputs.salesforce_instance_id }}
 
 on:
   workflow_dispatch:
@@ -27,6 +27,7 @@ on:
           - 'cleanup-updateds'
           - 'defunct-accounts-check'
           - 'remove-unaffiliated-affiliations'
+          - 'static-query'
       debug:
         type: choice
         required: false
