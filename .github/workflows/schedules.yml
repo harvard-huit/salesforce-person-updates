@@ -1,0 +1,60 @@
+name: Deploy Task Definition
+run-name: Deploying ${{ github.event.inputs.version }} to ${{ github.event.inputs.environment }}
+
+on:
+  # push:
+  #   branches: [ dev ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        default: 'dev'
+        options: 
+          - 'dev'
+          - 'test'
+          - 'stage'
+          - 'prod'
+        required: true
+
+env:
+  AWS_REGION: us-east-1
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  deploy:
+    name: Set up schedules on ${{ github.event.inputs.environment }}
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Login to AWS with a service account / iam user
+        # uses: aws-actions/configure-aws-credentials@13d241b293754004c80624b5567555c4a39ffbe3
+        uses: HUIT/configure-aws-credentials@13d241b293754004c80624b5567555c4a39ffbe3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_NONPROD }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_NONPROD }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          path: ./checkout
+
+      - name: Run AAIS Deploy Container Action
+        uses: HUIT/aais-ecs-infrastructure/actions/schedules@feature/github_action
+        with:
+          # Required
+          ansible_vars: ansible_vars/${{ github.event.inputs.environment }}_ansible_vars.yml
+          cluster_config_repository: HUIT/aais-services-config
+          cluster_config: aais_services_${{ github.event.inputs.environment }}.yml
+          # Required -- this token is linked to the user associated with the run
+          github_token: ${{ github.token }}
+          # Optional
+          #   this needs to match the directory the main repository was checked out into
+          #   if the checkout was done without a path, this is not needed
+          app_root: checkout
+
+     
