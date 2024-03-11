@@ -6,14 +6,6 @@
             "departments": "hrDeptId",
             "salesforce": "HUDA__hud_DEPT_ID__c"
         },
-        "hierarchy": {
-            "fields": {
-                "Name": "description",
-                "Description": "description",
-                "HUDA__hud_DEPT_SHORT_DESC__c": "code"    
-            },
-            "simplify_codes": true
-        },
         "fields": {
             "HUDA__hud_DEPT_ID__c": "hrDeptId",
             "Name": "hrDeptDesc",
@@ -29,15 +21,7 @@
             "HUDA__hud_SUB_AFFILIATION_CD__c": "subAffiliation.code",
             "HUDA__hud_SUB_AFFILIATION_DESC__c": "subAffiliation.description",
             "HUDA__hud_UPDATE_SOURCE__c": "updateSource",
-            "HUDA__hud_UPDATE_DT__c": "updateDate",
-            "Parent": {
-                "ref": {
-                    "object": "Account",
-                    "ref_external_id": "HUDA__hud_DEPT_ID__c",
-                    "source_value_ref": "subAffiliation.code",
-                    "simplify_code": true
-                }    
-            }
+            "HUDA__hud_UPDATE_DT__c": "updateDate"
         }
     },
     "Contact": {
