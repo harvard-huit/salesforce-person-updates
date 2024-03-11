@@ -1,22 +1,20 @@
-name: Deploy Task Definition
-run-name: Deploying ${{ github.event.inputs.version }} to ${{ github.event.inputs.environment }}
+name: Set up Schedules
+run-name: Set up Schedules in ${{ github.event.inputs.environment }}
 
 on:
-  # push:
-  #   branches: [ dev ]
   workflow_dispatch:
     inputs:
       environment:
         type: choice
-        default: 'dev'
-        options: 
-          - 'dev'
-          - 'test'
-          - 'stage'
-          - 'prod'
+        options:
+          - dev
+          - test
+          - stage
+          - prod
         required: true
 
 env:
+  branch: ${{ github.ref_name }}
   AWS_REGION: us-east-1
 
 defaults:
@@ -24,12 +22,11 @@ defaults:
     shell: bash
 
 jobs:
+  
   deploy:
-    name: Set up schedules on ${{ github.event.inputs.environment }}
+    name: Setting up Schedules in ${{ github.event.inputs.environment }}
     runs-on: ubuntu-latest
-
     steps:
-
       - name: Login to AWS with a service account / iam user
         # uses: aws-actions/configure-aws-credentials@13d241b293754004c80624b5567555c4a39ffbe3
         uses: HUIT/configure-aws-credentials@13d241b293754004c80624b5567555c4a39ffbe3
@@ -43,18 +40,18 @@ jobs:
         with:
           path: ./checkout
 
-      - name: Run AAIS Deploy Container Action
+      - name: Run AAIS Scheduling Action
         uses: HUIT/aais-ecs-infrastructure/actions/schedules@feature/github_action
         with:
           # Required
           ansible_vars: ansible_vars/${{ github.event.inputs.environment }}_ansible_vars.yml
           cluster_config_repository: HUIT/aais-services-config
-          cluster_config: aais_services_${{ github.event.inputs.environment }}.yml
+          cluster_config: aais_services_dev.yml
           # Required -- this token is linked to the user associated with the run
           github_token: ${{ github.token }}
           # Optional
           #   this needs to match the directory the main repository was checked out into
           #   if the checkout was done without a path, this is not needed
           app_root: checkout
-
-     
+          infrastructure_branch: feature/github_action
+      
