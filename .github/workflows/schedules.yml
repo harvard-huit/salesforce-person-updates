@@ -46,7 +46,7 @@ jobs:
           # Required
           ansible_vars: ansible_vars/${{ github.event.inputs.environment }}_ansible_vars.yml
           cluster_config_repository: HUIT/aais-services-config
-          cluster_config: aais_services_dev.yml
+          cluster_config: aais_services_${{ github.event.inputs.environment }}.yml
           # Required -- this token is linked to the user associated with the run
           github_token: ${{ github.token }}
           # Optional
