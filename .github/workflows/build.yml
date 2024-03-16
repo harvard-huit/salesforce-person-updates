@@ -63,7 +63,7 @@ jobs:
           path: ./checkout
       - name: Run the action
         id: get_version
-        uses: ./actions/get-version
+        uses: HUIT/aais-ecs-infrastructure/actions/get-version@develop
         with:
           ansible_vars: ./checkout/ansible_vars/dev_ansible_vars.yml
     outputs:
