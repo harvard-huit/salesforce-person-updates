@@ -84,11 +84,10 @@ jobs:
       - name: Which Version
         id: which_version
         run: |
-          version=${{ needs.get_version.outputs.version }}
           if [ -z "${{ inputs.version }}" ]; then
-            echo "version=${{ needs.get_version.outputs.version }}" >> $GITHUB_OUTPUT
-          fi
             echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          fi
+            echo "version=${{ needs.get_version.outputs.version }}" >> $GITHUB_OUTPUT
           
       - name: Build
         run: |
