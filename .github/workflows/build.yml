@@ -53,36 +53,47 @@ jobs:
           source env/bin/activate
           python -m unittest discover -s src -p *_test.py    
 
+  get_version:
+    name: Get Version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v3
+        with: 
+          path: ./checkout
+      - name: Run the action
+        id: get_version
+        uses: ./actions/get-version
+        with:
+          ansible_vars: ./checkout/ansible_vars/dev_ansible_vars.yml
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+
+
   build:
     name: Build Code ${{ github.event.inputs.version }}
-    needs: [unittest]
+    needs: [unittest, get_version]
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v3
         with: 
-          path: ./salesforce
-      
-        # Note: this will get the version from the ansible vars
-      - name: Get Version
-        if: ${{ !github.event.inputs.version }}
+          path: ./checkout
+
+      - name: Which Version
+        id: which_version
         run: |
-          cd salesforce
-          while read -r line; do
-            if [[ $line =~ "target_app_version" ]] && ! [[ $line =~ ^#.* ]]; then
-              # delete everything up to the opening double quote
-              version="${line#*\"}"
-              # delete everything after the next double quote
-              version="${version%%\"*}"
-            fi
-          done < ./ansible_vars/dev_ansible_vars.yml
-          echo "version=$version" >> $GITHUB_ENV
-            
+          version=${{ needs.get_version.outputs.version }}
+          if [ -z "${{ inputs.version }}" ]; then
+            echo "version=${{ needs.get_version.outputs.version }}" >> $GITHUB_OUTPUT
+          fi
+            echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          
       - name: Build
         run: |
-          cd salesforce
-          docker build -t artifactory.huit.harvard.edu/aais-docker-local/salesforce-person-updates:${{ env.version }} .
+          cd checkout
+          docker build -t artifactory.huit.harvard.edu/aais-docker-local/salesforce-person-updates:${{ steps.which_version.outputs.version }} .
 
       - name: Push to Artifactory
         run: |
@@ -90,3 +101,13 @@ jobs:
           docker push artifactory.huit.harvard.edu/aais-docker-local/salesforce-person-updates:${{ env.version }}
 
 
+  deploy:
+    name: Deploy to Dev
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    needs: [get_version, build]
+    uses: ./.github/workflows/deploy.yml
+    with: 
+      version: ${{ needs.get_version.outputs.version }}
+      environment: dev
+    secrets: inherit
+        

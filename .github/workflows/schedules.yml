@@ -28,8 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Login to AWS with a service account / iam user
-        # uses: aws-actions/configure-aws-credentials@13d241b293754004c80624b5567555c4a39ffbe3
-        uses: HUIT/configure-aws-credentials@13d241b293754004c80624b5567555c4a39ffbe3
+        uses: HUIT/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_NONPROD }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_NONPROD }}
@@ -41,7 +40,7 @@ jobs:
           path: ./checkout
 
       - name: Run AAIS Scheduling Action
-        uses: HUIT/aais-ecs-infrastructure/actions/schedules@feature/github_action
+        uses: HUIT/aais-ecs-infrastructure/actions/schedules@develop
         with:
           # Required
           ansible_vars: ansible_vars/${{ github.event.inputs.environment }}_ansible_vars.yml
@@ -53,5 +52,5 @@ jobs:
           #   this needs to match the directory the main repository was checked out into
           #   if the checkout was done without a path, this is not needed
           app_root: checkout
-          infrastructure_branch: feature/github_action
+          infrastructure_branch: develop
       
