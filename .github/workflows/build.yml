@@ -98,7 +98,7 @@ jobs:
       - name: Push to Artifactory
         run: |
           docker login artifactory.huit.harvard.edu --username "${{ secrets.ARTIFACTORY_USER }}" --password "${{ secrets.ARTIFACTORY_PWD }}"
-          docker push artifactory.huit.harvard.edu/aais-docker-local/salesforce-person-updates:${{ env.version }}
+          docker push artifactory.huit.harvard.edu/aais-docker-local/salesforce-person-updates:${{ steps.which_version.outputs.version }}
 
 
   deploy:
