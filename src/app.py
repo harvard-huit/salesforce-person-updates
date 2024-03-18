@@ -516,7 +516,7 @@ class SalesforcePersonUpdates:
         else: 
             has_conditions = False
 
-        pds_query['conditions']['updateDate'] = ">" + watermark.strftime('%Y-%m-%dT%H:%M:%S')
+        pds_query['conditions']['cacheUpdateDate'] = ">" + watermark.strftime('%Y-%m-%dT%H:%M:%S')
         if updates_only:
             # if we are only doing updates, we should clear the conditions
             pds_query['conditions'] = {}
@@ -564,7 +564,7 @@ class SalesforcePersonUpdates:
                 pds_id = self.app_config.config['Contact']['Id']['pds']
                 pds_query['fields'] = [pds_id]
                 pds_query['conditions'] = {}
-                pds_query['conditions']['updateDate'] = ">" + watermark.strftime('%Y-%m-%dT%H:%M:%S')
+                pds_query['conditions']['cacheUpdateDate'] = ">" + watermark.strftime('%Y-%m-%dT%H:%M:%S')
                 # add exclusion of updated ids
                 pds_query['conditions'][pds_id] = {
                     "value": self.updated_ids,
@@ -1028,7 +1028,7 @@ class SalesforcePersonUpdates:
         if not watermark:
             watermark = self.app_config.watermarks['person']
 
-        pds_query['conditions']['updateDate'] = ">" + watermark.strftime('%Y-%m-%dT%H:%M:%S')
+        pds_query['conditions']['cacheUpdateDate'] = ">" + watermark.strftime('%Y-%m-%dT%H:%M:%S')
         people = self.pds.get_people(pds_query)
 
 sfpu = SalesforcePersonUpdates(local=LOCAL)

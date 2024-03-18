@@ -23,7 +23,7 @@ jobs:
     steps:
 
       - name: Mirror Action
-        uses: HUIT/github-mirror-action@1.0.0
+        uses: HUIT/github-mirror-action@v1.0.0
         with:
           # Required
           local_repository: github.huit.harvard.edu/HUIT/salesforce-person-updates
