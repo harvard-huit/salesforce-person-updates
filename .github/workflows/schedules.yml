@@ -40,7 +40,7 @@ jobs:
           path: ./checkout
 
       - name: Run AAIS Scheduling Action
-        uses: HUIT/aais-ecs-infrastructure/actions/run_ansible@develop
+        uses: HUIT/aais-ecs-infrastructure/actions/run-ansible@develop
         with:
           # Required
           playbook: ecs-create-all-schedules.yml
