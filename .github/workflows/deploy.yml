@@ -54,9 +54,10 @@ jobs:
           path: ./checkout
           
       - name: Run AAIS Deploy Container Action
-        uses: HUIT/aais-ecs-infrastructure/actions/deploy-container@develop
+        uses: HUIT/aais-ecs-infrastructure/actions/run_ansible@develop
         with:
           # Required
+          playbook: deploy-container.yml
           ansible_vars: ansible_vars/${{ inputs.environment }}_ansible_vars.yml
           cluster_config_repository: HUIT/aais-services-config
           cluster_config: aais_services_${{ inputs.environment }}.yml
