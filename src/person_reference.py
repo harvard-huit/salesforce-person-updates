@@ -60,8 +60,8 @@ class PersonReference():
         return self.getResultsJson(self.major_affiliations_url)
     
     def getMajAffiliations(self):
-        logger.warning("Warning: why are you using this? Please use getMajorAffiliations instead. getMajAffiliations will not be removed ever, I just want to shame you for not using the right method.")
-        return self.getResults(self.major_affiliations_url)
+        logger.warning("Warning: why are you using this? Please use getMajorAffiliations instead. getMajAffiliations will work and will not be removed ever, I just want to shame you for not using the right method.")
+        return self.getResultsJson(self.major_affiliations_url)
 
     def getResultsJson(self, url):
         try:
