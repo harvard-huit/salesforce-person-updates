@@ -1,9 +1,9 @@
 ## Purpose
 
 ### What this primarily does:
- - [ ] issue 1 (#issue_ref)
- - [ ] issue 2 (#issue_ref)
- - [ ] issue 3 (#issue_ref)
+ - [ ] #issue_ref
+ - [ ] #issue_ref
+ - [ ] important thing I didn't have time to make an issue for
 
 ### What this also does:
  - [ ] additional stuff being added 
@@ -14,9 +14,7 @@
  - pay no attention to the man behind the curtain (or the transformer.py file)
  - be nice
 
-## Currently Deployed to **null**
+### Currently Deployed to **null**
 
 ## Test coverage
-Yes/No
-
-Why not?
+Yes/No/why not?
