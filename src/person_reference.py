@@ -25,13 +25,6 @@ class PersonReference():
             "x-api-key": apikey
         }
 
-        if environment != "testing":
-            try:
-                self.healthCheck()
-            except Exception as e:
-                logger.error(f"Error: Unable to connect to Person Reference API {e}")
-                raise e
-            
         # set up urls
         self.health_url = f"https://{ self.host }/ats/person/reference/v1/monitor/health"
 
@@ -40,6 +33,14 @@ class PersonReference():
         self.departments_url = f"https://{ self.host }/ats/person/reference/v1/department"
         self.sub_affiliations_url = f"https://{ self.host }/ats/person/reference/v1/subAffiliation"
         self.major_affiliations_url = f"https://{ self.host }/ats/person/reference/v1/majorAffiliation"
+
+        if environment != "testing":
+            try:
+                self.healthCheck()
+            except Exception as e:
+                logger.error(f"Error: Unable to connect to Person Reference API {e}")
+                raise e
+            
 
     def healthCheck(self):
         return self.getResultsText(self.health_url)
@@ -72,7 +73,7 @@ class PersonReference():
             if not "results" in response.json():
                 logger.error(f"Error: Reference API gave unknown response: {response.text}")
 
-            return response.json()
+            return response.json()['results']
 
         except Exception as e:
             logger.error(f"Error: {e}")

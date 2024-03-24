@@ -1,102 +1,187 @@
 {
     "type": "object",
     "additionalProperties": {
-        "type" : "object",
-        "properties" : {
-            "Id" : {
-                "anyOf": [
-                    {
-                        "type" : "object",
-                        "properties": {
-                            "pds": {
-                                "anyOf": [
-                                    { "type": "string" },
-                                    { "type": "array" }
-                                ]
-                            },
-                            "salesforce": {
-                                "type": "string"
-                            }
-                        },
-                        "required": ["salesforce", "pds"]
-                    },
-                    {
-                        "type" : "object",
-                        "properties": {
-                            "departments": {
-                                "type": "string"
-                            },
-                            "salesforce": {
-                                "type": "string"
-                            }
-                        },
-                        "required": ["salesforce", "departments"]
-                    }
-                ]
-            },
-            "source" : { "enum" : ["pds", "departments"] },
-            "flat" : { "type" : "boolean" },
-            "fields": {
-                "type": "object",
-                "additionalProperties": {
-                    "anyOf": [
-                        {
-                            "type": "string"
-                        },
-                        {
-                            "type": "boolean"
-                        },
-                        {
-                            "type": "array"
-                        },
-                        {
-                            "type": "object",
-                            "properties": {
-                                "value": { 
-                                    "anyOf": [
-                                        { "type": "string" },
-                                        { "type": "boolean"},
-                                        { "type": "array" }
-                                    ]
-                                },
-                                "when": { 
-                                    "type": "object",
-                                    "additionalProperties": {
+        "anyOf": [
+            {
+                "type" : "object",
+                "properties" : {
+                    "Id" : {
+                        "anyOf": [
+                            {
+                                "type" : "object",
+                                "properties": {
+                                    "pds": {
                                         "anyOf": [
                                             { "type": "string" },
-                                            { "type": "boolean" },
                                             { "type": "array" }
                                         ]
+                                    },
+                                    "salesforce": {
+                                        "type": "string"
                                     }
                                 },
-                                "ref": {
+                                "required": ["salesforce", "pds"]
+                            },
+                            {
+                                "type" : "object",
+                                "properties": {
+                                    "departments": {
+                                        "type": "string"
+                                    },
+                                    "salesforce": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": ["salesforce", "departments"]
+                            }
+                        ]
+                    },
+                    "source" : { "enum" : ["pds", "departments"] },
+                    "flat" : { "type" : "boolean" },
+                    "fields": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "boolean"
+                                },
+                                {
+                                    "type": "array"
+                                },
+                                {
                                     "type": "object",
                                     "properties": {
-                                        "object": { "type": "string" },
-                                        "ref_external_id": { "type": "string" },
-                                        "source_value_ref": { 
+                                        "value": { 
                                             "anyOf": [
                                                 { "type": "string" },
+                                                { "type": "boolean"},
                                                 { "type": "array" }
                                             ]
+                                        },
+                                        "when": { 
+                                            "type": "object",
+                                            "additionalProperties": {
+                                                "anyOf": [
+                                                    { "type": "string" },
+                                                    { "type": "boolean" },
+                                                    { "type": "array" }
+                                                ]
+                                            }
+                                        },
+                                        "ref": {
+                                            "type": "object",
+                                            "properties": {
+                                                "object": { "type": "string" },
+                                                "ref_external_id": { "type": "string" },
+                                                "source_value_ref": { 
+                                                    "anyOf": [
+                                                        { "type": "string" },
+                                                        { "type": "array" }
+                                                    ]
+                                                }
+                                            },
+                                            "required": ["object", "ref_external_id", "source_value_ref"]
+        
+                                        },
+                                        "picklist": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                                "type": "array"
+                                            
+                                            }
                                         }
-                                    },
-                                    "required": ["object", "ref_external_id", "source_value_ref"]
-
-                                },
-                                "picklist": {
-                                    "type": "object",
-                                    "additionalProperties": {
-                                        "type": "array"
-                                    
                                     }
                                 }
+                            ]
+                        }
+                    }
+                },
+                "required": ["Id", "fields"]
+        
+            },
+            {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "order": { "type": "integer" },
+                        "Id" : {
+                            "type" : "object",
+                            "properties": {
+                                "source": { "type": "string" },                            
+                                "salesforce": { "type": "string" }
+                            },
+                            "required": ["salesforce", "source"]
+                        },
+                        "source" : { "enum" : ["pds", "departments", "schools", "units", "major_affiliations", "sub_affiliations"] },
+                        "flat" : { "type" : "boolean", "$comment": "deprecated" },
+                        "fields": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "anyOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "boolean"
+                                    },
+                                    {
+                                        "type": "array"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "value": { 
+                                                "anyOf": [
+                                                    { "type": "string" },
+                                                    { "type": "boolean"},
+                                                    { "type": "array" }
+                                                ]
+                                            },
+                                            "when": { 
+                                                "type": "object",
+                                                "additionalProperties": {
+                                                    "anyOf": [
+                                                        { "type": "string" },
+                                                        { "type": "boolean" },
+                                                        { "type": "array" }
+                                                    ]
+                                                }
+                                            },
+                                            "ref": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "object": { "type": "string" },
+                                                    "ref_external_id": { "type": "string" },
+                                                    "source_value_ref": { 
+                                                        "anyOf": [
+                                                            { "type": "string" },
+                                                            { "type": "array" }
+                                                        ]
+                                                    }
+                                                },
+                                                "required": ["object", "ref_external_id", "source_value_ref"]
+            
+                                            },
+                                            "picklist": {
+                                                "type": "object",
+                                                "additionalProperties": {
+                                                    "type": "array"
+                                                
+                                                }
+                                            }
+                                        }
+                                    }
+                                ]
                             }
                         }
-                    ]
+                    },
+                    "required": ["order", "id", "source", "fields"]
                 }
             }
-        },
-        "required": ["Id", "fields"]
-    }
+        ]
+   }
 }

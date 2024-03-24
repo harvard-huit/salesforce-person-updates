@@ -653,8 +653,10 @@ class HarvardSalesforce:
                 # if salesforce_id_name not in unique_object_fields:
                 #     unique_object_fields.append(salesforce_id_name)
 
-                # full_source_id_value is the id name of the SAME external id as it exists in the source data (e.g. pds or departments)
-                if source_name in config[object]['Id']:
+                if 'source' in config[object]['Id']:
+                    full_source_id_value = config[object]['Id']['source']
+                elif source_name in config[object]['Id']:
+                    # full_source_id_value is the id name of the SAME external id as it exists in the source data (e.g. pds or departments)
                     full_source_id_value = config[object]['Id'][source_name]
                 else:
                     raise Exception(f"Error: source {source_name} not found in config. (Did you remember to slice the config?)")
