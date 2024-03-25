@@ -108,3 +108,4 @@ schedules:
         value: "huitservice-prod"
       - name: "action"
         value: "person-updates"
+    schedule_rule_state: "DISABLED"

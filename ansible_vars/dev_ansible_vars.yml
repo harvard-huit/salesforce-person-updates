@@ -96,7 +96,7 @@ schedules:
       - name: "TABLE_NAME"
         value: "aais-services-salesforce-person-updates-dev"
       - name: "SALESFORCE_INSTANCE_ID"
-        value: "transp-sandbox"
+        value: "huitservice-full-sandbox"
       - name: "action"
         value: "person-updates"
     schedule_rule_state: "DISABLED"
