@@ -294,12 +294,16 @@ try:
         sfpu.people_data_load(pds_query=pds_query)
 
         logger.info(f"static-query action finished")
-    elif action == "test":
-        logger.info(f"test action called")
-
+    elif action == "full-account-load":
+        logger.info(f"full-account-load action called")
 
         account_handler = AccountHandler(sfpu)
         account_handler.accounts_data_load()
+
+        logger.info(f"full-account-load action finished")
+    elif action == "test":
+        logger.info(f"test action called")
+
 
         logger.info(f"test action finished")
     else: 
