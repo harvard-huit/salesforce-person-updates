@@ -29,10 +29,10 @@ class PersonReference():
         self.health_url = f"https://{ self.host }/ats/person/reference/v1/monitor/health"
 
         self.schools_url = f"https://{ self.host }/ats/person/reference/v1/studentSchool"
-        self.units_url = f"https://{ self.host }/ats/person/reference/v1/academicUnit"
-        self.departments_url = f"https://{ self.host }/ats/person/reference/v1/department"
+        self.units_url = f"https://{ self.host }/ats/person/reference/v1/unit"
+        self.departments_url = f"https://{ self.host }/ats/person/reference/v1/hrDepartment"
         self.sub_affiliations_url = f"https://{ self.host }/ats/person/reference/v1/subAffiliation"
-        self.major_affiliations_url = f"https://{ self.host }/ats/person/reference/v1/majorAffiliation"
+        self.major_affiliations_url = f"https://{ self.host }/ats/person/reference/v1/majAffiliation"
 
         if environment != "testing":
             try:
