@@ -44,18 +44,22 @@ class AccountHandler:
             elif source_type == "departments":
                 logger.error(f"departments not yet implemented")
                 source_data = []
+                # source_data = person_reference.getDepartments()
                 continue
             elif source_type == "units":
                 logger.error(f"units not yet implemented")
                 source_data = []
+                # source_data = person_reference.getUnits()
                 continue
             elif source_type == "sub_affiliations":
                 logger.error(f"sub_affiliations not yet implemented")
                 source_data = []
+                # source_data = person_reference.getSubAffiliations()
                 continue
             elif source_type == "major_affiliations":
                 logger.error(f"major_affiliations not yet implemented")
                 source_data = []
+                # source_data = person_reference.getMajorAffiliations()
                 continue
             else:
                 logger.error(f"source type {source_type} not recognized")
@@ -75,9 +79,29 @@ class AccountHandler:
             )
 
             data = {}
-            # data_gen = self.sfpu.transformer.transform(source_data=source_data, source_name='')
+            data_gen = self.sfpu.transformer.transform(source_data=source_data, source_config=account_config_wrapper)
+            for d in data_gen:
+                for i, v in d.items():
+                    if i not in data:
+                        data[i] = []
+
+                    if v['Account_Type__c'] is not None:
+                        if v['Account_Type__c'] in record_type_ids.keys():
+                            v['RecordTypeId'] = record_type_ids[v['Account_Type__c']]
+
+                    data[i].append(v)
+                    
+            for object, object_data in data.items():
+                logger.debug(f"object: {object}")
+                # logger.debug(pformat(object_data))
+
+                self.sfpu.hsf.pushBulk(object, object_data, id_name=external_id)
         
             logger.info(f"Finished account data load for {source_type}")
 
+
+        # self.app_config.update_watermark("department")
+        # logger.info(f"Department Watermark updated: {watermark}")
+        # logger.info(f"Finished department {type} load")
 
 

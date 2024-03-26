@@ -98,7 +98,12 @@ class SalesforceTransformer:
                 is_flat = source_config[object_name].get('flat') or False    
                 
                 object_config = source_config[object_name]['fields']
-                source_id_name = source_config[object_name]['Id'][source_name]
+                if 'source' in source_config[object_name]['Id']:
+                    source_id_name = source_config[object_name]['Id']['source']
+                elif source_name in source_config[object_name]['Id']:
+                    source_id_name = source_config[object_name]['Id'][source_name]
+                else:
+                    raise Exception(f"Error: Source Id not found in config for {object_name}")
                 salesforce_id_name = source_config[object_name]['Id']['salesforce']
 
                 is_branched = False
