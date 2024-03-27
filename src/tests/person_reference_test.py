@@ -72,7 +72,7 @@ class PersonReferenceTest(unittest.TestCase):
         result = self.person_reference.getResultsJson(self.person_reference.schools_url)
 
         # Assert the response
-        self.assertEqual(result, self.fake_schools)
+        self.assertEqual(result, self.fake_schools['results'])
         mock_get.assert_called_once_with(self.person_reference.schools_url, headers=self.person_reference.headers)
 
     @mock.patch('requests.get')
