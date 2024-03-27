@@ -3,6 +3,106 @@
     "additionalProperties": {
         "anyOf": [
             {
+                "type" : "object",
+                "properties" : {
+                    "Id" : {
+                        "anyOf": [
+                            {
+                                "type" : "object",
+                                "properties": {
+                                    "pds": {
+                                        "anyOf": [
+                                            { "type": "string" },
+                                            { "type": "array" }
+                                        ]
+                                    },
+                                    "salesforce": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": ["salesforce", "pds"]
+                            },
+                            {
+                                "type" : "object",
+                                "properties": {
+                                    "departments": {
+                                        "type": "string"
+                                    },
+                                    "salesforce": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": ["salesforce", "departments"]
+                            }
+                        ]
+                    },
+                    "source" : { "enum" : ["pds", "departments"] },
+                    "flat" : { "type" : "boolean" },
+                    "fields": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "boolean"
+                                },
+                                {
+                                    "type": "array"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "value": { 
+                                            "anyOf": [
+                                                { "type": "string" },
+                                                { "type": "boolean"},
+                                                { "type": "array" }
+                                            ]
+                                        },
+                                        "when": { 
+                                            "type": "object",
+                                            "additionalProperties": {
+                                                "anyOf": [
+                                                    { "type": "string" },
+                                                    { "type": "boolean" },
+                                                    { "type": "array" }
+                                                ]
+                                            }
+                                        },
+                                        "ref": {
+                                            "type": "object",
+                                            "properties": {
+                                                "object": { "type": "string" },
+                                                "ref_external_id": { "type": "string" },
+                                                "source_value_ref": { 
+                                                    "anyOf": [
+                                                        { "type": "string" },
+                                                        { "type": "array" }
+                                                    ]
+                                                }
+                                            },
+                                            "required": ["object", "ref_external_id", "source_value_ref"]
+        
+                                        },
+                                        "picklist": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                                "type": "array"
+                                            
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                },
+                "required": ["Id", "fields"]
+        
+            },
+            {
                 "type": "array",
                 "items": {
                     "type": "object",
