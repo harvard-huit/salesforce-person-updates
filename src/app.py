@@ -304,6 +304,8 @@ try:
     elif action == "test":
         logger.info(f"test action called")
 
+        result = sfpu.hsf.validateConfig(config=sfpu.app_config.config)
+        logger.info(f"Config validation result: {result}")
 
         logger.info(f"test action finished")
     else: 
