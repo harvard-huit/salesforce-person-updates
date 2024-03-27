@@ -42,25 +42,25 @@ class AccountHandler:
             if source_type == "schools":
                 source_data = person_reference.getSchools()
             elif source_type == "departments":
-                logger.error(f"departments not yet implemented")
-                source_data = []
-                # source_data = person_reference.getDepartments()
-                continue
+                # logger.error(f"departments not yet implemented")
+                # source_data = []
+                source_data = person_reference.getDepartments()
+                # continue
             elif source_type == "units":
-                logger.error(f"units not yet implemented")
-                source_data = []
-                # source_data = person_reference.getUnits()
-                continue
+                # logger.error(f"units not yet implemented")
+                # source_data = []
+                source_data = person_reference.getUnits()
+                # continue
             elif source_type == "sub_affiliations":
-                logger.error(f"sub_affiliations not yet implemented")
-                source_data = []
-                # source_data = person_reference.getSubAffiliations()
-                continue
+                # logger.error(f"sub_affiliations not yet implemented")
+                # source_data = []
+                source_data = person_reference.getSubAffiliations()
+                # continue
             elif source_type == "major_affiliations":
-                logger.error(f"major_affiliations not yet implemented")
-                source_data = []
-                # source_data = person_reference.getMajorAffiliations()
-                continue
+                # logger.error(f"major_affiliations not yet implemented")
+                # source_data = []
+                source_data = person_reference.getMajorAffiliations()
+                # continue
             else:
                 logger.error(f"source type {source_type} not recognized")
                 source_data = []
@@ -88,6 +88,8 @@ class AccountHandler:
                     if v['Account_Type__c'] is not None:
                         if v['Account_Type__c'] in record_type_ids.keys():
                             v['RecordTypeId'] = record_type_ids[v['Account_Type__c']]
+                        else:
+                            logger.warning(f"Account Type {v['Account_Type__c']} not found in record type ids")
 
                     data[i].append(v)
                     
