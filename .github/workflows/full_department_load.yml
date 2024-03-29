@@ -1,4 +1,4 @@
-name: Full Department Load
+name: Full Department Load (DEPRECATED)
 run-name: Full Department Load on ${{ github.event.inputs.environment }} for ${{ github.event.inputs.salesforce_instance_id }}
 
 on:
