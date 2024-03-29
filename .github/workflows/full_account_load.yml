@@ -79,8 +79,6 @@ jobs:
           CONTAINER_OVERRIDES='[ 
             {
               "name": "aais-services-${{ github.event.inputs.environment }}-feed-salesforce-person-updates", 
-              "cpu": ${{ github.event.inputs.cpu }},
-              "memory": ${{ github.event.inputs.memory }},
               "environment": [ 
                 {
                   "name": "SALESFORCE_INSTANCE_ID", 
@@ -101,7 +99,7 @@ jobs:
           CONTAINER_OVERRIDES=$(echo "$CONTAINER_OVERRIDES" | tr -d '\n')
           echo "CONTAINER_OVERRIDES=$CONTAINER_OVERRIDES" >> $GITHUB_ENV
 
-      - name: Run ${{ inputs.environment }} full data load on [${{ inputs.people }}]
+      - name: Run ${{ inputs.environment }} full Account data load
         run: |
           aws ecs run-task \
             --cluster aais-services-${{ inputs.environment }}-cluster \
