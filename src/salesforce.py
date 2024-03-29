@@ -959,7 +959,7 @@ class HarvardSalesforce:
         logger.info(f"length of ids: {len(ids)}")
 
         result_data = []
-        batch = 1000
+        batch = 500
         for i in range(0, len(ids), batch):
             try:
                 batch = ids[i:i + batch]
