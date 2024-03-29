@@ -472,15 +472,19 @@ class HarvardSalesforce:
                 try:
                     config_field = None
                     for object in config:
-
                         description = self.sf.__getattr__(object).describe()
-                        
-                        # in here we check that all fields we're trying to push to exist in the target salesforce
-                        for config_field in config[object]['fields'].keys():
-                            if config_field not in [f['name'] for f in description.get('fields')]:
-                                # also make sure it's not a relationship name
-                                if config_field not in [f['relationshipName'] for f in description.get('fields')]:
-                                    raise Exception(f"Error: {config_field} not found in {object}")
+
+                        config_objects = config[object]
+
+                        if not isinstance(config[object], list):
+                            config_objects = [config[object]]
+
+                        for config_obj in config_objects:
+                            for config_field in config_obj['fields'].keys():
+                                if config_field not in [f['name'] for f in description.get('fields')]:
+                                    # also make sure it's not a relationship name
+                                    if config_field not in [f['relationshipName'] for f in description.get('fields')]:
+                                        raise Exception(f"Error: {config_field} not found in {object}")
 
 
                 except Exception as e:
