@@ -179,7 +179,9 @@ class SalesforceTransformer:
                                 if '.' in source_value_ref and is_flat:
                                     (obj, val) = source_value_ref.split(".")
                                     source_value = source_data_object[obj][val]
-                                else:
+                                elif source_value_ref in source_data_object:
+                                    source_value = source_data_object[source_value_ref]
+                                else: 
                                     source_value = None
                                 if 'simplify_code' in source_object['ref']:
                                     if source_object['ref']['simplify_code'] == True:
@@ -408,7 +410,7 @@ class SalesforceTransformer:
                                     current_record[object_name][target] = None
                                     continue
                                 
-                                if isinstance(source_value, dict) and 'ref' in source_value:
+                                if isinstance(source_value, dict) and 'ref' in source_value.keys():
                                     if 'simplify_code' in source_value['ref']:
                                         if source_value['ref']['simplify_code'] == True:
                                             value = Departments.simplify_code(value)
