@@ -1,25 +1,20 @@
-**v1.x.x**
-* * *
+## Purpose
 
-# What does this Pull Request do?
-A brief description of what the intended result of the PR will be and/or what problem it solves.
+### What this primarily does:
+ - [ ] #issue_ref
+ - [ ] #issue_ref
+ - [ ] important thing I didn't have time to make an issue for
 
-# Issues Addressed
+### What this also does:
+ - [ ] additional stuff being added 
+ - [ ] that may not have issues associated
 
-# How should this be tested?
 
-## Currently Deployed to **stack**
+## Special instructions for reviewers
+ - pay no attention to the man behind the curtain (or the transformer.py file)
+ - be nice
 
-A description of what steps someone could take to:
- * Reproduce the problem you are fixing (if applicable)
- * Test that the Pull Request does what is intended.
- * Please be as detailed as possible.
- * Good testing instructions help get your PR completed faster.
+### Currently Deployed to `null`
 
-# Test coverage
-Yes/No: Are changes in this pull-request covered by:
-- unit tests?
-- integration/functional tests?
-
-# Interested parties
-Tag (@ mention) interested parties
+## Test coverage
+Yes/No/why not?

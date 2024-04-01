@@ -85,12 +85,12 @@ jobs:
         id: which_version
         run: |
           if [ -z "${{ inputs.version }}" ]; then
+            echo "Version from ansible_vars: ${{ needs.get_version.outputs.version }}"
+            echo "version=${{ needs.get_version.outputs.version }}" >> $GITHUB_OUTPUT
+          else
             echo "Version from input: ${{ inputs.version }}"
             echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
           fi
-            echo "Version from ansible_vars: ${{ needs.get_version.outputs.version }}"
-            echo "version=${{ needs.get_version.outputs.version }}" >> $GITHUB_OUTPUT
-          
       - name: Build
         run: |
           cd checkout

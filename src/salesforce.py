@@ -472,15 +472,19 @@ class HarvardSalesforce:
                 try:
                     config_field = None
                     for object in config:
-
                         description = self.sf.__getattr__(object).describe()
-                        
-                        # in here we check that all fields we're trying to push to exist in the target salesforce
-                        for config_field in config[object]['fields'].keys():
-                            if config_field not in [f['name'] for f in description.get('fields')]:
-                                # also make sure it's not a relationship name
-                                if config_field not in [f['relationshipName'] for f in description.get('fields')]:
-                                    raise Exception(f"Error: {config_field} not found in {object}")
+
+                        config_objects = config[object]
+
+                        if not isinstance(config[object], list):
+                            config_objects = [config[object]]
+
+                        for config_obj in config_objects:
+                            for config_field in config_obj['fields'].keys():
+                                if config_field not in [f['name'] for f in description.get('fields')]:
+                                    # also make sure it's not a relationship name
+                                    if config_field not in [f['relationshipName'] for f in description.get('fields')]:
+                                        raise Exception(f"Error: {config_field} not found in {object}")
 
 
                 except Exception as e:
@@ -653,8 +657,10 @@ class HarvardSalesforce:
                 # if salesforce_id_name not in unique_object_fields:
                 #     unique_object_fields.append(salesforce_id_name)
 
-                # full_source_id_value is the id name of the SAME external id as it exists in the source data (e.g. pds or departments)
-                if source_name in config[object]['Id']:
+                if 'source' in config[object]['Id']:
+                    full_source_id_value = config[object]['Id']['source']
+                elif source_name in config[object]['Id']:
+                    # full_source_id_value is the id name of the SAME external id as it exists in the source data (e.g. pds or departments)
                     full_source_id_value = config[object]['Id'][source_name]
                 else:
                     raise Exception(f"Error: source {source_name} not found in config. (Did you remember to slice the config?)")
@@ -953,7 +959,7 @@ class HarvardSalesforce:
         logger.info(f"length of ids: {len(ids)}")
 
         result_data = []
-        batch = 1000
+        batch = 500
         for i in range(0, len(ids), batch):
             try:
                 batch = ids[i:i + batch]
