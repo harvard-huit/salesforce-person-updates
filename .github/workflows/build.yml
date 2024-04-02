@@ -79,27 +79,27 @@ jobs:
           path: ./checkout
       - name: Get Dev Version
         id: get_dev_version
-        uses: HUIT/aais-ecs-infrastructure/actions/get-versions@develop
+        uses: HUIT/aais-ecs-infrastructure/actions/get-version@develop
         with:
-          environment: dev
+          ansible_vars: ./checkout/ansible_vars/dev_ansible_vars
       - name: Get Test Version
         if: ${{ inputs.version }} != null
         id: get_test_version
-        uses: HUIT/aais-ecs-infrastructure/actions/get-versions@develop
+        uses: HUIT/aais-ecs-infrastructure/actions/get-version@develop
         with:
-          environment: test
+          ansible_vars: ./checkout/ansible_vars/test_ansible_vars
       - name: Get Stage Version
         if: ${{ inputs.version }} != null
         id: get_stage_version
-        uses: HUIT/aais-ecs-infrastructure/actions/get-versions@develop
+        uses: HUIT/aais-ecs-infrastructure/actions/get-version@develop
         with:
-          environment: stage
+          ansible_vars: ./checkout/ansible_vars/stage_ansible_vars
       - name: Get Prod Version
         if: ${{ inputs.version }} != null
         id: get_prod_version
-        uses: HUIT/aais-ecs-infrastructure/actions/get-versions@develop
+        uses: HUIT/aais-ecs-infrastructure/actions/get-version@develop
         with:
-          environment: prod
+          ansible_vars: ./checkout/ansible_vars/prod_ansible_vars
 
       - name: JSON Output
         id: json_output
