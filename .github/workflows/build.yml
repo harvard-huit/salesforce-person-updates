@@ -83,19 +83,19 @@ jobs:
         with:
           ansible_vars: ./checkout/ansible_vars/dev_ansible_vars.yml
       - name: Get Test Version
-        if: ${{ inputs.version }} != null
+        if: inputs.version != null
         id: get_test_version
         uses: HUIT/aais-ecs-infrastructure/actions/get-version@develop
         with:
           ansible_vars: ./checkout/ansible_vars/test_ansible_vars.yml
       - name: Get Stage Version
-        if: ${{ inputs.version }} != null
+        if: inputs.version != null
         id: get_stage_version
         uses: HUIT/aais-ecs-infrastructure/actions/get-version@develop
         with:
           ansible_vars: ./checkout/ansible_vars/stage_ansible_vars.yml
       - name: Get Prod Version
-        if: ${{ inputs.version }} != null
+        if: inputs.version != null
         id: get_prod_version
         uses: HUIT/aais-ecs-infrastructure/actions/get-version@develop
         with:
@@ -103,19 +103,19 @@ jobs:
 
       - name: JSON Output
         id: json_output
-        if: ${{ inputs.version }} != null
+        if: inputs.version != null
         run: |
           python - <<EOF
           import json
           cache_updates = []
-          if ${{ inputs.version }} == ${{ steps.get_dev_version.outputs.version }}:
-            cache_updates.append({"env": "dev", "version": ${{ steps.get_dev_version.outputs.version }}})
-          if ${{ inputs.version }} == ${{ steps.get_test_version.outputs.version }}:
-            cache_updates.append({"env": "test", "version": ${{ steps.get_test_version.outputs.version }}})
-          if ${{ inputs.version }} == ${{ steps.get_stage_version.outputs.version }}:
-            cache_updates.append({"env": "stage", "version": ${{ steps.get_stage_version.outputs.version }}})
-          if ${{ inputs.version }} == ${{ steps.get_prod_version.outputs.version }}:
-            cache_updates.append({"env": "prod", "version": ${{ steps.get_prod_version.outputs.version }}})
+          if "${{ inputs.version }}" == "${{ steps.get_dev_version.outputs.version }}":
+            cache_updates.append({"env": "dev", "version": "${{ steps.get_dev_version.outputs.version }}"})
+          if "${{ inputs.version }}" == ${{ steps.get_test_version.outputs.version }}:
+            cache_updates.append({"env": "test", "version": "${{ steps.get_test_version.outputs.version }}"})
+          if "${{ inputs.version }}" == ${{ steps.get_stage_version.outputs.version }}:
+            cache_updates.append({"env": "stage", "version": "${{ steps.get_stage_version.outputs.version }}"})
+          if "${{ inputs.version }}" == "${{ steps.get_prod_version.outputs.version }}":
+            cache_updates.append({"env": "prod", "version": "${{ steps.get_prod_version.outputs.version }}"})
           print(json.dumps(cache_updates))
           EOF >> $GITHUB_OUTPUT
     outputs:
