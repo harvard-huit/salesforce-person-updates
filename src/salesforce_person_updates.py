@@ -187,7 +187,7 @@ class SalesforcePersonUpdates:
                 }
 
                 try: 
-                    self.sfpu.push_log(message=record.getMessage(), levelname=record.levelname, datetime=None, run_id=sfpu.run_id)
+                    self.sfpu.push_log(message=record.getMessage(), levelname=record.levelname, datetime=None, run_id=self.sfpu.run_id)
                 except Exception as e:
                     log_data['log_error'] = str(e)
 
