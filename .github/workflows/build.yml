@@ -115,11 +115,13 @@ jobs:
             cache_updates.append({"env": "stage", "version": "${{ steps.get_stage_version.outputs.version }}"})
           if "${{ inputs.version }}" == "${{ steps.get_prod_version.outputs.version }}":
             cache_updates.append({"env": "prod", "version": "${{ steps.get_prod_version.outputs.version }}"})
-          print(json.dumps(cache_updates))
+          print(json.dumps({
+            "cache_updates": cache_updates
+          }))
           EOF >> $GITHUB_OUTPUT
     outputs:
       dev: ${{ steps.get_dev_version.outputs.version }}
-      cache_updates: ${{ steps.json_output.outputs }}
+      cache_updates: ${{ steps.json_output.outputs.cache_updates || '[]' }}
 
   build:
     name: Build Code ${{ inputs.version }}
