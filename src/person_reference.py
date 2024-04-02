@@ -3,7 +3,7 @@ import requests
 
 
 class PersonReference():
-    def __init__(self, apikey, environment="dev"):
+    def __init__(self, apikey, environment="prod"):
         if apikey == None:
             raise Exception("Error: apikey required")
 
