@@ -122,7 +122,7 @@ jobs:
           echo "cache_updates=$cache_updates">> $GITHUB_OUTPUT
     outputs:
       dev: ${{ steps.get_dev_version.outputs.version }}
-      cache_updates: ${{ steps.json_output.outputs.cache_updates || '[]' }}
+      cache_updates: ${{ steps.json_output.outputs.cache_updates }}
 
   build:
     name: Build Code ${{ inputs.version }}
@@ -171,7 +171,7 @@ jobs:
     needs: [versions, build]
     strategy:
       matrix:
-        versions: ${{ needs.versions.outputs.cache_updates }}
+        versions: ${{ fromJson(needs.versions.outputs.cache_updates) || '[]' }}
     uses: ./.github/workflows/deploy.yml
     with: 
       version: ${{ matrix.versions.version }}
