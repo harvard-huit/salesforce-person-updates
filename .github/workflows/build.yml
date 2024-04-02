@@ -104,7 +104,7 @@ jobs:
       - name: JSON Output
         id: json_output
         run: |
-          python - <<EOF
+          echo "cache_updates=$(python - <<EOF
           import json
           cache_updates = []
           if "${{ inputs.version }}" == "${{ steps.get_dev_version.outputs.version }}":
@@ -115,8 +115,8 @@ jobs:
             cache_updates.append({"env": "stage", "version": "${{ steps.get_stage_version.outputs.version }}"})
           if "${{ inputs.version }}" == "${{ steps.get_prod_version.outputs.version }}":
             cache_updates.append({"env": "prod", "version": "${{ steps.get_prod_version.outputs.version }}"})
-          print("cache_updates=" + json.dumps(cache_updates))
-          EOF >> $GITHUB_OUTPUT
+          print(json.dumps(cache_updates))
+          EOF) >> $GITHUB_OUTPUT
     outputs:
       dev: ${{ steps.get_dev_version.outputs.version }}
       cache_updates: ${{ steps.json_output.outputs.cache_updates || '[]' }}
