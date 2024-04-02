@@ -168,8 +168,10 @@ jobs:
 
   cache_deploys:
     name: Cache Deploys
+    if: github.event_name == 'workflow_dispatch' && needs.versions.outputs.cache_updates != '[]'
     needs: [versions, build]
     strategy:
+      fail-fast: false
       matrix:
         versions: ${{ fromJson(needs.versions.outputs.cache_updates) || '[]' }}
     uses: ./.github/workflows/deploy.yml
