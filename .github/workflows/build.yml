@@ -53,22 +53,6 @@ jobs:
           source env/bin/activate
           python -m unittest discover -s src -p *_test.py    
 
-  # get_version:
-  #   name: Get Version
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout the code
-  #       uses: actions/checkout@v3
-  #       with: 
-  #         path: ./checkout
-  #     - name: Run the action
-  #       id: get_version
-  #       uses: HUIT/aais-ecs-infrastructure/actions/get-version@develop
-  #       with:
-  #         ansible_vars: ./checkout/ansible_vars/dev_ansible_vars.yml
-  #   outputs:
-  #     version: ${{ steps.get_version.outputs.version }}
-
   versions:
     name: Get all Deployed Versions
     runs-on: ubuntu-latest
