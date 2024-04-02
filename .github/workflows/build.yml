@@ -109,9 +109,9 @@ jobs:
           cache_updates = []
           if "${{ inputs.version }}" == "${{ steps.get_dev_version.outputs.version }}":
             cache_updates.append({"env": "dev", "version": "${{ steps.get_dev_version.outputs.version }}"})
-          if "${{ inputs.version }}" == ${{ steps.get_test_version.outputs.version }}:
+          if "${{ inputs.version }}" == "${{ steps.get_test_version.outputs.version }}":
             cache_updates.append({"env": "test", "version": "${{ steps.get_test_version.outputs.version }}"})
-          if "${{ inputs.version }}" == ${{ steps.get_stage_version.outputs.version }}:
+          if "${{ inputs.version }}" == "${{ steps.get_stage_version.outputs.version }}":
             cache_updates.append({"env": "stage", "version": "${{ steps.get_stage_version.outputs.version }}"})
           if "${{ inputs.version }}" == "${{ steps.get_prod_version.outputs.version }}":
             cache_updates.append({"env": "prod", "version": "${{ steps.get_prod_version.outputs.version }}"})
