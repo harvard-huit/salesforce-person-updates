@@ -179,7 +179,7 @@ class SalesforceTransformer:
                                 if '.' in source_value_ref and is_flat:
                                     (obj, val) = source_value_ref.split(".")
                                     source_value = source_data_object[obj][val]
-                                elif source_value_ref in source_data_object:
+                                elif isinstance(source_value_ref, str) and source_value_ref in source_data_object:
                                     source_value = source_data_object[source_value_ref]
                                 else: 
                                     source_value = None
