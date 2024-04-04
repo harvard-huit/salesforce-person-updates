@@ -55,6 +55,10 @@ if stack == 'developer':
     f.close()
 
     query_filename = '../example_pds_query.json'
+
+    if os.getenv("QUERY_FILENAME") is not None:
+        query_filename = os.getenv("QUERY_FILENAME")
+
     if is_unittest():
         query_filename = '../' + query_filename
 
@@ -81,15 +85,18 @@ class SalesforcePersonUpdates:
 
             if local == "True":
                 self.app_config = AppConfig(id=None, table_name=None, local=True)
+                logger.info(f"config : local true")
             else:
                 if self.salesforce_instance_id is None or self.table_name is None:
                     raise Exception("ERROR: SALESFORCE_INSTANCE_ID and TABLE_NAME are required env vars, these tell us where to get the configuration.")
 
                 self.app_config = AppConfig(id=self.salesforce_instance_id, table_name=self.table_name)
+                logger.info(f"config : dynamo")
 
             if os.getenv("FORCE_LOCAL_CONFIG"):
                 self.app_config.config = config
                 # self.app_config.pds_query = pds_query
+                logger.info(f"config : forced local")
 
             self.record_limit = None
             try:
