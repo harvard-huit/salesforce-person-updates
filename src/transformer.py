@@ -173,7 +173,8 @@ class SalesforceTransformer:
                                 source_value_ref = source_object['ref']['source_value_ref']
                                 if isinstance(source_value_ref, list):
                                     for possible_source_value_ref in source_value_ref:
-                                        if possible_source_value_ref in source_data_object:
+                                        (obj, val) = possible_source_value_ref.split(".")
+                                        if val in source_data_object:
                                             source_value_ref = possible_source_value_ref
                                             break
                                 if '.' in source_value_ref and is_flat:
