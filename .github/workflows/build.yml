@@ -53,26 +53,64 @@ jobs:
           source env/bin/activate
           python -m unittest discover -s src -p *_test.py    
 
-  get_version:
-    name: Get Version
+  versions:
+    name: Get all Deployed Versions
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the code
         uses: actions/checkout@v3
         with: 
           path: ./checkout
-      - name: Run the action
-        id: get_version
+      - name: Get Dev Version
+        id: get_dev_version
         uses: HUIT/aais-ecs-infrastructure/actions/get-version@develop
         with:
           ansible_vars: ./checkout/ansible_vars/dev_ansible_vars.yml
-    outputs:
-      version: ${{ steps.get_version.outputs.version }}
+      - name: Get Test Version
+        if: inputs.version != null
+        id: get_test_version
+        uses: HUIT/aais-ecs-infrastructure/actions/get-version@develop
+        with:
+          ansible_vars: ./checkout/ansible_vars/test_ansible_vars.yml
+      - name: Get Stage Version
+        if: inputs.version != null
+        id: get_stage_version
+        uses: HUIT/aais-ecs-infrastructure/actions/get-version@develop
+        with:
+          ansible_vars: ./checkout/ansible_vars/stage_ansible_vars.yml
+      - name: Get Prod Version
+        if: inputs.version != null
+        id: get_prod_version
+        uses: HUIT/aais-ecs-infrastructure/actions/get-version@develop
+        with:
+          ansible_vars: ./checkout/ansible_vars/prod_ansible_vars.yml
 
+      - name: JSON Output
+        id: json_output
+        run: |
+          cache_updates=$(python - <<EOF
+          import json
+          cache_updates = []
+          if "${{ inputs.version }}" != "":
+            if "${{ inputs.version }}" == "${{ steps.get_dev_version.outputs.version }}":
+              cache_updates.append({"env": "dev", "version": "${{ steps.get_dev_version.outputs.version }}"})
+            if "${{ inputs.version }}" == "${{ steps.get_test_version.outputs.version }}":
+              cache_updates.append({"env": "test", "version": "${{ steps.get_test_version.outputs.version }}"})
+            if "${{ inputs.version }}" == "${{ steps.get_stage_version.outputs.version }}":
+              cache_updates.append({"env": "stage", "version": "${{ steps.get_stage_version.outputs.version }}"})
+            if "${{ inputs.version }}" == "${{ steps.get_prod_version.outputs.version }}":
+              cache_updates.append({"env": "prod", "version": "${{ steps.get_prod_version.outputs.version }}"})
+          print(json.dumps(cache_updates))
+          EOF
+          ) 
+          echo "cache_updates=$cache_updates">> $GITHUB_OUTPUT
+    outputs:
+      dev: ${{ steps.get_dev_version.outputs.version }}
+      cache_updates: ${{ steps.json_output.outputs.cache_updates }}
 
   build:
-    name: Build Code ${{ github.event.inputs.version }}
-    needs: [unittest, get_version]
+    name: Build Code ${{ inputs.version }}
+    needs: [unittest, versions]
     runs-on: ubuntu-latest
 
     steps:
@@ -85,12 +123,12 @@ jobs:
         id: which_version
         run: |
           if [ -z "${{ inputs.version }}" ]; then
+            echo "Version from dev_ansible_vars: ${{ needs.versions.outputs.dev }}"
+            echo "version=${{ needs.versions.outputs.dev }}" >> $GITHUB_OUTPUT
+          else
             echo "Version from input: ${{ inputs.version }}"
             echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
           fi
-            echo "Version from ansible_vars: ${{ needs.get_version.outputs.version }}"
-            echo "version=${{ needs.get_version.outputs.version }}" >> $GITHUB_OUTPUT
-          
       - name: Build
         run: |
           cd checkout
@@ -105,10 +143,23 @@ jobs:
   deploy:
     name: Deploy to Dev
     if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
-    needs: [get_version, build]
+    needs: [versions, build]
     uses: ./.github/workflows/deploy.yml
     with: 
-      version: ${{ needs.get_version.outputs.version }}
+      version: ${{ needs.versions.outputs.dev }}
       environment: dev
     secrets: inherit
-        
+
+  cache_deploys:
+    name: Cache Deploys
+    if: github.event_name == 'workflow_dispatch' && needs.versions.outputs.cache_updates != '[]'
+    needs: [versions, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        versions: ${{ fromJson(needs.versions.outputs.cache_updates) || '[]' }}
+    uses: ./.github/workflows/deploy.yml
+    with: 
+      version: ${{ matrix.versions.version }}
+      environment: ${{ matrix.versions.env }}
+    secrets: inherit

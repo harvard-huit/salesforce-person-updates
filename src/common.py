@@ -52,7 +52,8 @@ class AppConfig():
         self.config = None
         self.watermarks = {
             "person": None,
-            "department": None
+            "department": None,
+            "account": None
         }
 
         self.salesforce_password = None

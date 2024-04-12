@@ -1,5 +1,5 @@
-name: Full Department Load (DEPRECATED)
-run-name: Full Department Load on ${{ github.event.inputs.environment }} for ${{ github.event.inputs.salesforce_instance_id }}
+name: Full Account Data Load
+run-name: Full Account data load on ${{ github.event.inputs.environment }} for ${{ github.event.inputs.salesforce_instance_id }}
 
 on:
   workflow_dispatch:
@@ -18,7 +18,13 @@ on:
         type: string
         required: true
         default: 'huit-full-sandbox'
-              
+      debug:
+        type: choice
+        required: false
+        default: 'False'
+        options:
+          - 'True'
+          - 'False'
 
 env:
   AWS_REGION: us-east-1
@@ -29,7 +35,7 @@ defaults:
 
 jobs:
   data_load: 
-    name: Full department load on ${{ github.event.inputs.environment }} for ${{ github.event.inputs.salesforce_instance_id }}
+    name: Full account data load on ${{ github.event.inputs.environment }} for ${{ github.event.inputs.salesforce_instance_id }}
     runs-on: [ ubuntu-latest ]
 
     steps:
@@ -54,7 +60,7 @@ jobs:
           echo "TABLE_NAME=aais-services-salesforce-person-updates-${{ github.event.inputs.environment }}" >> $GITHUB_ENV
   
       - name: Login to AWS with a service account / iam user
-        uses: HUIT/configure-aws-credentials@13d241b293754004c80624b5567555c4a39ffbe3
+        uses: HUIT/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_NONPROD }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_NONPROD }}
@@ -65,8 +71,7 @@ jobs:
           role-skip-session-tagging: true
           role-external-id: ${{ secrets.EXTERNAL_ID }}
 
-
-      - name: get current identity
+      - name: log current identity
         run: aws sts get-caller-identity
 
       - name: Create Overrides
@@ -74,18 +79,19 @@ jobs:
           CONTAINER_OVERRIDES='[ 
             {
               "name": "aais-services-${{ github.event.inputs.environment }}-feed-salesforce-person-updates", 
-              "cpu": 1024,
-              "memory": 2048,
               "environment": [ 
                 {
                   "name": "SALESFORCE_INSTANCE_ID", 
-                  "value": "${{ github.event.inputs.salesforce_instance_id }}"
+                  "value": "${{ inputs.salesforce_instance_id }}"
                 }, {
                   "name": "TABLE_NAME", 
                   "value": "${{ env.TABLE_NAME }}"
                 }, {
                   "name": "action", 
-                  "value": "full-department-load"
+                  "value": "full-account-load"
+                }, {
+                  "name": "DEBUG", 
+                  "value": "${{ inputs.debug }}"
                 }
               ]
             } 
@@ -93,12 +99,12 @@ jobs:
           CONTAINER_OVERRIDES=$(echo "$CONTAINER_OVERRIDES" | tr -d '\n')
           echo "CONTAINER_OVERRIDES=$CONTAINER_OVERRIDES" >> $GITHUB_ENV
 
-      - name: Run ${{ github.event.inputs.environment }} spot update on [${{ github.event.inputs.people }}]
+      - name: Run ${{ inputs.environment }} full Account data load
         run: |
           aws ecs run-task \
-            --cluster aais-services-${{ github.event.inputs.environment }}-cluster \
+            --cluster aais-services-${{ inputs.environment }}-cluster \
             --overrides '{"containerOverrides": ${{ env.CONTAINER_OVERRIDES }} }' \
-            --task-definition arn:aws:ecs:us-east-1:${{ env.account }}:task-definition/aais-services-${{ github.event.inputs.environment }}-feed-salesforce-person-updates${{ env.task_version }} \
+            --task-definition arn:aws:ecs:us-east-1:${{ env.account }}:task-definition/aais-services-${{ inputs.environment }}-feed-salesforce-person-updates \
             --network-configuration '{ "awsvpcConfiguration": { "assignPublicIp":"DISABLED", "securityGroups": ["${{ env.security_group }}"], "subnets": ["${{ env.subnet }}"]}}' \
             --launch-type FARGATE
   

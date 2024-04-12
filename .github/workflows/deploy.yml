@@ -1,5 +1,5 @@
 name: Deploy Task Definition
-run-name: Deploying ${{ github.event.inputs.version }} to ${{ github.event.inputs.environment }}
+run-name: Deploying ${{ inputs.version }} to ${{ inputs.environment }}
 
 on:
   # push:
@@ -36,7 +36,7 @@ defaults:
 
 jobs:
   deploy:
-    name: Deploy ${{ github.event.inputs.version }} to ${{ github.event.inputs.environment }}
+    name: Deploy ${{ inputs.version }} to ${{ inputs.environment }}
     runs-on: ubuntu-latest
 
     steps:
@@ -54,9 +54,10 @@ jobs:
           path: ./checkout
           
       - name: Run AAIS Deploy Container Action
-        uses: HUIT/aais-ecs-infrastructure/actions/deploy-container@develop
+        uses: HUIT/aais-ecs-infrastructure/actions/run-ansible@develop
         with:
           # Required
+          playbook: deploy-container.yml
           ansible_vars: ansible_vars/${{ inputs.environment }}_ansible_vars.yml
           cluster_config_repository: HUIT/aais-services-config
           cluster_config: aais_services_${{ inputs.environment }}.yml
@@ -67,5 +68,5 @@ jobs:
           #   if the checkout was done without a path, this is not needed
           app_root: checkout
           infrastructure_branch: develop
-          debug: true
+          debug: false
      

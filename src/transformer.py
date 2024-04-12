@@ -32,16 +32,33 @@ class SalesforceTransformer:
     # target_object is used to filter down to a single target object in the config (ex: Contact)
     # exlude_target_objects is a list of Objects you want to specifically ignore on this run 
     #   For example, if you ran the Contacts a minute ago (to get ids), you may not want to run them again
-    def transform(self, source_data, source_name=None, target_object=None, exclude_target_objects=[]):
+    def transform(self, source_data, source_name=None, target_object=None, exclude_target_objects=[], source_config=None):
+        """
+        This method will take a variety of inputs and transform them into a format that can be used to update Salesforce
+        Required:
+            source_data: a list of dictionaries that represent the data from the source
+        
+        Optional:
+            source_name: the name of the source, this is used to filter a FLAT config
+            target_object: the name of the target object to filter a FLAT config
+            exclude_target_objects: a list of objects to exclude from the transformation of a FLAT config
 
+            (new in v1.1)
+            source_config: the config to use for the transformation, if not provided, 
+                it will use the config provided in the constructor
+                trimmed based on the above optional params
+        """
         logger.debug(f"Starting transfom")
-        if target_object is not None:
-            source_config = self.getTargetConfig(target_object)
-            source_name = source_config[target_object]['source']
-        elif source_name is not None:
-            source_config = self.getSourceConfig(source_name)
-        else:
-            source_config = self.config
+
+        # we look for the source_config first, if it's not provided, we'll try to get it from the target_object
+        if source_config is None:
+            if target_object is not None:
+                source_config = self.getTargetConfig(target_object)
+                source_name = source_config[target_object]['source']
+            elif source_name is not None:
+                source_config = self.getSourceConfig(source_name)
+            else:
+                source_config = self.config
         
         data = {}
         best_branches = {}
@@ -81,7 +98,12 @@ class SalesforceTransformer:
                 is_flat = source_config[object_name].get('flat') or False    
                 
                 object_config = source_config[object_name]['fields']
-                source_id_name = source_config[object_name]['Id'][source_name]
+                if 'source' in source_config[object_name]['Id']:
+                    source_id_name = source_config[object_name]['Id']['source']
+                elif source_name in source_config[object_name]['Id']:
+                    source_id_name = source_config[object_name]['Id'][source_name]
+                else:
+                    raise Exception(f"Error: Source Id not found in config for {object_name}")
                 salesforce_id_name = source_config[object_name]['Id']['salesforce']
 
                 is_branched = False
@@ -157,7 +179,9 @@ class SalesforceTransformer:
                                 if '.' in source_value_ref and is_flat:
                                     (obj, val) = source_value_ref.split(".")
                                     source_value = source_data_object[obj][val]
-                                else:
+                                elif isinstance(source_value_ref, str) and source_value_ref in source_data_object:
+                                    source_value = source_data_object[source_value_ref]
+                                else: 
                                     source_value = None
                                 if 'simplify_code' in source_object['ref']:
                                     if source_object['ref']['simplify_code'] == True:
@@ -386,7 +410,7 @@ class SalesforceTransformer:
                                     current_record[object_name][target] = None
                                     continue
                                 
-                                if isinstance(source_value, dict) and 'ref' in source_value:
+                                if isinstance(source_value, dict) and 'ref' in source_value.keys():
                                     if 'simplify_code' in source_value['ref']:
                                         if source_value['ref']['simplify_code'] == True:
                                             value = Departments.simplify_code(value)
@@ -437,7 +461,6 @@ class SalesforceTransformer:
 
         # return data
     
-
     # this method will set the id of the current record given the source_data_object record, the object name and the config
     # NOTE: a record should be a single salesforce object name with objects that are not necessarily affiliated 
     #   with the same source_data_object
