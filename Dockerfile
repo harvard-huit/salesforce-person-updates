@@ -31,15 +31,17 @@ RUN \
 	dnf clean all && \
 	rm -rf /var/cache/dnf
 
-
-# Install Python application and change working directory to it.
-COPY src /opt/app
-COPY config.schema.json /opt/app
+COPY src/requirements.txt /opt/app/
 WORKDIR /opt/app
 
 # # Install the Python modules our API application uses.
 RUN python${PYTHON_VERSION} -m pip config set global.extra-index-url https://artifactory.huit.harvard.edu/artifactory/api/pypi/ats-python/simple
 RUN python${PYTHON_VERSION} -m pip install --user --no-cache-dir -r requirements.txt
+
+# Install Python application and change working directory to it.
+COPY src /opt/app
+COPY config.schema.json /opt/app
+
 
 # Needed for boto to be able to find the parameter store
 ENV AWS_DEFAULT_REGION us-east-1
