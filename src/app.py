@@ -32,6 +32,10 @@ if stack == 'developer':
     f.close()
 
     query_filename = '../example_pds_query.json'
+
+    if os.getenv("QUERY_FILENAME") is not None:
+        query_filename = os.getenv("QUERY_FILENAME")
+
     if is_unittest():
         query_filename = '../' + query_filename
 
@@ -281,6 +285,18 @@ try:
             logger.warning(f"delete complete")
 
         logger.info(f"delete-all-data action finished")
+    elif action == "delete-account-data":
+        logger.warning(f"delete-account-data action called")
+        external_id = 'Account_PDC_Key__c'
+        result = sfpu.hsf.sf.query_all(f"SELECT Id, {external_id} FROM Account WHERE {external_id} != null ORDER BY LastModifiedDate DESC")
+        logger.info(f"Found {len(result['records'])} Account records")
+        # delete them all
+        ids = [{'Id': record['Id']} for record in result['records']]
+        logger.warning(f"attempting delete")
+        sfpu.hsf.sf.bulk.__getattr__('Account').delete(ids)
+        logger.warning(f"delete complete")
+
+        logger.info(f"delete-account-data action finished")
     elif action == "static-query":
         logger.info(f"static-query action called")
         # query_filename = '../examples/example_pds_query_hms.json'
