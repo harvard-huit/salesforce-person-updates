@@ -86,7 +86,7 @@ if task_running and not stack == "developer":
             logger.warning(f"The current task is actively running and the wait limit of {WAIT_LIMIT} has been exceeded.")
             exit()
 
-setTaskRunning(sfpu.app_config, True)
+setTaskRunning(sfpu.app_config, True, run_id=sfpu.run_id)
 
 try:
     if action == 'single-person-update' and len(person_ids) > 0:
@@ -313,5 +313,4 @@ try:
 except Exception as e:
     logger.error(e)
 finally:
-    if not stack == "developer":
-        setTaskRunning(sfpu.app_config, False)
+    setTaskRunning(sfpu.app_config, False, run_id=sfpu.run_id)

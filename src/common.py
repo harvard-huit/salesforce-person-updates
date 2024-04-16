@@ -279,7 +279,7 @@ def isTaskRunning(app_config: AppConfig):
     return task_running
 
 # sets the status of the task_running variable
-def setTaskRunning(app_config: AppConfig, running: bool):
+def setTaskRunning(app_config: AppConfig, running: bool, run_id=None):
     """
     Sets task running status in DynamoDB 
     """
@@ -295,8 +295,56 @@ def setTaskRunning(app_config: AppConfig, running: bool):
             ExpressionAttributeValues=expression_attribute_values
         )
         logger.info(f"Info: Setting task_running variable to {running} for {app_config.name}")
+        if running:
+            set_running_id(app_config, run_id)
+        else:
+            remove_running_id(app_config, run_id)
     except Exception as e:
         logger.error(f"Error: failure to set task status for id:{app_config.id} on table: {app_config.table_name}")
         raise e
 
+def set_running_id(app_config: AppConfig, run_id: str):
+    """
+    Updates the running_ids attribute in the DynamoDB table
+    """
+    try:
+        dynamo = boto3.resource('dynamodb')
+        table = dynamo.Table(app_config.table_name)
 
+        response = table.update_item(
+            Key={'id': app_config.id, 'name': app_config.name},
+            UpdateExpression='SET running_ids = list_append(if_not_exists(running_ids, :empty_list), :value)',
+            ExpressionAttributeValues={
+                ':value': [run_id], 
+                ':empty_list': []
+            },
+            ReturnValues='UPDATED_NEW'
+        )
+        logger.info(f"Info: Setting running_id ({run_id}) for {app_config.name}")
+        if len(response['Attributes']['running_ids']) > 0:
+            logger.info(f"Info: Running_ids marked as running for this config: {response['Attributes']['running_ids']}")
+        return response['Attributes']['running_ids']
+    except Exception as e:
+        logger.error(f"Error: failure to set running_id ({run_id}) for id:{app_config.id} on table: {app_config.table_name}")
+        raise e
+
+def remove_running_id(app_config: AppConfig, run_id: str):
+    """
+    Removes the run_id from the running_ids attribute in the DynamoDB table
+    """
+    try:
+        dynamo = boto3.resource('dynamodb')
+        table = dynamo.Table(app_config.table_name)
+
+        response = table.update_item(
+            Key={'id': app_config.id, 'name': app_config.name},
+            UpdateExpression='REMOVE running_ids[:index]',
+            ExpressionAttributeValues={':index': run_id}
+        )
+        logger.info(f"Info: Removing running_id ({run_id}) for {app_config.name}")
+        if len(response['Attributes']['running_ids']) > 0:
+            logger.info(f"Info: Running_ids still marked as running for this config: {response['Attributes']['running_ids']}")
+        return response['Attributes']['running_ids']
+    except Exception as e:
+        logger.error(f"Error: failure to remove running_id ({run_id}) for id:{app_config.id} on table: {app_config.table_name}")
+        raise e
