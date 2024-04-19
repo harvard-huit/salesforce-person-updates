@@ -26,6 +26,8 @@ on:
           - 'test'
           - 'cleanup-updateds'
           - 'defunct-accounts-check'
+          - 'defunct-contacts-check'
+          - 'defunct-accounts-remove'
           - 'remove-unaffiliated-affiliations'
           - 'static-query'
       debug:
@@ -64,7 +66,7 @@ defaults:
     shell: bash
 
 jobs:
-  data_load: 
+  action_run: 
     name: ${{ github.event.inputs.action }} on ${{ github.event.inputs.environment }} for ${{ github.event.inputs.salesforce_instance_id }}
     runs-on: [ ubuntu-latest ]
 

@@ -1031,19 +1031,19 @@ class SalesforcePersonUpdates:
         result = self.hsf.sf.query_all(f"SELECT Id, {external_id}, LastModifiedDate FROM Contact WHERE {external_id} != null ORDER BY LastModifiedDate DESC")
 
         ids_to_remove = []
-        # seen_external_ids = []
-        # for record in result['records']:
-        #     if record[external_id] in seen_external_ids:
-        #         ids_to_remove.append(record['Id'])
-        #     else:
-        #         seen_external_ids.append(record[external_id])
-        # logger.info(f"Found {len(ids_to_remove)} contacts with duplicate external ids")
+        seen_external_ids = []
+        for record in result['records']:
+            if record[external_id] in seen_external_ids:
+                ids_to_remove.append(record['Id'])
+            else:
+                seen_external_ids.append(record[external_id])
+        logger.info(f"Found {len(ids_to_remove)} contacts with duplicate external ids")
 
         # get all contacts that are "huit updated" but have no external id
-        result = self.hsf.sf.query_all(f"SELECT Id, {external_id}, LastModifiedDate FROM Contact WHERE {external_id} = null AND huit__Updated__c = true ORDER BY LastModifiedDate DESC")
-        for record in result['records']:
-            ids_to_remove.append(record['Id'])
-        logger.info(f"Found {len(result['records'])} (HUIT) contacts with no external id")
+        # result = self.hsf.sf.query_all(f"SELECT Id, {external_id}, LastModifiedDate FROM Contact WHERE {external_id} = null AND huit__Updated__c = true ORDER BY LastModifiedDate DESC")
+        # for record in result['records']:
+        #     ids_to_remove.append(record['Id'])
+        # logger.info(f"Found {len(result['records'])} (HUIT) contacts with no external id")
 
 
         # logger.info(f"{ids_to_remove}")

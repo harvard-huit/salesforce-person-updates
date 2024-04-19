@@ -194,70 +194,25 @@ try:
 
         logger.info("department test action finished")
     elif action == "defunct-accounts-check":
-        logger.info(f"defunct accounts test action called")
+        logger.info(f"defunct accounts check action called")
 
         # sfpu.remove_defunct_accounts()
         ids = sfpu.check_for_defunct_accounts()
 
-        exit()
 
-        children = []
-        # find children
-        batch = 500
-        for i in range(0, len(ids), batch):
-            batch_ids = ids[i:i+batch]
-            ids_string = "'" + '\',\''.join(batch_ids) + "'"
-            select_statement = f"SELECT Id FROM Account WHERE ParentId IN ({ids_string})"
-            sf_data = sfpu.hsf.sf.query_all(select_statement)
+        logger.info(f"defunct accounts check action finished")
+    elif action == "defunct-contacts-check":
+        logger.info(f"defunct contacts check action called")
 
-            for record in sf_data['records']:
-                children.append(record['Id'])
+        ids = sfpu.check_for_defunct_contacts()
 
-        logger.info(f"Found {len(children)} children")
+        logger.info(f"defunct contacts check action finished")
+    elif action == "defunct-contacts-remove":
+        logger.info(f"defunct contacts remove action called")
 
+        sfpu.remove_defunct_contacts()
 
-        # find affiliations
-        affiliations = []
-        batch = 500
-        for i in range(0, len(ids), batch):
-            batch_ids = ids[i:i+batch]
-            ids_string = "'" + '\',\''.join(batch_ids) + "'"
-            select_statement = f"SELECT Id FROM hed__Affiliation__c WHERE hed__Account__c IN ({ids_string})"
-            sf_data = sfpu.hsf.sf.query_all(select_statement)
-
-            for record in sf_data['records']:
-                affiliations.append(record['Id'])
-        
-        logger.info(f"Found {len(affiliations)} affiliations")
-
-        # clear affiliation account references
-        logger.info(f"Clearing account references from affiliations")
-        batch = 10000
-        for i in range(0, len(affiliations), batch):
-            batch_ids = affiliations[i:i+batch]
-            batch_objects = []
-            for id in batch_ids:
-                batch_objects.append({'Id': id, 'hed__Account__c': None})
-            sfpu.hsf.sf.bulk.hed__Affiliation__c.update(batch_objects)
-        logger.info(f"finished clearing account references from affiliations")
-
-
-        # sfpu.check_duplicates('Account', dry_run=True)
-
-        # sfpu.departments = Departments(apikey=sfpu.app_config.dept_apikey)
-        # sfpu.setup_department_hierarchy(department_hash=sfpu.departments.department_hash, external_id='HUDA__hud_DEPT_ID__c', code_field='HUDA__hud_DEPT_OFFICIAL_DESC__c', description_field='HUDA__hud_DEPT_LONG_DESC__c')
-
-        # data = [
-        # {
-        #     "Name": "Harvard Busn Sch Major Affil",
-        #     "HUDA__hud_DEPT_ID__c": "0BUS1",
-        #     "HUDA__hud_DEPT_OFFICIAL_DESC__c": "BUS^MA",
-        #     "HUDA__hud_DEPT_LONG_DESC__c": "Harvard Busn Sch Major Affil"
-        # }
-        # ]
-        # sfpu.hsf.pushBulk('Account', data, id_name='HUDA__hud_DEPT_ID__c')
-
-        logger.info(f"defunct accounts test action finished")
+        logger.info(f"defunct contacts remove action finished")
     elif action == "remove people test":
         logger.info(f"remove people test action called")
 
@@ -271,6 +226,7 @@ try:
         # result = sfpu.hsf.sf.bulk.Contact.delete(ids)
 
         logger.info(f"remove people test action finished")
+
     elif action == "delete-all-data":
         logger.warning(f"delete-all-data action called")
         for object_name in sfpu.app_config.config.keys():
@@ -319,9 +275,6 @@ try:
         logger.info(f"full-account-load action finished")
     elif action == "test":
         logger.info(f"test action called")
-
-        result = sfpu.hsf.validateConfig(config=sfpu.app_config.config)
-        logger.info(f"Config validation result: {result}")
 
         logger.info(f"test action finished")
     else: 
