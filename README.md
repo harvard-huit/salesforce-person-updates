@@ -135,6 +135,20 @@ An export of a valid (at the time of writing this) dynamo entry in the table can
 
 The dynamo table includes a configuration, a pds query, and references to credentials stored in secrets manager. 
 
+### PDS API Keys
+
+These are the Apigee apikeys for use in the Person Data Connector (PDC). Currently all PDC feeds are using the same keys. There is no plan to change this, but these secrets are set up in secrets manager for use in these configurations. 
+
+(Make sure the `<HASH>` is replaced with the actual.)
+
+#### admints-dev
+ - `arn:aws:secretsmanager:us-east-1:001980101248:secret:aais-services-salesforce-pdc-apikey-<HASH>:CRM-PDC-C::`
+ - `arn:aws:secretsmanager:us-east-1:001980101248:secret:aais-services-salesforce-pdc-apikey-<HASH>:CRM-PDC-D::`
+
+#### admints-prod
+ - `arn:aws:secretsmanager:us-east-1:949726781110:secret:aais-services-salesforce-pdc-apikey-<HASH>:CRM-PDC-C::`
+ - `arn:aws:secretsmanager:us-east-1:949726781110:secret:aais-services-salesforce-pdc-apikey-<HASH>:CRM-PDC-D::`
+
 ### Configuration
 
 The configuration is the heart of this application. Each Salesforce instance will have its own configuration that will map fields from the PDS (and departments (and potentially other data sources)) to Objects in Salesforce. 
