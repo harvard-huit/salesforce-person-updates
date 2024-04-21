@@ -27,7 +27,7 @@ on:
           - 'cleanup-updateds'
           - 'defunct-accounts-check'
           - 'defunct-contacts-check'
-          - 'defunct-accounts-remove'
+          - 'defunct-contacts-remove'
           - 'remove-unaffiliated-affiliations'
           - 'static-query'
       debug:
