@@ -336,12 +336,29 @@ def remove_running_id(app_config: AppConfig, run_id: str):
         dynamo = boto3.resource('dynamodb')
         table = dynamo.Table(app_config.table_name)
 
+        # get the index of the run_id in the running_ids list
+        response = table.get_item(
+            Key={'id': app_config.id, 'name': app_config.name}
+        )
+        if 'Item' not in response:
+            raise Exception(f"Error: unable to retrieve table values for table {app_config.table_name}: {response}")
+        if 'running_ids' not in response['Item']:
+            logger.error(f"Error: no running_ids attribute found for {app_config.name}")
+            return None
+        
+        if run_id not in response['Item']['running_ids']:
+            logger.warning(f"Warning: run_id ({run_id}) not found in running_ids for {app_config.name}")
+            return None
+        
+        running_ids = response['Item']['running_ids']
+
+        index_to_remove = running_ids.index(run_id)
+
         response = table.update_item(
             Key={'id': app_config.id, 'name': app_config.name},
-            UpdateExpression='REMOVE running_ids[:index]',
-            ExpressionAttributeValues={':index': run_id}
+            UpdateExpression=f"REMOVE running_ids[{index_to_remove}]"
         )
-        logger.info(f"Info: Removing running_id ({run_id}) for {app_config.name}")
+        logger.info(f"Info: Removed running_id ({run_id}) for {app_config.name}")
         if len(response['Attributes']['running_ids']) > 0:
             logger.info(f"Info: Running_ids still marked as running for this config: {response['Attributes']['running_ids']}")
         return response['Attributes']['running_ids']
