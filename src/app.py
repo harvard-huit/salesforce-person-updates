@@ -76,7 +76,18 @@ if os.getenv("FORCE_LOCAL_CONFIG"):
 task_running = isTaskRunning(sfpu.app_config)
 WAIT_LIMIT = 20
 if task_running and not stack == "developer":
-    if action in ['single-person-update','person-updates','person-updates-updates-only','department-updates','delete-people','cleanup-updateds','remove-unaffiliated-affiliations','remove-all-contacts','department test','defunct-accounts-check','remove people test','delete-all-data']:
+    if action in [
+            'single-person-update',
+            'person-updates',
+            'person-updates-updates-only',
+            'department-updates',
+            'cleanup-updateds',
+            'remove-unaffiliated-affiliations',
+            'department test',
+            'defunct-accounts-check',
+            'remove people test',
+            'defunct-contacts-check',
+            'defunct-contacts-remove']:
         logger.warning(f"The current task is actively running.")
         exit()
     elif action in ['full-person-load','full-department-load']:
