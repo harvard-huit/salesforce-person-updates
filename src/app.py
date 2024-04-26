@@ -6,6 +6,7 @@ from account_handler import AccountHandler
 import os
 import json
 import time
+from datetime import datetime
 
 
 import inspect
@@ -125,6 +126,19 @@ try:
         updates_only = False
 
         sfpu.update_people_data_load(updates_only=updates_only)
+        
+        account_watermark = sfpu.app_config.watermarks.get('account', None)
+        if account_watermark is not None:
+            today = datetime.now().weekday()
+            accout_watermark_day = account_watermark.weekday()
+            if today != accout_watermark_day:
+                
+                account_handler = AccountHandler(sfpu)
+                account_handler.accounts_data_load()
+
+
+
+
     elif action == 'full-department-load':
         hierarchy = False
         if 'hierarchy' in sfpu.app_config.config['Account']:
