@@ -173,7 +173,7 @@ class SalesforceTransformer:
                                 source_value_ref = source_object['ref']['source_value_ref']
                                 if isinstance(source_value_ref, list):
                                     for possible_source_value_ref in source_value_ref:
-                                        if self.value_in_list(possible_source_value_ref, source_data_object):
+                                        if self.key_in_nested_dict(possible_source_value_ref, source_data_object):
                                             source_value_ref = possible_source_value_ref
                                             break
                                 if '.' in source_value_ref and is_flat:
@@ -599,7 +599,7 @@ class SalesforceTransformer:
             logger.warning(f"Warning: picklist_transform called on non-picklist field ({object_name}.{field_name})")
             return value
         
-    def value_in_list(self, value, list_to_check, start_with=1):
+    def key_in_nested_dict(self, value, list_to_check, start_with=1):
         elements = value.split(".")
         element_length = len(elements)
         obj = list_to_check
@@ -614,5 +614,8 @@ class SalesforceTransformer:
         elements = ref.split(".")
         o = obj
         for element in elements:
-            o = o[element]
+            if isinstance(o[element], list):
+                o = o[element][0]
+            else:
+                o = o[element]
         return o
