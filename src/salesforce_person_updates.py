@@ -643,6 +643,7 @@ class SalesforcePersonUpdates:
                 # if this is a new day, go through the cleanup process
                 logger.info(f"New day, running cleanup")
                 self.cleanup_updateds()
+                
 
         watermark = self.app_config.update_watermark("person")
         logger.info(f"Watermark updated: {watermark}")

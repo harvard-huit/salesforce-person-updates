@@ -597,6 +597,8 @@ class HarvardSalesforce:
                         valid_date = datetime.strptime(value, '%Y-%m-%dT%H:%M:%S').date()
                     except:
                         value = value.replace(" ", "T")
+                        value = value.split(".")[0]
+                        value = value.split("Z")[0]
                         valid_date = datetime.strptime(value, '%Y-%m-%dT%H:%M:%S').date()
                     if not (date(1700, 1, 1) <= valid_date <= date(2400, 1, 1)):
                         logger.error(f"Error: date out of range: {value}. Indentifier: {identifier}")

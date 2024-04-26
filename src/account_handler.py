@@ -30,11 +30,9 @@ class AccountHandler:
         # get accounts config
         account_configs = self.sfpu.app_config.config['Account']
         if not isinstance(account_configs, list):
-            account_configs = [account_configs]
-
-        
-        sorted_configs = sorted(account_configs, key=lambda account: account['order'])
-
+            sorted_configs = [account_configs]
+        else:
+            sorted_configs = sorted(account_configs, key=lambda account: account['order'])
         
         for account_config in sorted_configs:
             source_type = account_config['source']
@@ -85,7 +83,7 @@ class AccountHandler:
                     if i not in data:
                         data[i] = []
 
-                    if v['Account_Type__c'] is not None:
+                    if 'Account_Type__c' in v and v['Account_Type__c'] is not None:
                         if v['Account_Type__c'] in record_type_ids.keys():
                             v['RecordTypeId'] = record_type_ids[v['Account_Type__c']]
                         else:
