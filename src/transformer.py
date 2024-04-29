@@ -599,10 +599,10 @@ class SalesforceTransformer:
             logger.warning(f"Warning: picklist_transform called on non-picklist field ({object_name}.{field_name})")
             return value
         
-    def key_in_nested_dict(self, value, list_to_check, start_with=1):
+    def key_in_nested_dict(self, value, dict_to_check, start_with=1):
         elements = value.split(".")
         element_length = len(elements)
-        obj = list_to_check
+        obj = dict_to_check
         for i in range(start_with, element_length):
             if elements[i] in obj:
                 if i == element_length - 1:
