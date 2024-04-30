@@ -86,7 +86,7 @@ class SalesforceTransformerTest(unittest.TestCase):
                 "fields": {
                     "affiliationId": ["emps.id", "stus.id", "pois.id"],
                     "rootId": "personKey",
-                    "otherValue": ["emps.other_value", "stus.other_value", "pois.other_value"]
+                    "otherValue": ["emps.other_value", "stus.other_value", "pois.other_value.code"]
                 }
             }
         }
@@ -243,7 +243,9 @@ class SalesforceTransformerTest(unittest.TestCase):
                     "pois": [
                         {
                             "id": "8",
-                            "other_value": "eight"
+                            "other_value": {
+                                "code": "eight"
+                            } 
                         }
                     ]
                 }
@@ -629,6 +631,48 @@ class SalesforceTransformerTest(unittest.TestCase):
                 self.assertDictEqual(self.sample_transformed_pds_data[object_name][count], object)
                 count += 1
 
+    def test_key_in_nested_dict_returns_true_when_value_exists(self):
+        list_to_check = self.fakeConfig
+        value = "Contact.Id.pds"
+        result = self.transformer.key_in_nested_dict(value, list_to_check, 0)
+        self.assertTrue(result)
+
+    def test_key_in_nested_dict_returns_false_when_value_does_not_exist(self):
+        list_to_check = self.fakeConfig
+        value = "Contact.Id.foo"
+        result = self.transformer.key_in_nested_dict(value, list_to_check)
+        self.assertFalse(result)
+
+    def test_key_in_nested_dict_returns_false_when_value_is_not_last_element(self):
+        list_to_check = self.fakeConfig
+        value = "Contact.Id"
+        result = self.transformer.key_in_nested_dict(value, list_to_check)
+        self.assertFalse(result)
+
+    def test_ref_to_object_value(self):
+        obj = self.sample_pds_data['results'][0]
+        
+        ref = "personKey"
+        expected = "1"
+        result = self.transformer.ref_to_object_value(ref, obj)
+        self.assertEqual(result, expected)
+
+        ref = "names.firstName"
+        expected = "Happy"
+        result = self.transformer.ref_to_object_value(ref, obj)
+        self.assertEqual(result, expected)
+
+        obj = self.sample_pds_data['results'][2]
+
+        ref = "emps.id"
+        expected = "6"
+        result = self.transformer.ref_to_object_value(ref, obj)
+        self.assertEqual(result, expected)
+
+        ref = "pois.other_value.code"
+        expected = "eight"
+        result = self.transformer.ref_to_object_value(ref, obj)
+        self.assertEqual(result, expected)
 
 if __name__ == '__main__':
     unittest.main()
