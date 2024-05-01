@@ -127,16 +127,18 @@ try:
 
         sfpu.update_people_data_load(updates_only=updates_only)
         
-        account_watermark = sfpu.app_config.watermarks.get('account', None)
-        if account_watermark is not None:
-            today = datetime.now().weekday()
-            accout_watermark_day = account_watermark.weekday()
-            if today != accout_watermark_day:
-                
-                account_handler = AccountHandler(sfpu)
-                account_handler.accounts_data_load()
+        try:
+            account_watermark = sfpu.app_config.watermarks.get('account', None)
+            if account_watermark is not None:
+                today = datetime.now().weekday()
+                accout_watermark_day = account_watermark.weekday()
+                if today != accout_watermark_day:
 
+                    account_handler = AccountHandler(sfpu)
+                    account_handler.accounts_data_load()
 
+        except Exception as e:
+            logger.error(e)
 
 
     elif action == 'full-department-load':
