@@ -132,8 +132,12 @@ class SalesforcePersonUpdates:
             self.hsf.getTypeMap(self.app_config.config.keys())
 
             # validate the config
-            self.hsf.validateConfig(self.app_config.config)
-
+            try:
+                self.hsf.validateConfig(self.app_config.config)
+            except Exception as e:
+                logger.error(f"Config validation failed for {self.salesforce_instance_id} with error: {e}")
+                raise e
+            
             # initialize storage for updated ids
             self.updated_ids = []
 
@@ -168,7 +172,7 @@ class SalesforcePersonUpdates:
 
 
         except Exception as e:
-            logger.error(f"Run failed with error: {e}")
+            logger.error(f"Run failed: id: {self.salesforce_instance_id}, action: {self.action},  with error: {e}")
             raise e
 
     # this will make logs come out as json and send logs elsewhere
@@ -643,7 +647,7 @@ class SalesforcePersonUpdates:
                 # if this is a new day, go through the cleanup process
                 logger.info(f"New day, running cleanup")
                 self.cleanup_updateds()
-                
+
 
         watermark = self.app_config.update_watermark("person")
         logger.info(f"Watermark updated: {watermark}")
