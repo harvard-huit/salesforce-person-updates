@@ -300,3 +300,14 @@ def setTaskRunning(app_config: AppConfig, running: bool):
         raise e
 
 
+def get_all_config_ids(table_name):
+    """
+    Retrieves all config ids from DynamoDB
+    """
+    try:
+        dynamo = boto3.client('dynamodb')
+        response = dynamo.scan(TableName=table_name)
+        return [item.get('id').get('S') for item in response.get('Items')]
+    except Exception as e:
+        logger.error(f"Error: failure to get all config ids from table: {table_name}")
+        raise e
