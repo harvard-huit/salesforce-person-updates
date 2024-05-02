@@ -7,7 +7,7 @@
 
 # target_desired_task_count: 2
 target_app_context: "/salesforce-person-updates"
-target_app_version: "v1.1.0"
+target_app_version: "v1.1.1"
 create_service: false
 
 # this is the lowest for fargate?
