@@ -173,14 +173,13 @@ class SalesforceTransformer:
                                 source_value_ref = source_object['ref']['source_value_ref']
                                 if isinstance(source_value_ref, list):
                                     for possible_source_value_ref in source_value_ref:
-                                        if possible_source_value_ref in source_data_object:
+                                        if self.key_in_nested_dict(possible_source_value_ref, source_data_object):
                                             source_value_ref = possible_source_value_ref
                                             break
                                 if '.' in source_value_ref and is_flat:
-                                    (obj, val) = source_value_ref.split(".")
-                                    source_value = source_data_object[obj][val]
+                                    source_value = self.ref_to_object_value(source_value_ref, source_data_object)
                                 elif isinstance(source_value_ref, str) and source_value_ref in source_data_object:
-                                    source_value = source_data_object[source_value_ref]
+                                    source_value = self.ref_to_object_value(source_value_ref, source_data_object)
                                 else: 
                                     source_value = None
                                 if 'simplify_code' in source_object['ref']:
@@ -599,3 +598,24 @@ class SalesforceTransformer:
         else:
             logger.warning(f"Warning: picklist_transform called on non-picklist field ({object_name}.{field_name})")
             return value
+        
+    def key_in_nested_dict(self, value, dict_to_check, start_with=1):
+        elements = value.split(".")
+        element_length = len(elements)
+        obj = dict_to_check
+        for i in range(start_with, element_length):
+            if elements[i] in obj:
+                if i == element_length - 1:
+                    return True
+                obj = obj[elements[i]]
+        return False
+    
+    def ref_to_object_value(self, ref, obj):
+        elements = ref.split(".")
+        o = obj
+        for element in elements:
+            if isinstance(o[element], list):
+                o = o[element][0]
+            else:
+                o = o[element]
+        return o

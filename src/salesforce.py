@@ -597,6 +597,8 @@ class HarvardSalesforce:
                         valid_date = datetime.strptime(value, '%Y-%m-%dT%H:%M:%S').date()
                     except:
                         value = value.replace(" ", "T")
+                        value = value.split(".")[0]
+                        value = value.split("Z")[0]
                         valid_date = datetime.strptime(value, '%Y-%m-%dT%H:%M:%S').date()
                     if not (date(1700, 1, 1) <= valid_date <= date(2400, 1, 1)):
                         logger.error(f"Error: date out of range: {value}. Indentifier: {identifier}")
@@ -959,10 +961,10 @@ class HarvardSalesforce:
         logger.info(f"length of ids: {len(ids)}")
 
         result_data = []
-        batch = 500
-        for i in range(0, len(ids), batch):
+        batch_size = 500
+        for i in range(0, len(ids), batch_size):
             try:
-                batch = ids[i:i + batch]
+                batch = ids[i:i + batch_size]
                 ids_string = "'" + '\',\''.join(batch) + "'"
                 sf_data = self.sf.query_all(f"SELECT {external_id} FROM {object_name} WHERE {external_id} IN({ids_string})")
                 logger.debug(f"got this data from salesforce: {sf_data}")

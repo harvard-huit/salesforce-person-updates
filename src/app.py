@@ -6,6 +6,7 @@ from account_handler import AccountHandler
 import os
 import json
 import time
+from datetime import datetime
 
 
 import inspect
@@ -32,6 +33,10 @@ if stack == 'developer':
     f.close()
 
     query_filename = '../example_pds_query.json'
+
+    if os.getenv("QUERY_FILENAME") is not None:
+        query_filename = os.getenv("QUERY_FILENAME")
+
     if is_unittest():
         query_filename = '../' + query_filename
 
@@ -72,7 +77,18 @@ if os.getenv("FORCE_LOCAL_CONFIG"):
 task_running = isTaskRunning(sfpu.app_config)
 WAIT_LIMIT = 20
 if task_running and not stack == "developer":
-    if action in ['single-person-update','person-updates','person-updates-updates-only','department-updates','delete-people','cleanup-updateds','remove-unaffiliated-affiliations','remove-all-contacts','department test','defunct-accounts-check','remove people test','delete-all-data']:
+    if action in [
+            'single-person-update',
+            'person-updates',
+            'person-updates-updates-only',
+            'department-updates',
+            'cleanup-updateds',
+            'remove-unaffiliated-affiliations',
+            'department test',
+            'defunct-accounts-check',
+            'remove people test',
+            'defunct-contacts-check',
+            'defunct-contacts-remove']:
         logger.warning(f"The current task is actively running.")
         exit()
     elif action in ['full-person-load','full-department-load']:
@@ -110,6 +126,21 @@ try:
         updates_only = False
 
         sfpu.update_people_data_load(updates_only=updates_only)
+        
+        try:
+            account_watermark = sfpu.app_config.watermarks.get('account', None)
+            if account_watermark is not None:
+                today = datetime.now().weekday()
+                accout_watermark_day = account_watermark.weekday()
+                if today != accout_watermark_day:
+
+                    account_handler = AccountHandler(sfpu)
+                    account_handler.accounts_data_load()
+
+        except Exception as e:
+            logger.error(e)
+
+
     elif action == 'full-department-load':
         hierarchy = False
         if 'hierarchy' in sfpu.app_config.config['Account']:
@@ -190,70 +221,25 @@ try:
 
         logger.info("department test action finished")
     elif action == "defunct-accounts-check":
-        logger.info(f"defunct accounts test action called")
+        logger.info(f"defunct accounts check action called")
 
         # sfpu.remove_defunct_accounts()
         ids = sfpu.check_for_defunct_accounts()
 
-        exit()
 
-        children = []
-        # find children
-        batch = 500
-        for i in range(0, len(ids), batch):
-            batch_ids = ids[i:i+batch]
-            ids_string = "'" + '\',\''.join(batch_ids) + "'"
-            select_statement = f"SELECT Id FROM Account WHERE ParentId IN ({ids_string})"
-            sf_data = sfpu.hsf.sf.query_all(select_statement)
+        logger.info(f"defunct accounts check action finished")
+    elif action == "defunct-contacts-check":
+        logger.info(f"defunct contacts check action called")
 
-            for record in sf_data['records']:
-                children.append(record['Id'])
+        ids = sfpu.check_for_defunct_contacts()
 
-        logger.info(f"Found {len(children)} children")
+        logger.info(f"defunct contacts check action finished")
+    elif action == "defunct-contacts-remove":
+        logger.info(f"defunct contacts remove action called")
 
+        sfpu.remove_defunct_contacts()
 
-        # find affiliations
-        affiliations = []
-        batch = 500
-        for i in range(0, len(ids), batch):
-            batch_ids = ids[i:i+batch]
-            ids_string = "'" + '\',\''.join(batch_ids) + "'"
-            select_statement = f"SELECT Id FROM hed__Affiliation__c WHERE hed__Account__c IN ({ids_string})"
-            sf_data = sfpu.hsf.sf.query_all(select_statement)
-
-            for record in sf_data['records']:
-                affiliations.append(record['Id'])
-        
-        logger.info(f"Found {len(affiliations)} affiliations")
-
-        # clear affiliation account references
-        logger.info(f"Clearing account references from affiliations")
-        batch = 10000
-        for i in range(0, len(affiliations), batch):
-            batch_ids = affiliations[i:i+batch]
-            batch_objects = []
-            for id in batch_ids:
-                batch_objects.append({'Id': id, 'hed__Account__c': None})
-            sfpu.hsf.sf.bulk.hed__Affiliation__c.update(batch_objects)
-        logger.info(f"finished clearing account references from affiliations")
-
-
-        # sfpu.check_duplicates('Account', dry_run=True)
-
-        # sfpu.departments = Departments(apikey=sfpu.app_config.dept_apikey)
-        # sfpu.setup_department_hierarchy(department_hash=sfpu.departments.department_hash, external_id='HUDA__hud_DEPT_ID__c', code_field='HUDA__hud_DEPT_OFFICIAL_DESC__c', description_field='HUDA__hud_DEPT_LONG_DESC__c')
-
-        # data = [
-        # {
-        #     "Name": "Harvard Busn Sch Major Affil",
-        #     "HUDA__hud_DEPT_ID__c": "0BUS1",
-        #     "HUDA__hud_DEPT_OFFICIAL_DESC__c": "BUS^MA",
-        #     "HUDA__hud_DEPT_LONG_DESC__c": "Harvard Busn Sch Major Affil"
-        # }
-        # ]
-        # sfpu.hsf.pushBulk('Account', data, id_name='HUDA__hud_DEPT_ID__c')
-
-        logger.info(f"defunct accounts test action finished")
+        logger.info(f"defunct contacts remove action finished")
     elif action == "remove people test":
         logger.info(f"remove people test action called")
 
@@ -267,6 +253,7 @@ try:
         # result = sfpu.hsf.sf.bulk.Contact.delete(ids)
 
         logger.info(f"remove people test action finished")
+
     elif action == "delete-all-data":
         logger.warning(f"delete-all-data action called")
         for object_name in sfpu.app_config.config.keys():
@@ -281,6 +268,18 @@ try:
             logger.warning(f"delete complete")
 
         logger.info(f"delete-all-data action finished")
+    elif action == "delete-account-data":
+        logger.warning(f"delete-account-data action called")
+        external_id = 'Account_PDC_Key__c'
+        result = sfpu.hsf.sf.query_all(f"SELECT Id, {external_id} FROM Account WHERE {external_id} != null ORDER BY LastModifiedDate DESC")
+        logger.info(f"Found {len(result['records'])} Account records")
+        # delete them all
+        ids = [{'Id': record['Id']} for record in result['records']]
+        logger.warning(f"attempting delete")
+        sfpu.hsf.sf.bulk.__getattr__('Account').delete(ids)
+        logger.warning(f"delete complete")
+
+        logger.info(f"delete-account-data action finished")
     elif action == "static-query":
         logger.info(f"static-query action called")
         # query_filename = '../examples/example_pds_query_hms.json'
@@ -304,14 +303,14 @@ try:
     elif action == "test":
         logger.info(f"test action called")
 
-        result = sfpu.hsf.validateConfig(config=sfpu.app_config.config)
-        logger.info(f"Config validation result: {result}")
-
         logger.info(f"test action finished")
     else: 
         logger.warning(f"App triggered without a valid action: {action}, please see documentation for more information.")
 except Exception as e:
-    logger.error(e)
+    action = os.getenv("action", None)
+    salesforce_id = os.getenv("SALESFORCE_INSTANCE_ID", None)
+    logger.error(f"Salesforce instance: {salesforce_id}, action: {action}: {e}")
+    raise e
 finally:
     if not stack == "developer":
         setTaskRunning(sfpu.app_config, False)
