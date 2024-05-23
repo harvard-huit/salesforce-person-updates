@@ -389,7 +389,9 @@ class SalesforcePersonUpdates:
 
 
     # valid types are "full" and "update"
+    # NOTE: DEPRECATED
     def departments_data_load(self, type="full", hierarchy=False):
+        logger.warning(f"DEPRECATED: departments_data_load")
         logger.info(f"Starting a department {type} load")
         self.departments = Departments(apikey=self.app_config.dept_apikey)
 
@@ -619,7 +621,7 @@ class SalesforcePersonUpdates:
 
                 # now check if those ids exist in salesforce
                 filtered_id_list = self.hsf.filter_external_ids(object_name='Contact', external_id=external_id, ids=id_list)
-                logger.info(f"Filtered ids: {len(filtered_id_list)}")
+                logger.debug(f"Filtered ids: {len(filtered_id_list)}")
 
                 # if they do, we need to update them
                 if len(filtered_id_list) > 0:
