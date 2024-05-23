@@ -100,7 +100,7 @@ class AccountHandler:
             logger.info(f"Finished account data load for {source_type}")
 
 
-        # self.app_config.update_watermark("department")
+        self.app_config.update_watermark("account")
         # logger.info(f"Department Watermark updated: {watermark}")
         # logger.info(f"Finished department {type} load")
 
