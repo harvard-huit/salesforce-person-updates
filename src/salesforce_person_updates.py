@@ -198,7 +198,12 @@ class SalesforcePersonUpdates:
                 }
 
                 try: 
-                    self.sfpu.push_log(message=record.getMessage(), levelname=record.levelname, datetime=None, run_id=self.sfpu.run_id)
+                    # limit message to 1000 characters for salesforce
+                    message = record.getMessage()
+                    if len(message) > 1000:
+                        message = message[:1000] + "..."
+
+                    self.sfpu.push_log(message=message, levelname=record.levelname, datetime=None, run_id=self.sfpu.run_id)
                 except Exception as e:
                     log_data['log_error'] = str(e)
 
