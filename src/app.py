@@ -79,6 +79,7 @@ WAIT_LIMIT = 20
 if task_running and not stack == "developer":
     if action in [
             'single-person-update',
+            'validate',
             'person-updates',
             'person-updates-updates-only',
             'department-updates',
@@ -107,6 +108,8 @@ setTaskRunning(sfpu.app_config, True)
 try:
     if action == 'single-person-update' and len(person_ids) > 0:
         sfpu.update_single_person(person_ids)
+    elif action == 'validate':
+        sfpu.validate()
     elif action == 'full-person-load':
         updates_only = False
         if 'Contact' in sfpu.app_config.config and 'updateOnlyFlag' in sfpu.app_config.config['Contact'] and sfpu.app_config.config['Contact']['updateOnlyFlag'] == True:
@@ -314,3 +317,4 @@ except Exception as e:
 finally:
     if not stack == "developer":
         setTaskRunning(sfpu.app_config, False)
+
