@@ -531,7 +531,7 @@ class HarvardSalesforce:
             raise Exception(f"Error: field ({field}) does not have an associated `updateable`")
 
         # NOTE: Salesforce cannot take a null value directly, it needs to take the value: '#N/A'?
-        if not value:
+        if value is None:
             return None
 
         if not isinstance(value, (str, bool, int)):
@@ -625,10 +625,11 @@ class HarvardSalesforce:
                 logger.error(f"Error converting {object}.{field} ({value}) to double/float: {e}. Identifier: {identifier}")
                 return None
         elif field_type in ["boolean"]:
-            try:
-                return value in [True, False]
-            except ValueError as e:
-                logger.error(f"Error: field {field} is a boolean, must be True or False. Tried value: {value}")
+            if isinstance(value, bool):
+                return value
+            else:
+                # logger.error(f"Error: field {field} is a boolean, must be True or False. Tried value: {value}")
+                return False
         else:
             logger.error(f"Error: unhandled field_type: {field_type}. Please check config and target Salesforce instance")
             return None
