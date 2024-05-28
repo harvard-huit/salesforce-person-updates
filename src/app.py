@@ -1,5 +1,4 @@
 from common import isTaskRunning, setTaskRunning, logger, stack
-from departments import Departments
 from salesforce_person_updates import SalesforcePersonUpdates
 from account_handler import AccountHandler
 
@@ -82,17 +81,15 @@ if task_running and not stack == "developer":
             'validate',
             'person-updates',
             'person-updates-updates-only',
-            'department-updates',
             'cleanup-updateds',
             'remove-unaffiliated-affiliations',
-            'department test',
             'defunct-accounts-check',
             'remove people test',
             'defunct-contacts-check',
             'defunct-contacts-remove']:
         logger.warning(f"The current task is actively running.")
         exit()
-    elif action in ['full-person-load','full-department-load']:
+    elif action in ['full-person-load','full-account-load']:
         wait_count = 1
         while (task_running and wait_count <= WAIT_LIMIT):
             logger.warning(f"The current task is actively running. (Currently on try {wait_count}/{WAIT_LIMIT})")
@@ -144,13 +141,6 @@ try:
             logger.error(e)
 
 
-    elif action == 'full-department-load':
-        hierarchy = False
-        if 'hierarchy' in sfpu.app_config.config['Account']:
-            hierarchy = True
-        sfpu.departments_data_load(type="full", hierarchy=hierarchy)
-    elif action == 'department-updates':
-        sfpu.departments_data_load(type="update")
     elif action == 'delete-people':
         sfpu.delete_people(dry_run=True, huids=person_ids)
     elif action == 'cleanup-updateds':
@@ -185,44 +175,6 @@ try:
         # delete them
         ids = [record['HUDA__hud_UNIV_ID__c'] for record in result['records']]
         sfpu.delete_people(dry_run=True, huids=ids)    
-    elif action == "department test":
-        logger.info("department test action called")
-
-        departments = Departments(apikey=sfpu.app_config.dept_apikey)
-        department_external_id_name = sfpu.app_config.config['Account']['Id']['salesforce']
-        department_id_name = sfpu.app_config.config['Account']['Id']['departments']
-        department_ids = [department[department_id_name] for department in departments.results]
-
-        result = sfpu.hsf.get_accounts_hash(id_name=department_external_id_name, ids=department_ids)
-        logger.info(f"Found {len(result.keys())} Account records")
-
-        # get all maj affiliations
-        major_affiliations = departments.get_major_affiliations(departments.results)
-
-        object_data = []
-        for major_affiliation in major_affiliations:
-            obj = {
-                'Name': major_affiliation['description'],
-            }
-            obj[department_external_id_name] = major_affiliation['code']
-            if major_affiliation['code'] in result:
-                obj['Id'] = result[major_affiliation['code']]['Id']
-            object_data.append(obj)
-        
-        logger.info(f"Upserting to Account with {len(object_data)} records")
-        sfpu.hsf.pushBulk('Account', object_data)
-
-        # get all sub affiliations
-
-        for department in departments.results:
-            if department[department_id_name] not in result:
-                logger.warning(f"Department {department[department_id_name]} not found in Salesforce")
-            
-
-        # sfpu.setup_department_hierarchy(departments)
-
-
-        logger.info("department test action finished")
     elif action == "defunct-accounts-check":
         logger.info(f"defunct accounts check action called")
 
