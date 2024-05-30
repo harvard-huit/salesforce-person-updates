@@ -977,12 +977,16 @@ class HarvardSalesforce:
         return result_data
 
 
-    def get_all_external_ids(self, object_name: str, external_id: str):
+    def get_all_external_ids(self, object_name: str, external_id: str, updated_flag_name: str=None, updated_flag_value: bool=None):
         # this will return a list of all of the existing contact ids from salesforce
-        logger.info(f"get_all_external_ids getting all {external_id} from {object_name}")
+        updated_flag_string = ""
+        if updated_flag_name is not None:
+            updated_flag_string = f" AND {updated_flag_name} = {updated_flag_value} "
+        logger.info(f"get_all_external_ids getting all {external_id} from {object_name} {updated_flag_string}")
+
         ids = []
         try:
-            sf_data = self.sf.query_all(f"SELECT {external_id} FROM {object_name} WHERE {external_id} != null")
+            sf_data = self.sf.query_all(f"SELECT {external_id} FROM {object_name} WHERE {external_id} != null {updated_flag_string}")
             logger.debug(f"got this data from salesforce: {sf_data['records']}")
             for record in sf_data['records']:
                 ids.append(record[external_id])
