@@ -101,6 +101,7 @@ if task_running and not stack == "developer":
             exit()
 
 setTaskRunning(sfpu.app_config, True)
+output = ""
 
 try:
     if action == 'single-person-update' and len(person_ids) > 0:
@@ -261,12 +262,15 @@ try:
         logger.info(f"test action finished")
     else: 
         logger.warning(f"App triggered without a valid action: {action}, please see documentation for more information.")
+    output = "Success Apparent"
 except Exception as e:
     action = os.getenv("action", None)
     salesforce_id = os.getenv("SALESFORCE_INSTANCE_ID", None)
     logger.error(f"Salesforce instance: {salesforce_id}, action: {action}: {e}")
+    output = f"ERROR: {e}"
     raise e
 finally:
     if not stack == "developer":
         setTaskRunning(sfpu.app_config, False)
+        sfpu.app_config.stop_task_with_reason(f"Salesforce instance: {salesforce_id}: Action: {action} completed. {output}")
 

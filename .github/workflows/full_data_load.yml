@@ -88,9 +88,9 @@ jobs:
         run: |
           CONTAINER_OVERRIDES='[ 
             {
-              "name": "aais-services-${{ github.event.inputs.environment }}-feed-salesforce-person-updates", 
-              "cpu": ${{ github.event.inputs.cpu }},
-              "memory": ${{ github.event.inputs.memory }},
+              "name": "aais-services-${{ inputs.environment }}-feed-salesforce-person-updates", 
+              "cpu": ${{ inputs.cpu }},
+              "memory": ${{ inputs.memory }},
               "environment": [ 
                 {
                   "name": "SALESFORCE_INSTANCE_ID", 
