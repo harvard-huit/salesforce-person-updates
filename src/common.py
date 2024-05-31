@@ -52,7 +52,6 @@ class AppConfig():
         self.config = None
         self.watermarks = {
             "person": None,
-            "department": None,
             "account": None
         }
 
@@ -106,16 +105,17 @@ class AppConfig():
             person_watermark = datetime.strptime(person_watermark_env, '%Y-%m-%dT%H:%M:%S').date()
         else:
             person_watermark = one_day_ago
-        department_watermark_env = os.getenv('DEPARTMENT_WATERMARK') or False
-        if department_watermark_env:
-            department_watermark = datetime.strptime(department_watermark_env, '%Y-%m-%dT%H:%M:%S').date()
+
+        account_watermark_env = os.getenv('ACCOUNT_WATERMARK') or False
+        if account_watermark_env:
+            account_watermark = datetime.strptime(account_watermark_env, '%Y-%m-%dT%H:%M:%S').date()
         else:
-            department_watermark = one_day_ago
+            account_watermark = one_day_ago
         
         # set the watermarks the same way they would come out from the get_config_values
         self.watermarks = {
             "person": person_watermark,
-            "department": department_watermark
+            "account": account_watermark
         }
 
 
@@ -141,8 +141,6 @@ class AppConfig():
                     self.watermarks = response.get('Item').get('watermarks').get('M')
                     if os.getenv("FORCE_PERSON_WATERMARK"):
                         self.watermarks["person"] = os.getenv("FORCE_PERSON_WATERMARK")
-                    if os.getenv("FORCE_DEPARTMENT_WATERMARK"):
-                        self.watermarks["department"] = os.getenv("FORCE_DEPARTMENT_WATERMARK")
 
                     # we want the watermarks to be datetime objects so we can do comparisons easily on them
                     #   this will also throw an error if the format is wrong on the watermark
@@ -200,6 +198,11 @@ class AppConfig():
             pieces = arn.split(':')
             arn = ':'.join(pieces[:7])
             val = pieces[-3]
+        elif arn is None:
+            return None
+        else: 
+            logger.warning(f"Warning: arn {arn} is not in the correct format")
+            return None
             
         response = secretsmanager.get_secret_value(
             SecretId=arn

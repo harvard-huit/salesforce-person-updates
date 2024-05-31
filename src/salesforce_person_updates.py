@@ -198,7 +198,12 @@ class SalesforcePersonUpdates:
                 }
 
                 try: 
-                    self.sfpu.push_log(message=record.getMessage(), levelname=record.levelname, datetime=None, run_id=self.sfpu.run_id)
+                    # limit message to 1000 characters for salesforce
+                    message = record.getMessage()
+                    if len(message) > 1000:
+                        message = message[:1000] + "..."
+
+                    self.sfpu.push_log(message=message, levelname=record.levelname, datetime=None, run_id=self.sfpu.run_id)
                 except Exception as e:
                     log_data['log_error'] = str(e)
 
@@ -603,19 +608,19 @@ class SalesforcePersonUpdates:
                 # NOTE: we might be able to get away here with simply running it through an updates_only run
 
                 # we only need the external ids and the updateDate condition
-                pds_query = {}
+                temp_pds_query = {}
                 external_id = self.app_config.config['Contact']['Id']['salesforce']
                 pds_id = self.app_config.config['Contact']['Id']['pds']
-                pds_query['fields'] = [pds_id]
-                pds_query['conditions'] = {}
-                pds_query['conditions']['cacheUpdateDate'] = ">" + watermark.strftime('%Y-%m-%dT%H:%M:%S')
+                temp_pds_query['fields'] = [pds_id]
+                temp_pds_query['conditions'] = {}
+                temp_pds_query['conditions']['cacheUpdateDate'] = ">" + watermark.strftime('%Y-%m-%dT%H:%M:%S')
                 # add exclusion of updated ids
-                pds_query['conditions'][pds_id] = {
+                temp_pds_query['conditions'][pds_id] = {
                     "value": self.updated_ids,
                     "exclude": True
                 }
                 # process the query synchronously (for simplicity's sake)
-                self.pds.start_pagination(pds_query, wait=True, type="list")
+                self.pds.start_pagination(temp_pds_query, wait=True, type="list")
                 people_list = self.pds.results
                 id_list = [person[pds_id] for person in people_list]
 
@@ -634,6 +639,7 @@ class SalesforcePersonUpdates:
                         raise Exception(f"Filtered id list is too large: {len(filtered_id_list)} or add a record_limit")
                     self.hsf.flag_field(object_name='Contact', external_id=external_id, flag_name=updated_flag, value=False, ids=filtered_id_list)
                     try:
+                        pds_query = self.app_config.pds_query
                         pds_query['conditions'] = {}
                         pds_query['conditions'][pds_id] = filtered_id_list
                         # NOTE: this can fail if the id list is too large (due to elastic search limitations)
@@ -649,7 +655,6 @@ class SalesforcePersonUpdates:
                 # if this is a new day, go through the cleanup process
                 logger.info(f"New day, running cleanup")
                 self.cleanup_updateds()
-
 
         watermark = self.app_config.update_watermark("person")
         logger.info(f"Watermark updated: {watermark}")
@@ -900,42 +905,35 @@ class SalesforcePersonUpdates:
         external_id = self.app_config.config[object_name]['Id']['salesforce']
         updated_flag = self.app_config.config[object_name]['updatedFlag']
         pds_id = self.app_config.config[object_name]['Id']['pds']
-        all_sf_ids = self.hsf.get_all_external_ids(object_name=object_name, external_id=external_id)
-        logger.info(f"Found {len(all_sf_ids)} ids in Salesforce")
+        all_sf_ids = self.hsf.get_all_external_ids(object_name=object_name, external_id=external_id, updated_flag=True)
+        logger.info(f"Found {len(all_sf_ids)} ids in Salesforce with a True updated flag")
         
         # 2. Call PDS with those IDs
         # we only need to know if these are getttable, 
         #   it doesn't matter what other fields or conditions are in the provided query
-        pds_query = {}
-        pds_query['fields'] = [pds_id]
-        pds_query['conditions'] = {}
+        temp_pds_query = {}
+        temp_pds_query['fields'] = [pds_id]
+        temp_pds_query['conditions'] = {}
 
-        # people = self.pds.start_pagination(pds_query, wait=True, type="list")
-        # all_pds_ids = [person[pds_id] for person in people]
+        not_updating_ids = []
+        # step through the sf ids 800 at a time
+        for i in range(0, len(all_sf_ids), 800):
+            sf_ids_batch = all_sf_ids[i:i+800]
+            temp_pds_query['conditions'][pds_id] = sf_ids_batch
+            try:
+                results = self.pds.search(temp_pds_query)
+                pds_ids = [person[pds_id] for person in results['results']]
+                if len(pds_ids) < len(sf_ids_batch):
+                    # get the diff
+                    not_updating_ids += [item for item in sf_ids_batch if item not in pds_ids]
 
-        try: 
-            all_pds_ids = []
-            results = []
-            self.pds.start_pagination(pds_query)
-            while(len(results) > 0 or self.pds.is_paginating):
-                results = self.pds.next_page_results()
-                all_pds_ids += [person[pds_id] for person in results]
-            logger.info(f"Found {len(all_pds_ids)} ids in PDS")
-        except Exception as e:
-            logger.error(f"Error getting all pds ids: {e}")
-            raise e
+            except Exception as e:
+                logger.error(f"Error getting pds ids: {e}")
+                raise e
 
-        try:
-            # 3. Diff the lists
-            not_updating_ids = [item for item in all_sf_ids if item not in all_pds_ids]
-            logger.info(f"Found {len(not_updating_ids)} ids that are no longer updating")
-            logger.debug(f"not_updating_ids: {not_updating_ids}")
+        logger.info(f"Found {len(not_updating_ids)} ids that are no longer updating")
 
-            # 4. Mark the ones that don't show up
-            self.hsf.flag_field(object_name=object_name, external_id=external_id, flag_name=updated_flag, value=False, ids=not_updating_ids)
-        except Exception as e:
-            logger.error(f"Error marking ids as not updated: {e}")
-            raise e
+        self.hsf.flag_field(object_name=object_name, external_id=external_id, flag_name=updated_flag, value=False, ids=not_updating_ids)
 
 
     # this method will create xls files with comparisons of data from 2 salesforce sources
