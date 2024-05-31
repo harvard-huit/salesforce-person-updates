@@ -1,5 +1,5 @@
 from logging import LogRecord
-from common import logger, stack, AppConfig
+from common import logger, stack, AppConfig, ThreadExcept
 import pds
 from salesforce import HarvardSalesforce
 from transformer import SalesforceTransformer
@@ -7,7 +7,6 @@ from person_reference import PersonReference
 from departments import Departments
 
 import os
-import threading
 import json
 import logging
 import time
@@ -521,7 +520,7 @@ class SalesforcePersonUpdates:
             # unthreaded:
             # self.hsf.pushBulk(object, object_data)    
 
-            thread = threading.Thread(target=self.hsf.pushBulk, args=(object, object_data, external_id))
+            thread = ThreadExcept(target=self.hsf.pushBulk, args=(object, object_data, external_id))
             thread.start()
             branch_threads.append(thread)
         
@@ -529,6 +528,8 @@ class SalesforcePersonUpdates:
         #   so they won't block the main thread
         for thread in branch_threads:
             thread.join()
+            if thread.exception:
+                raise thread.exception
 
     def update_single_person(self, huids):
         pds_query = self.app_config.pds_query
@@ -547,6 +548,8 @@ class SalesforcePersonUpdates:
                 for thread in self.batch_threads.copy():	
                     if not thread.is_alive():	
                         self.batch_threads.remove(thread)
+                    if thread.exception:
+                        raise thread.exception
 
 
         logger.info(f"Finished spot data load: {self.run_id}")
@@ -805,7 +808,7 @@ class SalesforcePersonUpdates:
                 if not dry_run:
                     # self.process_people_batch(people)
                     logger.info(f"Starting a process thread")
-                    thread = threading.Thread(target=self.process_people_batch, args=(people,))
+                    thread = ThreadExcept(target=self.process_people_batch, args=(people,))
                     thread.start()
                     self.batch_threads.append(thread)
 
@@ -822,6 +825,8 @@ class SalesforcePersonUpdates:
                             # logger.info(f"{len(self.batch_threads)} unresolved threads")
                             if not thread.is_alive():
                                 self.batch_threads.remove(thread)
+                            if thread.exception:
+                                raise thread.exception
 
                 else:
                     logger.info(f"dry_run active: No processing happening.")
@@ -831,6 +836,8 @@ class SalesforcePersonUpdates:
                 for thread in self.batch_threads.copy():
                     if not thread.is_alive():
                         self.batch_threads.remove(thread)
+                    if thread.exception:
+                        raise thread.exception
 
             
                 if current_count >= total_count:
@@ -865,6 +872,8 @@ class SalesforcePersonUpdates:
                 for thread in self.batch_threads.copy():	
                     if not thread.is_alive():	
                         self.batch_threads.remove(thread)
+                    if thread.exception:
+                        raise thread.exception
 
 
         logger.info(f"Successfully finished data load: {self.run_id}")

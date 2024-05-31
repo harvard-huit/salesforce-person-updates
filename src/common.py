@@ -5,6 +5,7 @@ import os
 import urllib
 import json
 import boto3
+import threading
 from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
@@ -33,8 +34,6 @@ logger.addHandler(stream_handler)
 
 
 
-
-
 #============================================================================================
 # AppConfig
 #============================================================================================
@@ -54,6 +53,15 @@ class AppConfig():
             "person": None,
             "account": None
         }
+
+        task_info = self.get_task_info()
+        if task_info:
+            self.task_arn = task_info.get('task_arn')
+            self.cluster = task_info.get('cluster')
+        else:
+            self.task_arn = None
+            self.cluster = None
+
 
         self.salesforce_password = None
         self.salesforce_token = None
@@ -250,6 +258,50 @@ class AppConfig():
             except Exception as e:
                 logger.error(f"Error: failiure to update dynamo table {self.table_name} with watermarks {string_watermarks}")
                 raise e
+            
+    def get_task_info(self):
+        """
+        Retrieves info about the ECS task from the environment URI
+        """
+        try:
+            if os.getenv('ECS_CONTAINER_METADATA_URI_V4') is not None:
+                metadata_uri = os.getenv('ECS_CONTAINER_METADATA_URI_V4')
+                response = urllib.request.urlopen(metadata_uri)
+                data = json.loads(response.read())
+                logger.info(f"info: ECS_CONTAINER_METADATA_URI_V4 found in environment: {data}")
+                cluster = data.get('Cluster')
+                task_arn = data.get('TaskARN')
+                return {
+                    "task_arn": task_arn,
+                    "cluster": cluster
+                }
+            else:
+                logger.info(f"info: ECS_CONTAINER_METADATA_URI_V4 not found in environment, assuming local environment")
+                return None
+        except Exception as e:
+            logger.error(f"Error: failure to get task arn from environment")
+            raise e
+        
+    def stop_task_with_reason(self, reason):
+        """
+        Stops the task with the given ARN and reason
+        """
+        if self.task_arn is None:
+            logger.warning(f"Warning: task ARN not found, cannot stop task")
+            return
+
+        try:
+            ecs = boto3.client('ecs')
+            ecs.stop_task(
+                cluster=self.cluster,
+                task=self.task_arn,
+                reason=reason
+            )
+            logger.info(f"Info: Stopping task {self.task_arn} with reason {reason}")
+        except Exception as e:
+            logger.error(f"Error: failure to stop task {self.task_arn} with reason {reason}")
+            raise e
+
 
 #============================================================================================
 # Other
@@ -314,3 +366,16 @@ def get_all_config_ids(table_name):
     except Exception as e:
         logger.error(f"Error: failure to get all config ids from table: {table_name}")
         raise e
+    
+    
+class ThreadExcept(threading.Thread):
+    def __init__(self, target, args):
+        super().__init__(target=target, args=args)
+        self.exception = None
+
+    def run(self):
+        try:
+            if self._target:
+                self._target(*self._args)
+        except Exception as e:
+            self.exception = e
