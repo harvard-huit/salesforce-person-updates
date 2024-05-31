@@ -271,6 +271,9 @@ class AppConfig():
                 logger.info(f"info: ECS_CONTAINER_METADATA_URI_V4 found in environment: {data}")
                 cluster = data.get('Cluster')
                 task_arn = data.get('TaskARN')
+                if task_arn is None:
+                    if 'Labels' in data:
+                        task_arn = data.get('Labels').get('com.amazonaws.ecs.task-arn')
                 return {
                     "task_arn": task_arn,
                     "cluster": cluster
