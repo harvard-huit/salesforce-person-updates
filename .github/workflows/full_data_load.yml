@@ -1,5 +1,5 @@
 name: Full Person Data Load
-run-name: Full data load on ${{ inputs.environment }} for ${{ salesforce_instance_id }}
+run-name: Full data load on ${{ inputs.environment }} for ${{ inputs.salesforce_instance_id }}
 
 on:
   workflow_dispatch:
