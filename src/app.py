@@ -263,14 +263,19 @@ try:
     else: 
         logger.warning(f"App triggered without a valid action: {action}, please see documentation for more information.")
     output = "Success Apparent"
+    
 except Exception as e:
     action = os.getenv("action", None)
     salesforce_id = os.getenv("SALESFORCE_INSTANCE_ID", None)
     logger.error(f"Salesforce instance: {salesforce_id}, action: {action}: {e}")
     output = f"ERROR: {e}"
     raise e
+
 finally:
     if not stack == "developer":
         setTaskRunning(sfpu.app_config, False)
+
+        action = os.getenv("action", None)
+        salesforce_id = os.getenv("SALESFORCE_INSTANCE_ID", None)
         sfpu.app_config.stop_task_with_reason(f"Salesforce instance: {salesforce_id}: Action: {action} completed. {output}")
 
