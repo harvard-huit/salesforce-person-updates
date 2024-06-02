@@ -274,6 +274,7 @@ class AppConfig():
                 if task_arn is None:
                     if 'Labels' in data:
                         task_arn = data.get('Labels').get('com.amazonaws.ecs.task-arn')
+                        cluster = data.get('Labels').get('com.amazonaws.ecs.cluster')
                 return {
                     "task_arn": task_arn,
                     "cluster": cluster
@@ -287,11 +288,19 @@ class AppConfig():
         
     def stop_task_with_reason(self, reason):
         """
-        Stops the task with the given ARN and reason
+        Stops the task of the current arn with the given reason
         """
-        if self.task_arn is None:
-            logger.warning(f"Warning: task ARN not found, cannot stop task")
-            return
+        try:
+            if self.task_arn is None:
+                task_info = self.get_task_info()
+                self.task_arn = task_info.get('task_arn')
+                self.cluster = task_info.get('cluster')
+        except Exception as e:
+            pass
+        finally:
+            if self.task_arn is None:
+                logger.warning(f"Warning: task ARN not found, cannot stop task")
+                return None
 
         try:
             ecs = boto3.client('ecs')
