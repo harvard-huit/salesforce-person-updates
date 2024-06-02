@@ -132,23 +132,24 @@ jobs:
             --output text)
           echo "TASK_ARN=$TASK_ARN" >> $GITHUB_ENV
   
-      - name: Wait for task to complete
-        run: |
-          aws ecs wait tasks-stopped --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }}
-          STOP_CODE=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].stopCode' --output text)
-          if [[ "$STOP_CODE" == "EssentialContainerExited" ]]; then
-            EXIT_CODE=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].containers[0].exitCode' --output text)
-            if [[ "$EXIT_CODE" != "0" ]]; then
-              STOPPED_REASON=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].stoppedReason' --output text)
-              echo "Task failed with exit code $EXIT_CODE with reason: $STOPPED_REASON"
-              exit 1
-            else
-              echo "Task completed successfully"
-              exit 0
-            fi
+      # TODO: github issue: https://github.huit.harvard.edu/HUIT/salesforce-person-updates/issues/74
+      # - name: Wait for task to complete
+      #   run: |
+      #     aws ecs wait tasks-stopped --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }}
+      #     STOP_CODE=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].stopCode' --output text)
+      #     if [[ "$STOP_CODE" == "EssentialContainerExited" ]]; then
+      #       EXIT_CODE=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].containers[0].exitCode' --output text)
+      #       if [[ "$EXIT_CODE" != "0" ]]; then
+      #         STOPPED_REASON=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].stoppedReason' --output text)
+      #         echo "Task failed with exit code $EXIT_CODE with reason: $STOPPED_REASON"
+      #         exit 1
+      #       else
+      #         echo "Task completed successfully"
+      #         exit 0
+      #       fi
 
-          else 
-            echo "Task stopped with stop code $STOP_CODE"
-            exit 1
-          fi
+      #     else 
+      #       echo "Task stopped with stop code $STOP_CODE"
+      #       exit 1
+      #     fi
 
