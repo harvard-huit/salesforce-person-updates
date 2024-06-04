@@ -5,6 +5,7 @@ import os
 import urllib
 import json
 import boto3
+import threading
 from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
@@ -33,8 +34,6 @@ logger.addHandler(stream_handler)
 
 
 
-
-
 #============================================================================================
 # AppConfig
 #============================================================================================
@@ -52,9 +51,17 @@ class AppConfig():
         self.config = None
         self.watermarks = {
             "person": None,
-            "department": None,
             "account": None
         }
+
+        task_info = self.get_task_info()
+        if task_info:
+            self.task_arn = task_info.get('task_arn')
+            self.cluster = task_info.get('cluster')
+        else:
+            self.task_arn = None
+            self.cluster = None
+
 
         self.salesforce_password = None
         self.salesforce_token = None
@@ -106,16 +113,17 @@ class AppConfig():
             person_watermark = datetime.strptime(person_watermark_env, '%Y-%m-%dT%H:%M:%S').date()
         else:
             person_watermark = one_day_ago
-        department_watermark_env = os.getenv('DEPARTMENT_WATERMARK') or False
-        if department_watermark_env:
-            department_watermark = datetime.strptime(department_watermark_env, '%Y-%m-%dT%H:%M:%S').date()
+
+        account_watermark_env = os.getenv('ACCOUNT_WATERMARK') or False
+        if account_watermark_env:
+            account_watermark = datetime.strptime(account_watermark_env, '%Y-%m-%dT%H:%M:%S').date()
         else:
-            department_watermark = one_day_ago
+            account_watermark = one_day_ago
         
         # set the watermarks the same way they would come out from the get_config_values
         self.watermarks = {
             "person": person_watermark,
-            "department": department_watermark
+            "account": account_watermark
         }
 
 
@@ -141,8 +149,6 @@ class AppConfig():
                     self.watermarks = response.get('Item').get('watermarks').get('M')
                     if os.getenv("FORCE_PERSON_WATERMARK"):
                         self.watermarks["person"] = os.getenv("FORCE_PERSON_WATERMARK")
-                    if os.getenv("FORCE_DEPARTMENT_WATERMARK"):
-                        self.watermarks["department"] = os.getenv("FORCE_DEPARTMENT_WATERMARK")
 
                     # we want the watermarks to be datetime objects so we can do comparisons easily on them
                     #   this will also throw an error if the format is wrong on the watermark
@@ -200,6 +206,11 @@ class AppConfig():
             pieces = arn.split(':')
             arn = ':'.join(pieces[:7])
             val = pieces[-3]
+        elif arn is None:
+            return None
+        else: 
+            logger.warning(f"Warning: arn {arn} is not in the correct format")
+            return None
             
         response = secretsmanager.get_secret_value(
             SecretId=arn
@@ -247,6 +258,62 @@ class AppConfig():
             except Exception as e:
                 logger.error(f"Error: failiure to update dynamo table {self.table_name} with watermarks {string_watermarks}")
                 raise e
+            
+    def get_task_info(self):
+        """
+        Retrieves info about the ECS task from the environment URI
+        """
+        try:
+            if os.getenv('ECS_CONTAINER_METADATA_URI_V4') is not None:
+                metadata_uri = os.getenv('ECS_CONTAINER_METADATA_URI_V4')
+                response = urllib.request.urlopen(metadata_uri)
+                data = json.loads(response.read())
+                logger.info(f"info: ECS_CONTAINER_METADATA_URI_V4 found in environment: {data}")
+                cluster = data.get('Cluster')
+                task_arn = data.get('TaskARN')
+                if task_arn is None:
+                    if 'Labels' in data:
+                        task_arn = data.get('Labels').get('com.amazonaws.ecs.task-arn')
+                        cluster = data.get('Labels').get('com.amazonaws.ecs.cluster')
+                return {
+                    "task_arn": task_arn,
+                    "cluster": cluster
+                }
+            else:
+                logger.info(f"info: ECS_CONTAINER_METADATA_URI_V4 not found in environment, assuming local environment")
+                return None
+        except Exception as e:
+            logger.error(f"Error: failure to get task arn from environment")
+            raise e
+        
+    def stop_task_with_reason(self, reason):
+        """
+        Stops the task of the current arn with the given reason
+        """
+        try:
+            if self.task_arn is None:
+                task_info = self.get_task_info()
+                self.task_arn = task_info.get('task_arn')
+                self.cluster = task_info.get('cluster')
+        except Exception as e:
+            pass
+        finally:
+            if self.task_arn is None:
+                logger.warning(f"Warning: task ARN not found, cannot stop task")
+                return None
+
+        try:
+            ecs = boto3.client('ecs')
+            ecs.stop_task(
+                cluster=self.cluster,
+                task=self.task_arn,
+                reason=reason
+            )
+            logger.info(f"Info: Stopping task {self.task_arn} with reason {reason}")
+        except Exception as e:
+            logger.error(f"Error: failure to stop task {self.task_arn} with reason {reason}")
+            raise e
+
 
 #============================================================================================
 # Other
@@ -300,3 +367,27 @@ def setTaskRunning(app_config: AppConfig, running: bool):
         raise e
 
 
+def get_all_config_ids(table_name):
+    """
+    Retrieves all config ids from DynamoDB
+    """
+    try:
+        dynamo = boto3.client('dynamodb')
+        response = dynamo.scan(TableName=table_name)
+        return [item.get('id').get('S') for item in response.get('Items')]
+    except Exception as e:
+        logger.error(f"Error: failure to get all config ids from table: {table_name}")
+        raise e
+    
+    
+class ThreadExcept(threading.Thread):
+    def __init__(self, target, args):
+        super().__init__(target=target, args=args)
+        self.exception = None
+
+    def run(self):
+        try:
+            if self._target:
+                self._target(*self._args)
+        except Exception as e:
+            self.exception = e

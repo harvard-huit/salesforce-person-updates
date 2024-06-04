@@ -1,5 +1,5 @@
 name: Full Person Data Load
-run-name: Full data load on ${{ github.event.inputs.environment }} for ${{ github.event.inputs.salesforce_instance_id }}
+run-name: Full data load on ${{ inputs.environment }} for ${{ inputs.salesforce_instance_id }}
 
 on:
   workflow_dispatch:
@@ -58,94 +58,61 @@ on:
           - '8192'
           - '16384'
                             
-env:
-  AWS_REGION: us-east-1
-
 defaults:
   run:
     shell: bash
 
 jobs:
   data_load: 
-    name: Full data load on ${{ github.event.inputs.environment }} for ${{ github.event.inputs.salesforce_instance_id }}
+    name: Full data load on ${{ inputs.environment }} for ${{ inputs.salesforce_instance_id }}
+    environment: ${{ inputs.environment }}
     runs-on: [ ubuntu-latest ]
 
     steps:
-    #   - name: test task_version value
-    #     run: |
-    #       echo "\"${{ github.event.inputs.task_version }}\""
-
-    #   - name: Set task version format
-    #     if: ${{ github.event.inputs.task_version != '' }}
-    #     run: |
-    #       echo "task_version=:${{ github.event.inputs.task_version }}" >> $GITHUB_ENV
-
-
-      - name: Set admints-dev environment vars
-        if: ${{ github.event.inputs.environment == 'dev' || github.event.inputs.environment == 'test' }}
-        run: |
-          echo "account=001980101248" >> $GITHUB_ENV
-          echo "account_name=admintsdev" >> $GITHUB_ENV
-          echo "security_group=sg-07d8897b8146667d1" >> $GITHUB_ENV
-          echo "subnet=subnet-b1d4cac7" >> $GITHUB_ENV
-          echo "TABLE_NAME=aais-services-salesforce-person-updates-dev" >> $GITHUB_ENV
-
-
-      - name: Set admints environment vars
-        if: ${{ github.event.inputs.environment == 'stage' || github.event.inputs.environment == 'prod' }}
-        run: |
-          echo "account=949726781110" >> $GITHUB_ENV
-          echo "account_name=admints" >> $GITHUB_ENV
-          echo "security_group=sg-0d4440255bb6c7b71" >> $GITHUB_ENV
-          echo "subnet=subnet-152e3063" >> $GITHUB_ENV
-          echo "TABLE_NAME=aais-services-salesforce-person-updates-${{ github.event.inputs.environment }}" >> $GITHUB_ENV
-  
       - name: Login to AWS with a service account / iam user
-        uses: HUIT/configure-aws-credentials@13d241b293754004c80624b5567555c4a39ffbe3
+        uses: HUIT/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_NONPROD }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_NONPROD }}
-          aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: 'arn:aws:iam::${{ env.account }}:role/AutomationDeployRole'
+          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: 'arn:aws:iam::${{ vars.AWS_ACCOUNT }}:role/AutomationDeployRole'
           role-duration-seconds: 1200
           role-session-name: MyDeploySession
           role-skip-session-tagging: true
           role-external-id: ${{ secrets.EXTERNAL_ID }}
 
-
-
-      - name: get current identity again
+      - name: get current identity 
         run: aws sts get-caller-identity
 
       - name: Create Overrides
         run: |
           CONTAINER_OVERRIDES='[ 
             {
-              "name": "aais-services-${{ github.event.inputs.environment }}-feed-salesforce-person-updates", 
-              "cpu": ${{ github.event.inputs.cpu }},
-              "memory": ${{ github.event.inputs.memory }},
+              "name": "aais-services-${{ inputs.environment }}-feed-salesforce-person-updates", 
+              "cpu": ${{ inputs.cpu }},
+              "memory": ${{ inputs.memory }},
               "environment": [ 
                 {
                   "name": "SALESFORCE_INSTANCE_ID", 
-                  "value": "${{ github.event.inputs.salesforce_instance_id }}"
+                  "value": "${{ inputs.salesforce_instance_id }}"
                 }, {
                   "name": "TABLE_NAME", 
-                  "value": "${{ env.TABLE_NAME }}"
+                  "value": "${{ vars.TABLE_NAME }}"
                 }, {
                   "name": "action", 
                   "value": "full-person-load"
                 }, {
                   "name": "BATCH_SIZE", 
-                  "value": "${{ github.event.inputs.batch_size }}"
+                  "value": "${{ inputs.batch_size }}"
                 }, {
                   "name": "BATCH_THREAD_COUNT", 
-                  "value": "${{ github.event.inputs.batch_thread_count }}"
+                  "value": "${{ inputs.batch_thread_count }}"
                 }, {
                   "name": "RECORD_LIMIT", 
-                  "value": "${{ github.event.inputs.record_limit }}"
+                  "value": "${{ inputs.record_limit }}"
                 }, {
                   "name": "DEBUG", 
-                  "value": "${{ github.event.inputs.debug }}"
+                  "value": "${{ inputs.debug }}"
                 }
               ]
             } 
@@ -153,12 +120,43 @@ jobs:
           CONTAINER_OVERRIDES=$(echo "$CONTAINER_OVERRIDES" | tr -d '\n')
           echo "CONTAINER_OVERRIDES=$CONTAINER_OVERRIDES" >> $GITHUB_ENV
 
-      - name: Run ${{ github.event.inputs.environment }} full data load on [${{ github.event.inputs.people }}]
+      - name: Run ${{ inputs.environment }} full data load on [${{ inputs.people }}]
         run: |
-          aws ecs run-task \
-            --cluster aais-services-${{ github.event.inputs.environment }}-cluster \
-            --overrides '{"cpu": "${{ github.event.inputs.cpu }}", "memory": "${{ github.event.inputs.memory }}", "containerOverrides": ${{ env.CONTAINER_OVERRIDES }} }' \
-            --task-definition arn:aws:ecs:us-east-1:${{ env.account }}:task-definition/aais-services-${{ github.event.inputs.environment }}-feed-salesforce-person-updates${{ env.task_version }} \
-            --network-configuration '{ "awsvpcConfiguration": { "assignPublicIp":"DISABLED", "securityGroups": ["${{ env.security_group }}"], "subnets": ["${{ env.subnet }}"]}}' \
-            --launch-type FARGATE
+          TASK_ARN=$(aws ecs run-task \
+            --cluster aais-services-${{ inputs.environment }}-cluster \
+            --overrides '{"cpu": "${{ inputs.cpu }}", "memory": "${{ inputs.memory }}", "containerOverrides": ${{ env.CONTAINER_OVERRIDES }} }' \
+            --task-definition arn:aws:ecs:us-east-1:${{ vars.AWS_ACCOUNT }}:task-definition/aais-services-${{ inputs.environment }}-feed-salesforce-person-updates \
+            --network-configuration '{ "awsvpcConfiguration": { "assignPublicIp":"DISABLED", "securityGroups": ["${{ vars.SECURITY_GROUP }}"], "subnets": ["${{ vars.SUBNET }}"]}}' \
+            --launch-type FARGATE \
+            --query 'tasks[0].taskArn' \
+            --output text)
+          echo "TASK_ARN=$TASK_ARN" >> $GITHUB_ENV
   
+      # TODO: github issue: https://github.huit.harvard.edu/HUIT/salesforce-person-updates/issues/74
+      - name: Wait for task to complete
+        run: |
+          while true; do            
+            aws ecs wait tasks-stopped --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} > /dev/null 2> error.log
+            ERROR=$(cat error.log)
+            if [[ "$ERROR" == "Waiter TasksStopped failed: Max attempts exceeded" ]]; then
+              continue
+            fi
+            
+            STOP_CODE=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].stopCode' --output text)
+            if [[ "$STOP_CODE" == "EssentialContainerExited" ]]; then
+              EXIT_CODE=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].containers[0].exitCode' --output text)
+              if [[ "$EXIT_CODE" != "0" ]]; then
+                STOPPED_REASON=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].stoppedReason' --output text)
+        
+                echo "Task failed with exit code $EXIT_CODE with reason: $STOPPED_REASON"
+                exit 1
+              else
+                echo "Task completed successfully"
+                exit 0
+              fi
+
+            else 
+              echo "Task stopped with stop code $STOP_CODE"
+              exit 1
+            fi
+

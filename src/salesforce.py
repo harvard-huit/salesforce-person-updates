@@ -531,7 +531,7 @@ class HarvardSalesforce:
             raise Exception(f"Error: field ({field}) does not have an associated `updateable`")
 
         # NOTE: Salesforce cannot take a null value directly, it needs to take the value: '#N/A'?
-        if not value:
+        if value is None:
             return None
 
         if not isinstance(value, (str, bool, int)):
@@ -625,10 +625,11 @@ class HarvardSalesforce:
                 logger.error(f"Error converting {object}.{field} ({value}) to double/float: {e}. Identifier: {identifier}")
                 return None
         elif field_type in ["boolean"]:
-            try:
-                return value in [True, False]
-            except ValueError as e:
-                logger.error(f"Error: field {field} is a boolean, must be True or False. Tried value: {value}")
+            if isinstance(value, bool):
+                return value
+            else:
+                # logger.error(f"Error: field {field} is a boolean, must be True or False. Tried value: {value}")
+                return False
         else:
             logger.error(f"Error: unhandled field_type: {field_type}. Please check config and target Salesforce instance")
             return None
@@ -976,12 +977,16 @@ class HarvardSalesforce:
         return result_data
 
 
-    def get_all_external_ids(self, object_name: str, external_id: str):
+    def get_all_external_ids(self, object_name: str, external_id: str, updated_flag_name: str=None, updated_flag_value: bool=None):
         # this will return a list of all of the existing contact ids from salesforce
-        logger.info(f"get_all_external_ids getting all {external_id} from {object_name}")
+        updated_flag_string = ""
+        if updated_flag_name is not None:
+            updated_flag_string = f" AND {updated_flag_name} = {updated_flag_value} "
+        logger.info(f"get_all_external_ids getting all {external_id} from {object_name} {updated_flag_string}")
+
         ids = []
         try:
-            sf_data = self.sf.query_all(f"SELECT {external_id} FROM {object_name} WHERE {external_id} != null")
+            sf_data = self.sf.query_all(f"SELECT {external_id} FROM {object_name} WHERE {external_id} != null {updated_flag_string}")
             logger.debug(f"got this data from salesforce: {sf_data['records']}")
             for record in sf_data['records']:
                 ids.append(record[external_id])
