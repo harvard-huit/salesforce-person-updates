@@ -931,13 +931,15 @@ class SalesforcePersonUpdates:
             temp_pds_query['conditions'][pds_id] = sf_ids_batch
             try:
                 results = self.pds.search(temp_pds_query)
+                if 'results' not in results:
+                    break
                 pds_ids = [person[pds_id] for person in results['results']]
                 if len(pds_ids) < len(sf_ids_batch):
                     # get the diff
                     not_updating_ids += [item for item in sf_ids_batch if item not in pds_ids]
 
             except Exception as e:
-                logger.error(f"Error getting pds ids: {e}")
+                logger.error(f"Error getting pds ids: {e}, pds_query: {temp_pds_query}")
                 raise e
 
         logger.info(f"Found {len(not_updating_ids)} ids that are no longer updating")
