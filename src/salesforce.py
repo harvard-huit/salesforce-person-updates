@@ -625,6 +625,8 @@ class HarvardSalesforce:
 
         elif field_type in ["double"]:
             try: 
+                if bool(value) == False:
+                    return None
                 return float(value)
             except ValueError as e:
                 logger.error(f"Error converting {object}.{field} ({value}) to double/float: {e}. Identifier: {identifier}")
