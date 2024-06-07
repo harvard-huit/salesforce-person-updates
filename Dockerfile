@@ -43,8 +43,10 @@ COPY src /opt/app
 COPY config.schema.json /opt/app
 
 
-# Needed for boto to be able to find the parameter store
+# Needed for boto
 ENV AWS_DEFAULT_REGION us-east-1
+# $version is set in the github action
+ENV VERSION=${version}
 
 # make sure the stack env var is picked up for use in the build
 ARG STACK

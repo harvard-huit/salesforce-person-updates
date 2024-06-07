@@ -74,9 +74,12 @@ class SalesforcePersonUpdates:
             self.table_name = os.getenv("TABLE_NAME", None)
 
             self.action = os.getenv("action", None)
-            self.version = os.getenv("APP_VERSION", None)
+            self.version = os.getenv("VERSION", None)
 
-            logger.info(f"Starting PDC {self.action} action on: {self.salesforce_instance_id} with version: {self.version}")
+            if self.version is None:
+                logger.info(f"Starting PDC {self.action} action on: {self.salesforce_instance_id} with no version set.")
+            else: 
+                logger.info(f"Starting PDC {self.action} action on: {self.salesforce_instance_id} with version: {self.version}")
 
             current_time_mash = datetime.now().strftime('%Y%m%d%H%M')
             self.run_id = f"{self.action}_{current_time_mash}"
