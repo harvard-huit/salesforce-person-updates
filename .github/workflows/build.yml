@@ -132,7 +132,7 @@ jobs:
       - name: Build
         run: |
           cd checkout
-          docker build --build-arg VERSION=$version -t artifactory.huit.harvard.edu/aais-docker-local/salesforce-person-updates:${{ steps.which_version.outputs.version }} .
+          docker build --build-arg VERSION=${{inputs.version}} -t artifactory.huit.harvard.edu/aais-docker-local/salesforce-person-updates:${{ steps.which_version.outputs.version }} .
 
       - name: Push to Artifactory
         run: |
