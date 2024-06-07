@@ -74,9 +74,12 @@ class SalesforcePersonUpdates:
             self.table_name = os.getenv("TABLE_NAME", None)
 
             self.action = os.getenv("action", None)
-            self.version = os.getenv("APP_VERSION", None)
+            self.version = os.getenv("VERSION", None)
 
-            logger.info(f"Starting PDC {self.action} action on: {self.salesforce_instance_id} with version: {self.version}")
+            if self.version is None:
+                logger.info(f"Starting PDC {self.action} action on: {self.salesforce_instance_id} with no version set.")
+            else: 
+                logger.info(f"Starting PDC {self.action} action on: {self.salesforce_instance_id} with version: {self.version}")
 
             current_time_mash = datetime.now().strftime('%Y%m%d%H%M')
             self.run_id = f"{self.action}_{current_time_mash}"
@@ -914,7 +917,7 @@ class SalesforcePersonUpdates:
         external_id = self.app_config.config[object_name]['Id']['salesforce']
         updated_flag = self.app_config.config[object_name]['updatedFlag']
         pds_id = self.app_config.config[object_name]['Id']['pds']
-        all_sf_ids = self.hsf.get_all_external_ids(object_name=object_name, external_id=external_id, updated_flag=True)
+        all_sf_ids = self.hsf.get_all_external_ids(object_name=object_name, external_id=external_id, updated_flag_name=updated_flag, updated_flag_value=True)
         logger.info(f"Found {len(all_sf_ids)} ids in Salesforce with a True updated flag")
         
         # 2. Call PDS with those IDs
@@ -931,13 +934,15 @@ class SalesforcePersonUpdates:
             temp_pds_query['conditions'][pds_id] = sf_ids_batch
             try:
                 results = self.pds.search(temp_pds_query)
+                if 'results' not in results:
+                    break
                 pds_ids = [person[pds_id] for person in results['results']]
                 if len(pds_ids) < len(sf_ids_batch):
                     # get the diff
                     not_updating_ids += [item for item in sf_ids_batch if item not in pds_ids]
 
             except Exception as e:
-                logger.error(f"Error getting pds ids: {e}")
+                logger.error(f"Error getting pds ids: {e}, pds_query: {temp_pds_query}")
                 raise e
 
         logger.info(f"Found {len(not_updating_ids)} ids that are no longer updating")

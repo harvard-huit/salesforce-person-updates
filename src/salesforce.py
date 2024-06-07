@@ -533,6 +533,11 @@ class HarvardSalesforce:
         # NOTE: Salesforce cannot take a null value directly, it needs to take the value: '#N/A'?
         if value is None:
             return None
+        
+        # NOTE: adding this test to handle empty DotMaps
+        if bool(value) == False:
+            if value != False:
+                return None
 
         if not isinstance(value, (str, bool, int)):
             value_type = type(value)
@@ -620,6 +625,8 @@ class HarvardSalesforce:
 
         elif field_type in ["double"]:
             try: 
+                if bool(value) == False:
+                    return None
                 return float(value)
             except ValueError as e:
                 logger.error(f"Error converting {object}.{field} ({value}) to double/float: {e}. Identifier: {identifier}")
