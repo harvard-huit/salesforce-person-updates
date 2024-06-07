@@ -45,6 +45,8 @@ COPY config.schema.json /opt/app
 
 # Needed for boto
 ENV AWS_DEFAULT_REGION us-east-1
+# $VERSION is set in the github action
+ENV VERSION=${VERSION}
 
 # make sure the stack env var is picked up for use in the build
 ARG STACK
