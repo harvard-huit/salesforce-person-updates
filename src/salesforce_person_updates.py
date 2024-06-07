@@ -914,7 +914,7 @@ class SalesforcePersonUpdates:
         external_id = self.app_config.config[object_name]['Id']['salesforce']
         updated_flag = self.app_config.config[object_name]['updatedFlag']
         pds_id = self.app_config.config[object_name]['Id']['pds']
-        all_sf_ids = self.hsf.get_all_external_ids(object_name=object_name, external_id=external_id, updated_flag=True)
+        all_sf_ids = self.hsf.get_all_external_ids(object_name=object_name, external_id=external_id, updated_flag_name=updated_flag, updated_flag_value=True)
         logger.info(f"Found {len(all_sf_ids)} ids in Salesforce with a True updated flag")
         
         # 2. Call PDS with those IDs
