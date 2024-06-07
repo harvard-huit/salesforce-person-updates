@@ -773,7 +773,7 @@ class SalesforcePersonUpdates:
 
                 if len(results) > 0:
 
-                    people = self.pds.get_people(results)
+                    people = results
 
                     # check memory usage
                     memory_use_percent = psutil.virtual_memory().percent  # percentage of memory use
