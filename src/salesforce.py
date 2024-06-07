@@ -1003,3 +1003,8 @@ class HarvardSalesforce:
         
         return ids
     
+    def trim_nones(self, data):
+        for key, value in data.items():
+            if value is None:
+                del data[key]
+        return data
