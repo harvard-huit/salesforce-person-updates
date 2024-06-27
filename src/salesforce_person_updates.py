@@ -453,7 +453,7 @@ class SalesforcePersonUpdates:
         logger.info(f"Department Watermark updated: {watermark}")
         logger.info(f"Finished department {type} load")
 
-    def process_people_batch(self, people: list=[]):
+    def process_people_batch(self, people: list=[], trim_nons=False):
 
         hashed_ids = self.hsf.getUniqueIds(
             config=self.transformer.getTargetConfig('Contact'), 
@@ -479,6 +479,8 @@ class SalesforcePersonUpdates:
             contact_external_id = self.app_config.config['Contact']['Id']['salesforce']
             for object, object_data in data.items():
                 logger.debug(f"Upserting to {object} with {len(object_data)} records")
+                if trim_nons is True:
+                    object_data = self.hsf.trim_nones(object_data)
                 self.hsf.pushBulk(object, object_data, id_name=contact_external_id)
 
 
@@ -649,7 +651,7 @@ class SalesforcePersonUpdates:
                         pds_query['conditions'] = {}
                         pds_query['conditions'][pds_id] = filtered_id_list
                         # NOTE: this can fail if the id list is too large (due to elastic search limitations)
-                        self.people_data_load(pds_query=pds_query)
+                        self.people_data_load(pds_query=pds_query, trim_nons=True)
                     except Exception as e:
                         logger.error(f"Error updating filtered ids: {e}")
                         raise e
@@ -695,7 +697,7 @@ class SalesforcePersonUpdates:
             logger.error(f"Error with full data load")
             raise e
 
-    def people_data_load(self, dry_run=False, pds_query=None):
+    def people_data_load(self, dry_run=False, pds_query=None, trim_nons=False):
         # This method creates a thread for each batch, this may seem like a lot, but it is necessitated by the following factors:
         #   1. If we rely on the async of a bulk push, we cannot get the results (created/updated/error results)
         #      (as I was unable to get the API to return results. If this changes in the future, we could rethink that)
@@ -771,7 +773,7 @@ class SalesforcePersonUpdates:
 
                 if len(results) > 0:
 
-                    people = self.pds.make_people(results)
+                    people = results
 
                     # check memory usage
                     memory_use_percent = psutil.virtual_memory().percent  # percentage of memory use
@@ -811,7 +813,7 @@ class SalesforcePersonUpdates:
                 if not dry_run:
                     # self.process_people_batch(people)
                     logger.info(f"Starting a process thread")
-                    thread = ThreadExcept(target=self.process_people_batch, args=(people,))
+                    thread = ThreadExcept(target=self.process_people_batch, args=(people,trim_nons))
                     thread.start()
                     self.batch_threads.append(thread)
 
@@ -926,11 +928,12 @@ class SalesforcePersonUpdates:
         temp_pds_query = {}
         temp_pds_query['fields'] = [pds_id]
         temp_pds_query['conditions'] = {}
+        self.pds.batch_size = 800
 
         not_updating_ids = []
         # step through the sf ids 800 at a time
-        for i in range(0, len(all_sf_ids), 800):
-            sf_ids_batch = all_sf_ids[i:i+800]
+        for i in range(0, len(all_sf_ids), self.pds.batch_size):
+            sf_ids_batch = all_sf_ids[i:i+self.pds.batch_size]
             temp_pds_query['conditions'][pds_id] = sf_ids_batch
             try:
                 results = self.pds.search(temp_pds_query)
