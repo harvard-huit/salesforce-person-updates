@@ -928,11 +928,12 @@ class SalesforcePersonUpdates:
         temp_pds_query = {}
         temp_pds_query['fields'] = [pds_id]
         temp_pds_query['conditions'] = {}
+        self.pds.batch_size = 800
 
         not_updating_ids = []
         # step through the sf ids 800 at a time
-        for i in range(0, len(all_sf_ids), 800):
-            sf_ids_batch = all_sf_ids[i:i+800]
+        for i in range(0, len(all_sf_ids), self.pds.batch_size):
+            sf_ids_batch = all_sf_ids[i:i+self.pds.batch_size]
             temp_pds_query['conditions'][pds_id] = sf_ids_batch
             try:
                 results = self.pds.search(temp_pds_query)

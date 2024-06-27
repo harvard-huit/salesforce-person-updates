@@ -259,6 +259,13 @@ try:
     elif action == "test":
         logger.info(f"test action called")
 
+        # get all contacts that have our external id and a true huit_updated flag
+        # external_id = sfpu.app_config.config['Contact']['Id']['salesforce']
+        # result = sfpu.hsf.sf.query_all(f"SELECT Id, {external_id} FROM Contact WHERE {external_id} != null AND huit__Updated__c = true ORDER BY LastModifiedDate DESC")
+        # logger.info(f"Found {len(result['records'])} Contact records")
+
+        sfpu.cleanup_updateds()
+
         logger.info(f"test action finished")
     else: 
         logger.warning(f"App triggered without a valid action: {action}, please see documentation for more information.")
