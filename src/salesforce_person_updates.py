@@ -131,7 +131,8 @@ class SalesforcePersonUpdates:
 
             # check salesforce for required objects for push and get a map of the types
             self.hsf.getTypeMap(self.app_config.config.keys())
-
+            logger.debug(f"Object Metadata: {self.hsf.type_data}")
+            
             # validate the config
             try:
                 valid_response = self.hsf.validateConfig(self.app_config.config)
@@ -895,6 +896,29 @@ class SalesforcePersonUpdates:
         self.hsf.delete_records(object_name='Contact', ids=ids_to_remove)
 
         logger.info(f"remove_defunct_contacts action finished")
+
+    def check_for_duplicate_records(self, object_name):
+        # get all contacts that have our external id
+        external_id = self.app_config.config[object_name]['Id']['salesforce']
+        result = self.hsf.sf.query_all(f"SELECT Id, {external_id}, LastModifiedDate FROM {object_name} WHERE {external_id} != null ORDER BY LastModifiedDate DESC")
+
+        ids_to_remove = []
+        seen_external_ids = []
+        for record in result['records']:
+            if record[external_id] in seen_external_ids:
+                ids_to_remove.append(record['Id'])
+            else:
+                seen_external_ids.append(record[external_id])
+        logger.info(f"Found {len(ids_to_remove)} {object_name} with duplicate external ids")
+
+
+        return ids_to_remove
+    
+    def full_duplicate_check(self):
+        for object_name, object_config in self.app_config.config.items():
+            ids_to_remove = self.check_for_duplicate_records(object_name)
+
+
 
     def get_all_updated_people(self, watermark=None) -> list:
         # get all updates ids from the pds

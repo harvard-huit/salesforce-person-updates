@@ -256,8 +256,23 @@ try:
         account_handler.accounts_data_load()
 
         logger.info(f"full-account-load action finished")
+    elif action == "duplicate-check":
+        logger.info(f"duplicate-check action called")
+
+        sfpu.check_for_duplicates()
+
+        logger.info(f"duplicate-check action finished")
     elif action == "test":
         logger.info(f"test action called")
+
+        # get the HUDA__hud_Email__c object record with a HUDA__CONTACT_EMAIL_ADDRESS_KEY__c (external id) of 2982777
+        # result = sfpu.hsf.sf.query_all("SELECT Id, HUDA__EMAIL_ADDRESS__c, HUDA__Email_Contact__c, HUDA__EMAIL_ADDR_SOURCE__c, HUDA__UPDATE_DT__c FROM HUDA__hud_Email__c WHERE HUDA__CONTACT_EMAIL_ADDRESS_KEY__c = '2982777'")
+        # logger.info(f"Found {len(result['records'])} HUDA__hud_Email__c records")
+        # logger.info(result)
+
+        # check for defunct HUDA__hud_Email__c
+        # ids = sfpu.check_for_defunct_records('HUDA__hud_Email__c')
+        # logger.info(f"Found {len(ids)} defunct HUDA__hud_Email__c records")
 
         logger.info(f"test action finished")
     else: 
