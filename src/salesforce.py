@@ -496,7 +496,7 @@ class HarvardSalesforce:
         except Exception as e: 
             logger.error(f"Error: validation exception: {e}")
             # raise e
-            return False
+            return e
 
 
     # returns a mapping of the salesforce object field types

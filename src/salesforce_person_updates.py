@@ -135,7 +135,9 @@ class SalesforcePersonUpdates:
 
             # validate the config
             try:
-                self.hsf.validateConfig(self.app_config.config)
+                valid_response = self.hsf.validateConfig(self.app_config.config)
+                if valid_response is not True:
+                    raise Exception(f"{valid_response}")                
             except Exception as e:
                 logger.error(f"Config validation failed for {self.salesforce_instance_id} with error: {e}")
                 raise e
