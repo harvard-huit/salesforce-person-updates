@@ -4,7 +4,6 @@ import pds
 from salesforce import HarvardSalesforce
 from transformer import SalesforceTransformer
 from person_reference import PersonReference
-from departments import Departments
 
 import os
 import json
@@ -239,133 +238,6 @@ class SalesforcePersonUpdates:
         except Exception as e: 
             raise Exception(f"Logging failed: {data} :: {e}")
 
-    def setup_department_hierarchy(self, 
-                                   department_hash: dict, 
-                                   external_id: str):
-        """
-        NOTE on simplifying codes: we had to do this because codes are more than 10 characters and the current id field is 
-          limited to 10 characters
-
-        This is hard-coded. The configuration needs to be put in the config file.
-        """
-        logger.info(f"Starting department hierarchy setup")
-
-        # get the record type ids for Account
-        account_record_type_ids = self.hsf.get_record_type_ids('Account')
-
-        logger.info(f"account record type ids: {account_record_type_ids}")
-
-        try:
-            if not self.departments:
-                self.departments = Departments(apikey=self.app_config.dept_apikey)
-
-            if 'hierarchy' not in self.app_config.config['Account']:
-                raise Exception(f"Error: hierarchy config not found in Account config")
-            if 'fields' not in self.app_config.config['Account']['hierarchy']:
-                raise Exception(f"Error: fields not found in hierarchy config")
-            
-            account_type_map = self.hsf.getTypeMap(['Account'])
-            for field in self.app_config.config['Account']['hierarchy']['fields']:
-                if field not in account_type_map['Account']:
-                    raise Exception(f"Error: field {field} not found in Account Object")
-            
-            simplify_codes = False
-            if 'simplify_codes' in self.app_config.config['Account']['hierarchy']:
-                simplify_codes = self.app_config.config['Account']['hierarchy']['simplify_codes']
-
-            # check length of the external id
-            if external_id not in account_type_map['Account']:
-                raise Exception(f"Error: external_id {external_id} not found in Account Object")
-            if account_type_map['Account'][external_id]['externalId'] is False:
-                raise Exception(f"Error: external_id {external_id} is not an external id")
-
-            if account_type_map['Account'][external_id]['length'] < 10:
-                raise Exception(f"Error: external_id {external_id} is too short ({account_type_map['Account'][external_id]['length']} characters)")
-            if account_type_map['Account'][external_id]['length'] >= 20:
-                # if it's long enough, we don't need to simplify the codes
-                simplify_codes = False
-
-            simplified_codes = []
-            major_affiliations_map = self.departments.get_major_affiliations(department_hash)
-            data = []
-            for code, affiliation in major_affiliations_map.items():
-                description = affiliation['description']
-                simplified_code = code
-                if simplify_codes:
-                    simplified_code = self.departments.simplify_code(code)
-                    if not simplified_code:
-                        raise Exception(f"Error: code failed to simplify: {code}")
-                if simplified_code in simplified_codes:
-                    raise Exception(f"Duplicate simplified major affiliation code found: {simplified_code} ({code})")
-                simplified_codes.append(simplified_code)
-
-                data_obj = {
-                    external_id: simplified_code
-                }
-
-                for field_name, val in self.app_config.config['Account']['hierarchy']['fields'].items():
-                    if val == 'code':
-                        data_obj[field_name] = code
-                    if val == 'description':
-                        data_obj[field_name] = description
-
-                # TODO: make this a config
-                if 'Major Affiliation' in account_record_type_ids.keys():
-                    record_type_id = account_record_type_ids['Major Affiliation']
-                    data_obj['RecordTypeId'] = record_type_id
-
-                # push major affiliations into salesforce
-                data.append(data_obj)
-            logger.info(f"Pushing {len(data)} major affiliations")
-            self.hsf.pushBulk('Account', data, id_name=external_id)
-
-            sub_affiliations_map = self.departments.get_sub_affiliations(department_hash)
-            data = []
-            for code, affiliation in sub_affiliations_map.items():
-                
-                simplified_code = code
-                description = affiliation['description']
-                parent_code = affiliation['parent_code']
-                simplified_parent_code = parent_code
-
-                if simplify_codes:
-                    simplified_code = self.departments.simplify_code(code)
-                    if not simplified_code:
-                        raise Exception(f"Error: code failed to simplify: {code}")
-                    simplified_parent_code = self.departments.simplify_code(parent_code)
-                    if not simplified_parent_code:
-                        raise Exception(f"Error: parent code failed to simplify: {parent_code}")
-                if simplified_code in simplified_codes:
-                    raise Exception(f"Duplicate simplified sub affiliation code found: {simplified_code} ({code})")
-                simplified_codes.append(simplified_code)
-
-                data_obj = {
-                    external_id: simplified_code,
-                    'Parent': {
-                        external_id: simplified_parent_code
-                    }
-                }
-
-                for field_name, val in self.app_config.config['Account']['hierarchy']['fields'].items():
-                    if val == 'code':
-                        data_obj[field_name] = code
-                    if val == 'description':
-                        data_obj[field_name] = description
-
-                if 'Sub Affiliation' in account_record_type_ids.keys():
-                    record_type_id = account_record_type_ids['Sub Affiliation']
-                    data_obj['RecordTypeId'] = record_type_id
-
-                # push sub affiliations into salesforce
-                data.append(data_obj)
-
-            logger.info(f"Pushing {len(data)} sub affiliations")
-            self.hsf.pushBulk('Account', data, id_name=external_id, retries=1)
-            return True
-        except Exception as e:
-            logger.error(f"Error in building Account Hierarchy: {e}")
-            return False
-        # logger.debug(simplified_codes)
 
     def accounts_data_load(self):
         logger.info(f"Starting account data load")
@@ -396,64 +268,6 @@ class SalesforcePersonUpdates:
             elif source == "major_affiliations":
                 pass
 
-
-    # valid types are "full" and "update"
-    # NOTE: DEPRECATED
-    def departments_data_load(self, type="full", hierarchy=False):
-        logger.warning(f"DEPRECATED: departments_data_load")
-        logger.info(f"Starting a department {type} load")
-        self.departments = Departments(apikey=self.app_config.dept_apikey)
-
-
-        hashed_departments = self.departments.department_hash
-        logger.debug(f"Successfully got {len(self.departments.results)} departments")
-
-        record_type_ids = self.hsf.get_record_type_ids('Account')
-
-        watermark = self.app_config.watermarks["department"]
-
-        # the api does not have a "get updates" endpoint, so we need to filter here
-        results = self.departments.results
-        updated_results = []
-        if type=="update":
-            for index, department in hashed_departments.items():
-                department_datetime = datetime.strptime(department['updateDate'], '%Y-%m-%d %H:%M:%S').date()
-                if department_datetime > watermark:
-                    updated_results.append(department)
-            results = updated_results        
-
-        self.transformer.hashed_ids = self.hsf.getUniqueIds(
-            config=self.transformer.getSourceConfig('departments'), 
-            source_data=results
-        )
-
-        external_id = self.app_config.config['Account']['Id']['salesforce']
-        if hierarchy:
-            self.setup_department_hierarchy(department_hash=hashed_departments, external_id=external_id)
-
-
-        # data will have the structure of { "OBJECT": [{"FIELD": "VALUE"}, ...]}
-        data = {}
-        data_gen = self.transformer.transform(source_data=results, source_name='departments')
-        for d in data_gen:
-            for i, v in d.items():
-                if i not in data:
-                    data[i] = []
-                if 'Harvard Department' in record_type_ids.keys():
-                    v['RecordTypeId'] = record_type_ids['Harvard Department']
-                data[i].append(v)
-
-
-        logger.debug(f"**** Push Departments to SF  ****")
-        for object, object_data in data.items():
-            logger.debug(f"object: {object}")
-            logger.debug(pformat(object_data))
-
-            self.hsf.pushBulk(object, object_data, id_name=external_id)
-
-        self.app_config.update_watermark("department")
-        logger.info(f"Department Watermark updated: {watermark}")
-        logger.info(f"Finished department {type} load")
 
     def process_people_batch(self, people: list=[], trim_nons=False):
 

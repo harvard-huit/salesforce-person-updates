@@ -2,9 +2,6 @@ from common import logger
 from datetime import datetime
 import re
 
-from departments import Departments
-
-
 class SalesforceTransformer:
     def __init__(self, config, hsf):
         self.config = config
@@ -182,10 +179,6 @@ class SalesforceTransformer:
                                     source_value = self.ref_to_object_value(source_value_ref, source_data_object)
                                 else: 
                                     source_value = None
-                                if 'simplify_code' in source_object['ref']:
-                                    if source_object['ref']['simplify_code'] == True:
-                                        source_value = Departments.simplify_code(source_value)
-                                # salesforce_id = self.hashed_ids[ref_object]['Ids'][external_id]
                                 if source_value is None:
                                     continue
                                 if object_name not in current_record:
@@ -410,9 +403,6 @@ class SalesforceTransformer:
                                     continue
                                 
                                 if isinstance(source_value, dict) and 'ref' in source_value.keys():
-                                    if 'simplify_code' in source_value['ref']:
-                                        if source_value['ref']['simplify_code'] == True:
-                                            value = Departments.simplify_code(value)
                                     if value is None:
                                         continue
                                     value_obj = {}
