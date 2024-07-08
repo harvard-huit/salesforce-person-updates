@@ -1,4 +1,4 @@
-from common import isTaskRunning, setTaskRunning, logger, stack
+from common import isTaskRunning, setTaskRunning, logger, stack, Controller
 from salesforce_person_updates import SalesforcePersonUpdates
 from account_handler import AccountHandler
 
@@ -58,6 +58,13 @@ batch_thread_count_override = os.getenv("BATCH_THREAD_COUNT") or None
 LOCAL = os.getenv("LOCAL") or False
 ####################################
 
+# if action starts with "controller-"
+if action.startswith("controller-"):
+    table_name = os.getenv("TABLE_NAME", None)
+    controller = Controller(table_name)
+    logger.info(f"{controller.config_ids}")
+    
+    exit()
 
 sfpu = SalesforcePersonUpdates(local=LOCAL)
 
@@ -256,7 +263,7 @@ try:
         account_handler.accounts_data_load()
 
         logger.info(f"full-account-load action finished")
-    elif action == "duplicate-check":
+    elif action == "duplicate-check": 
         logger.info(f"duplicate-check action called")
 
         sfpu.check_for_duplicates()

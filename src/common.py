@@ -32,6 +32,24 @@ formatter = logging.Formatter(logging_format)
 stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
+class Controller():
+    def __init__(self, table_name, local=False):
+        self.table_name = table_name
+        self.local = local
+
+        self.config_ids = self.get_all_config_ids()
+
+    def get_all_config_ids(self):
+        """
+        Retrieves all config ids from DynamoDB
+        """
+        try:
+            dynamo = boto3.client('dynamodb')
+            response = dynamo.scan(TableName=self.table_name)
+            return [item.get('id').get('S') for item in response.get('Items')]
+        except Exception as e:
+            logger.error(f"Error: failure to get all config ids from table: {self.table_name}")
+            raise e
 
 
 #============================================================================================
@@ -364,19 +382,6 @@ def setTaskRunning(app_config: AppConfig, running: bool):
         logger.info(f"Info: Setting task_running variable to {running} for {app_config.name}")
     except Exception as e:
         logger.error(f"Error: failure to set task status for id:{app_config.id} on table: {app_config.table_name}")
-        raise e
-
-
-def get_all_config_ids(table_name):
-    """
-    Retrieves all config ids from DynamoDB
-    """
-    try:
-        dynamo = boto3.client('dynamodb')
-        response = dynamo.scan(TableName=table_name)
-        return [item.get('id').get('S') for item in response.get('Items')]
-    except Exception as e:
-        logger.error(f"Error: failure to get all config ids from table: {table_name}")
         raise e
     
     
