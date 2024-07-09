@@ -43,4 +43,4 @@ runs:
         rm instances.json
       shell: "bash"
       env:
-        AWS_REGION: ${{ inputs.region }}
+        AWS_DEFAULT_REGION: ${{ inputs.region }}
