@@ -58,7 +58,22 @@ on:
           - '7168'
           - '8192'
           - '16384'
-                            
+  workflow_call:
+    inputs:
+      environment: 
+        type: string
+        required: true
+      salesforce_instance_id:
+        type: string
+        required: true
+      action:
+        type: string
+        required: true
+      debug:
+        type: string
+        required: false
+
+
 defaults:
   run:
     shell: bash
@@ -70,7 +85,7 @@ jobs:
     runs-on: [ ubuntu-latest ]
 
     steps:
-  
+
       - name: Login to AWS with a service account / iam user
         uses: HUIT/configure-aws-credentials@v4
         with:
