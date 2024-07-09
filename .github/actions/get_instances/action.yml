@@ -4,6 +4,10 @@ inputs:
   table_name:
     type: string
     required: true
+  region: 
+    type: string
+    required: false
+    default: "us-east-1"
 outputs:
   instances:
     description: "Array of instance ids"
@@ -38,3 +42,5 @@ runs:
         echo "instances=$(cat instances.json)">> $GITHUB_OUTPUT
         rm instances.json
       shell: "bash"
+      env:
+        AWS_REGION: ${{ inputs.region }}
