@@ -323,6 +323,9 @@ class SalesforcePersonUpdates:
                 for i, v in d.items():
                     if i not in data:
                         data[i] = []
+                    if 'updatedFlag' in self.app_config.config[i]:
+                        updated_flag = self.app_config.config[i]['updatedFlag']
+                        v[updated_flag] = True
                     data[i].append(v)
                         
         del data_gen
