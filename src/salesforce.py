@@ -496,7 +496,7 @@ class HarvardSalesforce:
         except Exception as e: 
             logger.error(f"Error: validation exception: {e}")
             # raise e
-            return False
+            return e
 
 
     # returns a mapping of the salesforce object field types
@@ -550,7 +550,7 @@ class HarvardSalesforce:
             raise Exception(f"Error: field ({object}.{field}) is not editable")
 
         field_type = self.type_data[object][field]['type']
-        if field_type in ["textarea", "string"]:
+        if field_type in ["textarea", "string", "url"]:
             length = self.type_data[object][field]['length']
             if isinstance(value, bool):
                 if value:

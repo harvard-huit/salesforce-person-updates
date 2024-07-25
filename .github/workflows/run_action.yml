@@ -24,12 +24,13 @@ on:
         default: 'test'
         options: 
           - 'test'
-          - 'cleanup-updateds'
-          - 'defunct-accounts-check'
-          - 'defunct-contacts-check'
-          - 'defunct-contacts-remove'
-          - 'remove-unaffiliated-affiliations'
-          - 'static-query'
+          # - 'cleanup-updateds'
+          # - 'defunct-accounts-check'
+          # - 'defunct-contacts-check'
+          # - 'defunct-contacts-remove'
+          # - 'remove-unaffiliated-affiliations'
+          # - 'static-query'
+          - 'duplicate-check'
       debug:
         type: choice
         required: false
@@ -57,9 +58,21 @@ on:
           - '7168'
           - '8192'
           - '16384'
-                            
-env:
-  AWS_REGION: us-east-1
+  workflow_call:
+    inputs:
+      environment: 
+        type: string
+        required: true
+      salesforce_instance_id:
+        type: string
+        required: true
+      action:
+        type: string
+        required: true
+      debug:
+        type: string
+        required: false
+
 
 defaults:
   run:
@@ -67,89 +80,82 @@ defaults:
 
 jobs:
   action_run: 
-    name: ${{ github.event.inputs.action }} on ${{ github.event.inputs.environment }} for ${{ github.event.inputs.salesforce_instance_id }}
+    name: ${{ inputs.action }} on ${{ inputs.environment }} for ${{ inputs.salesforce_instance_id }}
+    environment: ${{ inputs.environment }}
     runs-on: [ ubuntu-latest ]
 
     steps:
-    #   - name: test task_version value
-    #     run: |
-    #       echo "\"${{ github.event.inputs.task_version }}\""
 
-    #   - name: Set task version format
-    #     if: ${{ github.event.inputs.task_version != '' }}
-    #     run: |
-    #       echo "task_version=:${{ github.event.inputs.task_version }}" >> $GITHUB_ENV
-
-
-      - name: Set admints-dev environment vars
-        if: ${{ github.event.inputs.environment == 'dev' || github.event.inputs.environment == 'test' }}
-        run: |
-          echo "account=001980101248" >> $GITHUB_ENV
-          echo "account_name=admintsdev" >> $GITHUB_ENV
-          echo "security_group=sg-07d8897b8146667d1" >> $GITHUB_ENV
-          echo "subnet=subnet-b1d4cac7" >> $GITHUB_ENV
-          echo "TABLE_NAME=aais-services-salesforce-person-updates-dev" >> $GITHUB_ENV
-
-
-      - name: Set admints environment vars
-        if: ${{ github.event.inputs.environment == 'stage' || github.event.inputs.environment == 'prod' }}
-        run: |
-          echo "account=949726781110" >> $GITHUB_ENV
-          echo "account_name=admints" >> $GITHUB_ENV
-          echo "security_group=sg-0d4440255bb6c7b71" >> $GITHUB_ENV
-          echo "subnet=subnet-152e3063" >> $GITHUB_ENV
-          echo "TABLE_NAME=aais-services-salesforce-person-updates-${{ github.event.inputs.environment }}" >> $GITHUB_ENV
-  
       - name: Login to AWS with a service account / iam user
-        uses: HUIT/configure-aws-credentials@13d241b293754004c80624b5567555c4a39ffbe3
+        uses: HUIT/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_NONPROD }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_NONPROD }}
-          aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: 'arn:aws:iam::${{ env.account }}:role/AutomationDeployRole'
+          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: 'arn:aws:iam::${{ vars.AWS_ACCOUNT }}:role/AutomationDeployRole'
           role-duration-seconds: 1200
           role-session-name: MyDeploySession
           role-skip-session-tagging: true
           role-external-id: ${{ secrets.EXTERNAL_ID }}
 
-
-
-      - name: get current identity again
+      - name: get current identity 
         run: aws sts get-caller-identity
 
-      - name: Create Overrides
-        run: |
-          CONTAINER_OVERRIDES='[ 
-            {
-              "name": "aais-services-${{ github.event.inputs.environment }}-feed-salesforce-person-updates", 
-              "cpu": ${{ github.event.inputs.cpu }},
-              "memory": ${{ github.event.inputs.memory }},
-              "environment": [ 
-                {
-                  "name": "SALESFORCE_INSTANCE_ID", 
-                  "value": "${{ github.event.inputs.salesforce_instance_id }}"
-                }, {
-                  "name": "TABLE_NAME", 
-                  "value": "${{ env.TABLE_NAME }}"
-                }, {
-                  "name": "action", 
-                  "value": "${{ github.event.inputs.action }}"
-                }, {
-                  "name": "DEBUG", 
-                  "value": "${{ github.event.inputs.debug }}"
-                }
-              ]
-            } 
-          ]'
-          CONTAINER_OVERRIDES=$(echo "$CONTAINER_OVERRIDES" | tr -d '\n')
-          echo "CONTAINER_OVERRIDES=$CONTAINER_OVERRIDES" >> $GITHUB_ENV
+      # - name: Create Overrides
+      #   run: |
+      #     CONTAINER_OVERRIDES='[ 
+      #       {
+      #         "name": "aais-services-${{ inputs.environment }}-feed-salesforce-person-updates", 
+      #         "cpu": ${{ inputs.cpu }},
+      #         "memory": ${{ inputs.memory }},
+      #         "environment": [ 
+      #           {
+      #             "name": "SALESFORCE_INSTANCE_ID", 
+      #             "value": "${{ inputs.salesforce_instance_id }}"
+      #           }, {
+      #             "name": "TABLE_NAME", 
+      #             "value": "${{ vars.TABLE_NAME }}"
+      #           }, {
+      #             "name": "action", 
+      #             "value": "${{ inputs.action }}"
+      #           }, {
+      #             "name": "DEBUG", 
+      #             "value": "${{ inputs.debug }}"
+      #           }
+      #         ]
+      #       } 
+      #     ]'
+      #     CONTAINER_OVERRIDES=$(echo "$CONTAINER_OVERRIDES" | tr -d '\n')
+      #     echo "CONTAINER_OVERRIDES=$CONTAINER_OVERRIDES" >> $GITHUB_ENV
 
-      - name: Run ${{ github.event.inputs.environment }} ${{ github.event.inputs.action }} on [${{ github.event.inputs.people }}]
-        run: |
-          aws ecs run-task \
-            --cluster aais-services-${{ github.event.inputs.environment }}-cluster \
-            --overrides '{"cpu": "${{ github.event.inputs.cpu }}", "memory": "${{ github.event.inputs.memory }}", "containerOverrides": ${{ env.CONTAINER_OVERRIDES }} }' \
-            --task-definition arn:aws:ecs:us-east-1:${{ env.account }}:task-definition/aais-services-${{ github.event.inputs.environment }}-feed-salesforce-person-updates${{ env.task_version }} \
-            --network-configuration '{ "awsvpcConfiguration": { "assignPublicIp":"DISABLED", "securityGroups": ["${{ env.security_group }}"], "subnets": ["${{ env.subnet }}"]}}' \
-            --launch-type FARGATE
-  
+      # - name: Run ${{ inputs.environment }} ${{ inputs.action }} 
+      #   run: |
+      #       TASK_ARN=$(aws ecs run-task \
+      #         --cluster aais-services-${{ inputs.environment }}-cluster \
+      #         --overrides '{"cpu": "${{ inputs.cpu }}", "memory": "${{ inputs.memory }}", "containerOverrides": ${{ env.CONTAINER_OVERRIDES }} }' \
+      #         --task-definition arn:aws:ecs:us-east-1:${{ vars.AWS_ACCOUNT }}:task-definition/aais-services-${{ inputs.environment }}-feed-salesforce-person-updates \
+      #         --network-configuration '{ "awsvpcConfiguration": { "assignPublicIp":"DISABLED", "securityGroups": ["${{ vars.SECURITY_GROUP }}"], "subnets": ["${{ vars.SUBNET }}"]}}' \
+      #         --launch-type FARGATE \
+      #         --query 'tasks[0].taskArn' \
+      #         --output text)
+      #       echo "TASK_ARN=$TASK_ARN" >> $GITHUB_ENV
+    
+      # - name: Wait for task to complete
+      #   run: |
+      #     aws ecs wait tasks-stopped --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }}
+      #     STOP_CODE=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].stopCode' --output text)
+      #     if [[ "$STOP_CODE" == "EssentialContainerExited" ]]; then
+      #       EXIT_CODE=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].containers[0].exitCode' --output text)
+      #       if [[ "$EXIT_CODE" != "0" ]]; then
+      #         STOPPED_REASON=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].stoppedReason' --output text)
+      #         echo "Task failed with exit code $EXIT_CODE with reason: $STOPPED_REASON"
+      #         exit 1
+      #       else
+      #         echo "Task completed successfully"
+      #         exit 0
+      #       fi
+
+      #     else 
+      #       echo "Task stopped with stop code $STOP_CODE"
+      #       exit 1
+      #     fi

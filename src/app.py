@@ -256,6 +256,12 @@ try:
         account_handler.accounts_data_load()
 
         logger.info(f"full-account-load action finished")
+    elif action == "duplicate-check":
+        logger.info(f"duplicate-check action called")
+
+        sfpu.check_for_duplicates()
+
+        logger.info(f"duplicate-check action finished")
     elif action == "test":
         logger.info(f"test action called")
 

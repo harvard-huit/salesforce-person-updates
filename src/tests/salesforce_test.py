@@ -316,11 +316,11 @@ class HarvardSalesforceTest(unittest.TestCase):
         self.assertTrue(self.sf.validateConfig(config=self.exampleConfig, dry_run=True))
 
     def test_invalid_config(self):
-        self.assertFalse(self.sf.validateConfig(config={
+        self.assertNotEqual(self.sf.validateConfig(config={
             "myObject": {
                 "fields": "something"
             }
-        }, dry_run=True))
+        }, dry_run=True), True)
         
     def test_check_duplicate_success(self):
         self.sf.sf.query_all.return_value = {
