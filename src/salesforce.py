@@ -550,7 +550,7 @@ class HarvardSalesforce:
             raise Exception(f"Error: field ({object}.{field}) is not editable")
 
         field_type = self.type_data[object][field]['type']
-        if field_type in ["textarea", "string", "url"]:
+        if field_type in ["textarea", "string", "url", "phone"]:
             length = self.type_data[object][field]['length']
             if isinstance(value, bool):
                 if value:
