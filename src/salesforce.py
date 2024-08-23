@@ -569,6 +569,11 @@ class HarvardSalesforce:
             # not really sure I want to validate what the picklist values are
             return str(value)
         elif field_type in ["phone"]:
+            # this regex: 
+            #   possible leading +
+            #   numbers (\d) and spaces (\s)
+            #   open and close parens ()
+            #   dashes
             if re.match(r"^\+?[\d\s\(\)\-]+$", value):
                 return str(value)
             else:
