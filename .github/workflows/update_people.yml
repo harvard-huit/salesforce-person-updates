@@ -27,6 +27,25 @@ on:
         type: string
         required: false
         default: ''
+  workflow_call:
+    inputs:
+      environment: 
+        type: string
+        default: 'dev'
+        required: true
+      people:
+        description: HUIDs (comma separated list?) 
+        type: string
+        required: true
+        default: '80719647'
+      salesforce_instance_id:
+        description: the salesforce instance id (from dynamo)
+        type: string
+        required: true
+      task_version:
+        type: string
+        required: false
+        default: ''
         
 
 defaults:
@@ -41,7 +60,7 @@ jobs:
     steps:
 
       - name: Login to AWS with a service account / iam user
-        uses: HUIT/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_NONPROD }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_NONPROD }}
@@ -91,6 +110,7 @@ jobs:
             --query 'tasks[0].taskArn' \
             --output text)
           echo "TASK_ARN=$TASK_ARN" >> $GITHUB_ENV
+          echo "TASK_ARN=$TASK_ARN" >> $GITHUB_STEP_SUMMARY
 
       - name: Wait for task to complete
         run: |
@@ -101,13 +121,16 @@ jobs:
             if [[ "$EXIT_CODE" != "0" ]]; then
               STOPPED_REASON=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].stoppedReason' --output text)
               echo "Task failed with exit code $EXIT_CODE with reason: $STOPPED_REASON"
+              echo "Task failed with exit code $EXIT_CODE with reason: $STOPPED_REASON" >> $GITHUB_STEP_SUMMARY
               exit 1
             else
               echo "Task completed successfully"
+              echo "Task completed successfully" >> $GITHUB_STEP_SUMMARY
               exit 0
             fi
 
           else 
             echo "Task stopped with stop code $STOP_CODE"
+            echo "Task stopped with stop code $STOP_CODE" >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
