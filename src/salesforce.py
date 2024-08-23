@@ -550,7 +550,7 @@ class HarvardSalesforce:
             raise Exception(f"Error: field ({object}.{field}) is not editable")
 
         field_type = self.type_data[object][field]['type']
-        if field_type in ["textarea", "string", "url", "phone"]:
+        if field_type in ["textarea", "string", "url"]:
             length = self.type_data[object][field]['length']
             if isinstance(value, bool):
                 if value:
@@ -568,7 +568,13 @@ class HarvardSalesforce:
         elif field_type in ["picklist", "multipicklist"]:
             # not really sure I want to validate what the picklist values are
             return str(value)
-        elif field_type in ["email"]:
+        elif field_type in ["phone"]:
+            if re.match(r"^\+?[\d\s\(\)\-]+$", value):
+                return str(value)
+            else:
+                logger.warning(f"Warning: {value} is not a valid phone number. Identifier: {identifier}")
+                return None
+        elif field_type in ["email"]:   
             # if the value is a valid email, return it
             # otherwise, log the error and return None
             if re.match(r"[^@]+@[^@]+\.[^@]+", value):
