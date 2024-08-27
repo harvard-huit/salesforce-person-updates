@@ -169,6 +169,7 @@ class SalesforceTransformer:
                                 ref_external_id_name = source_object['ref']['ref_external_id']
                                 source_value_ref = source_object['ref']['source_value_ref']
                                 if isinstance(source_value_ref, list):
+                                    # source_value_ref = source_value_ref[0]
                                     for possible_source_value_ref in source_value_ref:
                                         if self.key_in_nested_dict(possible_source_value_ref, source_data_object):
                                             source_value_ref = possible_source_value_ref
@@ -589,23 +590,28 @@ class SalesforceTransformer:
             logger.warning(f"Warning: picklist_transform called on non-picklist field ({object_name}.{field_name})")
             return value
         
-    def key_in_nested_dict(self, value, dict_to_check, start_with=1):
+    def key_in_nested_dict(self, value, dict_to_check, start_with=0):
         elements = value.split(".")
         element_length = len(elements)
-        obj = dict_to_check
+        obj = dict(dict_to_check)
         for i in range(start_with, element_length):
             if elements[i] in obj:
                 if i == element_length - 1:
                     return True
                 obj = obj[elements[i]]
+                if isinstance(obj, list):
+                    obj = obj[0]
         return False
     
     def ref_to_object_value(self, ref, obj):
         elements = ref.split(".")
-        o = obj
+        o = dict(obj)
         for element in elements:
+            if element not in o:
+                return None
             if isinstance(o[element], list):
                 o = o[element][0]
             else:
                 o = o[element]
+        
         return o
