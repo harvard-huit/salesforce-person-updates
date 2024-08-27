@@ -568,7 +568,18 @@ class HarvardSalesforce:
         elif field_type in ["picklist", "multipicklist"]:
             # not really sure I want to validate what the picklist values are
             return str(value)
-        elif field_type in ["email"]:
+        elif field_type in ["phone"]:
+            # this regex: 
+            #   possible leading +
+            #   numbers (\d) and spaces (\s)
+            #   open and close parens ()
+            #   dashes
+            if re.match(r"^\+?[\d\s\(\)\-]+$", value):
+                return str(value)
+            else:
+                logger.warning(f"Warning: {value} is not a valid phone number. Identifier: {identifier}")
+                return None
+        elif field_type in ["email"]:   
             # if the value is a valid email, return it
             # otherwise, log the error and return None
             if re.match(r"[^@]+@[^@]+\.[^@]+", value):
