@@ -170,7 +170,11 @@ class SalesforceTransformer:
                                 source_value_ref = source_object['ref']['source_value_ref']
                                 if isinstance(source_value_ref, list):
                                     for possible_source_value_ref in source_value_ref:
-                                        if self.key_in_nested_dict(possible_source_value_ref, source_data_object):
+                                        if is_flat:
+                                            starts_with = 0
+                                        else:
+                                            starts_with = 1
+                                        if self.key_in_nested_dict(possible_source_value_ref, source_data_object, start_with=starts_with):
                                             source_value_ref = possible_source_value_ref
                                             break
                                 if '.' in source_value_ref and is_flat:
@@ -200,9 +204,7 @@ class SalesforceTransformer:
 
                         # logger.debug(f"    value_reference: {value_reference}:{source_data_object.get(value_reference)}")                     
                         # logger.debug(f"    when: {when}")
-                        
-                        # skip this ref if it's sf and there's no sf ref
-                        
+                                                
                         # check the value referenced in the config
                         if isinstance(source_data_object[first], (str, bool, int)):
                             value = source_data_object[first]
@@ -598,6 +600,8 @@ class SalesforceTransformer:
                 if i == element_length - 1:
                     return True
                 obj = obj[elements[i]]
+                if isinstance(obj, list):
+                    obj = obj[0]
         return False
     
     def ref_to_object_value(self, ref, obj):
@@ -608,4 +612,5 @@ class SalesforceTransformer:
                 o = o[element][0]
             else:
                 o = o[element]
+        
         return o

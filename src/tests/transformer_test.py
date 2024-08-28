@@ -649,6 +649,13 @@ class SalesforceTransformerTest(unittest.TestCase):
         result = self.transformer.key_in_nested_dict(value, list_to_check)
         self.assertFalse(result)
 
+    def test_key_in_nested_dict_returns_true_when_value_is_in_listed_branch(self):
+        list_to_check = self.sample_pds_data['results'][0]
+        value = "names.personNameType.code"
+        result = self.transformer.key_in_nested_dict(value, list_to_check, 0)
+        self.assertTrue(result)
+
+
     def test_ref_to_object_value(self):
         obj = self.sample_pds_data['results'][0]
         
