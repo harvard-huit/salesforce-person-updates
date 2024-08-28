@@ -169,7 +169,6 @@ class SalesforceTransformer:
                                 ref_external_id_name = source_object['ref']['ref_external_id']
                                 source_value_ref = source_object['ref']['source_value_ref']
                                 if isinstance(source_value_ref, list):
-                                    # source_value_ref = source_value_ref[0]
                                     for possible_source_value_ref in source_value_ref:
                                         if is_flat:
                                             starts_with = 0
@@ -205,9 +204,7 @@ class SalesforceTransformer:
 
                         # logger.debug(f"    value_reference: {value_reference}:{source_data_object.get(value_reference)}")                     
                         # logger.debug(f"    when: {when}")
-                        
-                        # skip this ref if it's sf and there's no sf ref
-                        
+                                                
                         # check the value referenced in the config
                         if isinstance(source_data_object[first], (str, bool, int)):
                             value = source_data_object[first]
@@ -599,7 +596,6 @@ class SalesforceTransformer:
         element_length = len(elements)
         obj = dict_to_check
         for i in range(start_with, element_length):
-            # print(f"{i}/{element_length} -> {elements[i]}")
             if elements[i] in obj:
                 if i == element_length - 1:
                     return True
@@ -610,10 +606,8 @@ class SalesforceTransformer:
     
     def ref_to_object_value(self, ref, obj):
         elements = ref.split(".")
-        o = dict(obj)
+        o = obj
         for element in elements:
-            if element not in o:
-                return None
             if isinstance(o[element], list):
                 o = o[element][0]
             else:
