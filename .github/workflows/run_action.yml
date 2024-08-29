@@ -154,14 +154,17 @@ jobs:
         run: |
           aws ecs wait tasks-stopped --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }}
           STOP_CODE=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].stopCode' --output text)
-          if [[ "$STOP_CODE" == "EssentialContainerExited" ]]; then
+          # if stop code is either essentialcontainerexited or userinitiated
+          if [[ "$STOP_CODE" == "EssentialContainerExited" || "$STOP_CODE" == "UserInitiated" ]]; then
             EXIT_CODE=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].containers[0].exitCode' --output text)
+            STOPPED_REASON=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].stoppedReason' --output text)
             if [[ "$EXIT_CODE" != "0" ]]; then
-              STOPPED_REASON=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].stoppedReason' --output text)
               echo "Task failed with exit code $EXIT_CODE with reason: $STOPPED_REASON"
               exit 1
             else
               echo "Task completed successfully"
+              echo "## Task completed successfully" >> $GITHUB_STEP_SUMMARY
+              echo "$STOPPED_REASON" >> $GITHUB_STEP_SUMMARY
               exit 0
             fi
 
