@@ -58,7 +58,7 @@ jobs:
           
 
   test_instances:
-    name: Check Instances
+    name: Test Instances
     if: needs.get_instances.outputs.instances != '[]'
     needs: [ get_instances ]
     strategy:

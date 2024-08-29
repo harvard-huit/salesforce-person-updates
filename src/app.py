@@ -283,7 +283,7 @@ finally:
     if not stack == "developer":
         setTaskRunning(sfpu.app_config, False)
 
-        # action = os.getenv("action", None)
-        # salesforce_id = os.getenv("SALESFORCE_INSTANCE_ID", None)
-        # sfpu.app_config.stop_task_with_reason(f"Salesforce instance: {salesforce_id}: Action: {action} completed. {stop_reason}")
+        action = os.getenv("action", None)
+        salesforce_id = os.getenv("SALESFORCE_INSTANCE_ID", None)
+        sfpu.app_config.stop_task_with_reason(f"Salesforce instance: {salesforce_id}: Action: {action} completed. {stop_reason}")
 
