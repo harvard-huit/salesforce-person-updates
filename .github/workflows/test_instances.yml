@@ -12,6 +12,11 @@ on:
             - 'test'
             - 'stage'
             - 'prod'
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
 
 defaults:
   run:
