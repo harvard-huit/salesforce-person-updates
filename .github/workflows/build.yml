@@ -51,7 +51,8 @@ jobs:
       - name: Run tests
         run: | 
           source env/bin/activate
-          python -m unittest discover -s src -p *_test.py    
+          output=$(python -m unittest discover -s src -p *_test.py)
+          echo "$output">> $GITHUB_STEP_SUMMARY
 
   versions:
     name: Get all Deployed Versions
@@ -103,10 +104,12 @@ jobs:
           print(json.dumps(updates))
           EOF
           ) 
+          echo "## Updates" >> $GITHUB_STEP_SUMMARY
+          echo "$updates">> $GITHUB_STEP_SUMMARY
           echo "updates=$updates">> $GITHUB_OUTPUT
     outputs:
       dev: ${{ steps.get_dev_version.outputs.version }}
-      updates: ${{ steps.json_output.outputs.cache_updates }}
+      updates: ${{ steps.json_output.outputs.updates }}
 
   build:
     name: Build Code ${{ inputs.version }}
