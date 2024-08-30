@@ -88,25 +88,25 @@ jobs:
       - name: JSON Output
         id: json_output
         run: |
-          cache_updates=$(python - <<EOF
+          updates=$(python - <<EOF
           import json
-          cache_updates = []
-          if "${{ inputs.version }}" != "":
+          updates = []
+          if "${{ steps.get_dev_version.outputs.version }}" != "":
             if "${{ inputs.version }}" == "${{ steps.get_dev_version.outputs.version }}":
-              cache_updates.append({"env": "dev", "version": "${{ steps.get_dev_version.outputs.version }}"})
+              updates.append({"env": "dev", "version": "${{ steps.get_dev_version.outputs.version }}"})
             if "${{ inputs.version }}" == "${{ steps.get_test_version.outputs.version }}":
-              cache_updates.append({"env": "test", "version": "${{ steps.get_test_version.outputs.version }}"})
+              updates.append({"env": "test", "version": "${{ steps.get_test_version.outputs.version }}"})
             if "${{ inputs.version }}" == "${{ steps.get_stage_version.outputs.version }}":
-              cache_updates.append({"env": "stage", "version": "${{ steps.get_stage_version.outputs.version }}"})
+              updates.append({"env": "stage", "version": "${{ steps.get_stage_version.outputs.version }}"})
             if "${{ inputs.version }}" == "${{ steps.get_prod_version.outputs.version }}":
-              cache_updates.append({"env": "prod", "version": "${{ steps.get_prod_version.outputs.version }}"})
-          print(json.dumps(cache_updates))
+              updates.append({"env": "prod", "version": "${{ steps.get_prod_version.outputs.version }}"})
+          print(json.dumps(updates))
           EOF
           ) 
-          echo "cache_updates=$cache_updates">> $GITHUB_OUTPUT
+          echo "updates=$updates">> $GITHUB_OUTPUT
     outputs:
-      dev: ${{ steps.get_dev_version.outputs.version }}
-      cache_updates: ${{ steps.json_output.outputs.cache_updates }}
+      # dev: ${{ steps.get_dev_version.outputs.version }}
+      updates: ${{ steps.json_output.outputs.cache_updates }}
 
   build:
     name: Build Code ${{ inputs.version }}
@@ -140,24 +140,14 @@ jobs:
           docker push artifactory.huit.harvard.edu/aais-docker-local/salesforce-person-updates:${{ steps.which_version.outputs.version }}
 
 
-  deploy:
-    name: Deploy to Dev
-    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
-    needs: [versions, build]
-    uses: ./.github/workflows/deploy.yml
-    with: 
-      version: ${{ needs.versions.outputs.dev }}
-      environment: dev
-    secrets: inherit
-
-  cache_deploys:
-    name: Cache Deploys
-    if: github.event_name == 'workflow_dispatch' && needs.versions.outputs.cache_updates != '[]'
+  deploys:
+    name: Deploys
+    if: github.event_name == 'workflow_dispatch' && needs.versions.outputs.updates != '[]'
     needs: [versions, build]
     strategy:
       fail-fast: false
       matrix:
-        versions: ${{ fromJson(needs.versions.outputs.cache_updates) || '[]' }}
+        versions: ${{ fromJson(needs.versions.outputs.updates) || '[]' }}
     uses: ./.github/workflows/deploy.yml
     with: 
       version: ${{ matrix.versions.version }}

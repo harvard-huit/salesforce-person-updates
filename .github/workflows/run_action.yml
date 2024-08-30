@@ -160,6 +160,8 @@ jobs:
             STOPPED_REASON=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].stoppedReason' --output text)
             if [[ "$EXIT_CODE" != "0" ]]; then
               echo "Task failed with exit code $EXIT_CODE with reason: $STOPPED_REASON"
+              echo "## Task failed with exit code $EXIT_CODE" >> $GITHUB_STEP_SUMMARY
+              echo "$STOPPED_REASON" >> $GITHUB_STEP_SUMMARY
               exit 1
             else
               echo "Task completed successfully"
