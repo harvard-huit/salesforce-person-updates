@@ -1,5 +1,5 @@
 name: Build Image
-run-name: Build Image ${{ github.event.inputs.version }}
+run-name: Build Image ${{ inputs.version }}
 
 on:
   push:
@@ -105,7 +105,7 @@ jobs:
           ) 
           echo "updates=$updates">> $GITHUB_OUTPUT
     outputs:
-      # dev: ${{ steps.get_dev_version.outputs.version }}
+      dev: ${{ steps.get_dev_version.outputs.version }}
       updates: ${{ steps.json_output.outputs.cache_updates }}
 
   build:
