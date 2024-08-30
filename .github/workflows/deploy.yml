@@ -76,5 +76,6 @@ jobs:
     needs: [ deploy ]
     uses: ./github/workflows/test_instances.yml
     with:
+      version: ${{ inputs.version }}
       environment: prod
     secrets: inherit
