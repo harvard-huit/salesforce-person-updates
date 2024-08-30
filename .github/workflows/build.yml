@@ -142,7 +142,7 @@ jobs:
 
   deploys:
     name: Deploys
-    if: github.event_name == 'workflow_dispatch' && needs.versions.outputs.updates != '[]'
+    if: needs.versions.outputs.updates != '[]'
     needs: [versions, build]
     strategy:
       fail-fast: false

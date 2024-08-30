@@ -73,9 +73,8 @@ jobs:
   test_production:
     name: Test Production
     if: inputs.environment == 'prod'
-    needs: [ deploy ]
-    uses: ./github/workflows/test_instances.yml
+    needs: deploy
+    uses: ./.github/workflows/test_instances.yml
     with:
-      version: ${{ inputs.version }}
       environment: prod
     secrets: inherit
