@@ -140,16 +140,16 @@ jobs:
           docker push artifactory.huit.harvard.edu/aais-docker-local/salesforce-person-updates:${{ steps.which_version.outputs.version }}
 
 
-  deploys:
-    name: Deploys
-    if: github.event_name == 'workflow_dispatch' && needs.versions.outputs.updates != '[]'
-    needs: [versions, build]
-    strategy:
-      fail-fast: false
-      matrix:
-        versions: ${{ fromJson(needs.versions.outputs.updates) || '[]' }}
-    uses: ./.github/workflows/deploy.yml
-    with: 
-      version: ${{ matrix.versions.version }}
-      environment: ${{ matrix.versions.env }}
-    secrets: inherit
+  # deploys:
+  #   name: Deploys
+  #   if: github.event_name == 'workflow_dispatch' && needs.versions.outputs.updates != '[]'
+  #   needs: [versions, build]
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       versions: ${{ fromJson(needs.versions.outputs.updates) || '[]' }}
+  #   uses: ./.github/workflows/deploy.yml
+  #   with: 
+  #     version: ${{ matrix.versions.version }}
+  #     environment: ${{ matrix.versions.env }}
+  #   secrets: inherit
