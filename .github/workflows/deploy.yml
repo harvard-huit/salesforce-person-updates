@@ -70,11 +70,3 @@ jobs:
           infrastructure_branch: develop
           debug: false
   
-  test_production:
-    name: Test Production
-    if: inputs.environment == 'prod'
-    needs: deploy
-    uses: ./.github/workflows/test_instances.yml
-    with:
-      environment: prod
-    secrets: inherit

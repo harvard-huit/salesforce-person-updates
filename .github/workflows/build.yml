@@ -110,6 +110,7 @@ jobs:
           echo "updates=$updates">> $GITHUB_OUTPUT
     outputs:
       dev: ${{ steps.get_dev_version.outputs.version }}
+      prod: ${{ steps.get_prod_version.outputs.version }}
       updates: ${{ steps.json_output.outputs.updates }}
 
   build:
@@ -156,4 +157,14 @@ jobs:
     with: 
       version: ${{ matrix.versions.version }}
       environment: ${{ matrix.versions.env }}
+    secrets: inherit
+
+
+  test_production:
+    name: Test Production
+    if: needs.versions.outputs.prod != ''
+    needs: [versions, deploys]
+    uses: ./.github/workflows/test_instances.yml
+    with:
+      environment: prod
     secrets: inherit
