@@ -51,8 +51,11 @@ jobs:
       - name: Run tests
         run: | 
           source env/bin/activate
-          output=$(python -m unittest discover -s src -p *_test.py)
+          output=$(python -m unittest discover -s src -p *_test.py 2>&1)
+          echo "## Unit Tests" >> $GITHUB_STEP_SUMMARY
+          echo "<details><summary>Click to see unit test output</summary>" >> $GITHUB_STEP_SUMMARY
           echo "$output">> $GITHUB_STEP_SUMMARY
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
 
   versions:
     name: Get all Deployed Versions
