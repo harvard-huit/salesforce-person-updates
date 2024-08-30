@@ -285,5 +285,7 @@ finally:
 
         action = os.getenv("action", None)
         salesforce_id = os.getenv("SALESFORCE_INSTANCE_ID", None)
-        sfpu.app_config.stop_task_with_reason(f"Salesforce instance: {salesforce_id}: Action: {action} completed. {stop_reason}")
+        # NOTE: we cannot do this due to the current permissions on the execution role
+        #  we need to add the ECS:StopTask permission to the role
+        # sfpu.app_config.stop_task_with_reason(f"Salesforce instance: {salesforce_id}: Action: {action} completed. {stop_reason}")
 
