@@ -11,6 +11,15 @@ class SalesforceTransformerTest(unittest.TestCase):
 
     @mock.patch('salesforce.Salesforce')                                            
     def setUp(self, mock_connection):
+
+        patcher = mock.patch('transformer.logger')
+        self.mock_transformer_logger = patcher.start()
+        self.addCleanup(patcher.stop)
+        
+        patcher = mock.patch('salesforce.logger')
+        self.mock_salesforce_logger = patcher.start()
+        self.addCleanup(patcher.stop)
+
         connection_instance = mock.MagicMock()                                        
         connection_instance.execute.return_value = True
         mock_connection.return_value = connection_instance
