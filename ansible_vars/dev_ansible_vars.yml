@@ -105,7 +105,7 @@ schedules:
   - schedule_rule_name: "ndab-upd" # this will be appended to the task definition name, e.g my-cluster-dev-feed-my-dataload-half-hourly
     schedule_expression: "rate(30 minutes)" # rate or cron expression
     # optional
-    schedule_rule_description: "Updates for the NDAB Prod. (ndab-prod)"
+    schedule_rule_description: "Updates for the NDAB Dev. (ndab-full-sandbox)"
     # environment variable overrides
     schedule_env_overrides:
       - name: "TABLE_NAME"
