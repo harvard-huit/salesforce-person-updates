@@ -114,4 +114,4 @@ schedules:
         value: "ndab-full-sandbox"
       - name: "action"
         value: "person-updates"
-    schedule_rule_state: "ENABLED"
+    schedule_rule_state: "DISABLED"
