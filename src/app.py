@@ -280,6 +280,7 @@ except Exception as e:
     raise e
 
 finally:
+    logger.info(f"this is the finally block {stack}")
     if not stack == "developer":
         setTaskRunning(sfpu.app_config, False)
 
@@ -287,5 +288,6 @@ finally:
         salesforce_id = os.getenv("SALESFORCE_INSTANCE_ID", None)
         # NOTE: we cannot do this due to the current permissions on the execution role
         #  we need to add the ECS:StopTask permission to the role
+        logger.info(f"Salesforce instance: {salesforce_id}: Action: {action} completed. {stop_reason}")
         sfpu.app_config.stop_task_with_reason(f"Salesforce instance: {salesforce_id}: Action: {action} completed. {stop_reason}")
 
