@@ -273,9 +273,10 @@ try:
     stop_reason = "Success Apparent"
 
 except Exception as e:
+    logger.info(f"this is the exception block")
     action = os.getenv("action", None)
     salesforce_id = os.getenv("SALESFORCE_INSTANCE_ID", None)
-    logger.error(f"Salesforce instance: {salesforce_id}, action: {action}: {e}")
+    logger.info(f"Salesforce instance: {salesforce_id}, action: {action}: {e}")
     stop_reason = f"ERROR: {e}"
     # raise e
 
