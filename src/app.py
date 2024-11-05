@@ -59,7 +59,7 @@ LOCAL = os.getenv("LOCAL") or False
 ####################################
 
 try:
-
+    sfpu = None
     sfpu = SalesforcePersonUpdates(local=LOCAL)
 
     # connect to salesforce
@@ -290,7 +290,7 @@ finally:
         salesforce_id = os.getenv("SALESFORCE_INSTANCE_ID", None)
         table_name = os.getenv("TABLE_NAME", None)
 
-        if sfpu:
+        if sfpu is not None:
             setTaskRunning(sfpu.app_config, False)
 
             # NOTE: we cannot do this due to the current permissions on the execution role
