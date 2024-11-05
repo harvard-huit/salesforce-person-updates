@@ -277,7 +277,7 @@ except Exception as e:
     salesforce_id = os.getenv("SALESFORCE_INSTANCE_ID", None)
     logger.error(f"Salesforce instance: {salesforce_id}, action: {action}: {e}")
     stop_reason = f"ERROR: {e}"
-    raise e
+    # raise e
 
 finally:
     logger.info(f"this is the finally block {stack}")
