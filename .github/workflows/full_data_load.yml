@@ -120,7 +120,7 @@ jobs:
           CONTAINER_OVERRIDES=$(echo "$CONTAINER_OVERRIDES" | tr -d '\n')
           echo "CONTAINER_OVERRIDES=$CONTAINER_OVERRIDES" >> $GITHUB_ENV
 
-      - name: Run ${{ inputs.environment }} full data load on [${{ inputs.people }}]
+      - name: Run ${{ inputs.environment }} full data load
         run: |
           TASK_ARN=$(aws ecs run-task \
             --cluster aais-services-${{ inputs.environment }}-cluster \
