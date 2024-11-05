@@ -17,7 +17,7 @@ on:
         description: the salesforce instance id (from dynamo)
         type: string
         required: true
-        default: 'huit-full-sandbox'
+        default: 'huitsalescloud-huitfull'
       record_limit:
         type: number
         required: false
@@ -66,7 +66,7 @@ jobs:
   data_load: 
     name: Full data load on ${{ inputs.environment }} for ${{ inputs.salesforce_instance_id }}
     environment: ${{ inputs.environment }}
-    runs-on: [ arc-runner-set-huit ]
+    runs-on: [ ubuntu-latest ]
 
     steps:
       - name: Login to AWS with a service account / iam user
