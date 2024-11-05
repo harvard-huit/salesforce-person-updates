@@ -66,7 +66,7 @@ jobs:
   data_load: 
     name: Full data load on ${{ inputs.environment }} for ${{ inputs.salesforce_instance_id }}
     environment: ${{ inputs.environment }}
-    runs-on: [ ubuntu-latest ]
+    runs-on: [ arc-runner-set-huit ]
 
     steps:
       - name: Login to AWS with a service account / iam user
@@ -136,17 +136,17 @@ jobs:
       - name: Wait for task to complete
         run: |
           while true; do     
-            read lastStatus stopCode stoppedReason exitCode <<< $(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].[lastStatus, stopCode, stoppedReason, containers[0].exitCode]' --output text)
-            if [[ $stopCode == "EssentialContainerExited" ]]; then
-              if [[ $exitCode != "0" ]]; then
+            read lastStatus stopCode exitCode stoppedReason <<< $(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].[lastStatus, stopCode, stoppedReason, containers[0].exitCode]' --output text)
+            if [[ "$stopCode" == "EssentialContainerExited" || "$stopCode" == "UserInitiated" ]]; then
+              if [[ "$exitCode" != "None" ]]; then
                 echo "Task failed with exit code $exitCode with reason: $stoppedReason"
                 exit 1
               else
-                echo "Task completed successfully"
+                echo "Task completed successfully. $stoppedReason"
                 exit 0
               fi
-            else
-              echo "Task stopped with stop code $stopCode"
+              elif [[ "$lastStatus" == "STOPPED" ]]; then
+              echo "Task stopped with stop code $stopCode with reason: $stoppedReason and exit code: $exitCode"
               exit 1
             fi
             sleep 10
