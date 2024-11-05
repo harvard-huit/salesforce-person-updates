@@ -290,7 +290,7 @@ finally:
         salesforce_id = os.getenv("SALESFORCE_INSTANCE_ID", None)
         table_name = os.getenv("TABLE_NAME", None)
 
-        if sfpu is not None:
+        if sfpu:
             setTaskRunning(sfpu.app_config, False)
 
             # NOTE: we cannot do this due to the current permissions on the execution role
