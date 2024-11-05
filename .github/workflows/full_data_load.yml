@@ -132,31 +132,22 @@ jobs:
             --output text)
           echo "TASK_ARN=$TASK_ARN" >> $GITHUB_ENV
   
-      # TODO: github issue: https://github.huit.harvard.edu/HUIT/salesforce-person-updates/issues/74
-      # - name: Wait for task to complete
-      #   run: |
-      #     while true; do            
-      #       aws ecs wait tasks-stopped --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} > /dev/null 2> error.log
-      #       ERROR=$(cat error.log)
-      #       if [[ "$ERROR" == "Waiter TasksStopped failed: Max attempts exceeded" ]]; then
-      #         continue
-      #       fi
-            
-      #       STOP_CODE=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].stopCode' --output text)
-      #       if [[ "$STOP_CODE" == "EssentialContainerExited" ]]; then
-      #         EXIT_CODE=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].containers[0].exitCode' --output text)
-      #         if [[ "$EXIT_CODE" != "0" ]]; then
-      #           STOPPED_REASON=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].stoppedReason' --output text)
-        
-      #           echo "Task failed with exit code $EXIT_CODE with reason: $STOPPED_REASON"
-      #           exit 1
-      #         else
-      #           echo "Task completed successfully"
-      #           exit 0
-      #         fi
-
-      #       else 
-      #         echo "Task stopped with stop code $STOP_CODE"
-      #         exit 1
-      #       fi
-
+      # github issue: https://github.huit.harvard.edu/HUIT/salesforce-person-updates/issues/74
+      - name: Wait for task to complete
+        run: |
+          while true; do     
+            read lastStatus stopCode stoppedReason exitCode <<< $(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].[lastStatus, stopCode, stoppedReason, containers[0].exitCode]' --output text)
+            if [[ $stopCode == "EssentialContainerExited" ]]; then
+              if [[ $exitCode != "0" ]]; then
+                echo "Task failed with exit code $exitCode with reason: $stoppedReason"
+                exit 1
+              else
+                echo "Task completed successfully"
+                exit 0
+              fi
+            else
+              echo "Task stopped with stop code $stopCode"
+              exit 1
+            fi
+            sleep 10
+          done
