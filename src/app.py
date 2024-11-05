@@ -1,4 +1,4 @@
-from common import isTaskRunning, setTaskRunning, logger, stack
+from common import isTaskRunning, setTaskRunning, logger, stack, AppConfig
 from salesforce_person_updates import SalesforcePersonUpdates
 from account_handler import AccountHandler
 
@@ -61,6 +61,9 @@ LOCAL = os.getenv("LOCAL") or False
 try:
 
     sfpu = SalesforcePersonUpdates(local=LOCAL)
+
+    # connect to salesforce
+
 
     # We don't need to set up the logging to salesforce if we're running locally
     #  unless we're testing that
@@ -273,22 +276,27 @@ try:
     stop_reason = "Success Apparent"
 
 except Exception as e:
-    logger.info(f"this is the exception block")
     action = os.getenv("action", None)
     salesforce_id = os.getenv("SALESFORCE_INSTANCE_ID", None)
-    logger.info(f"Salesforce instance: {salesforce_id}, action: {action}: {e}")
+    logger.error(f"Salesforce instance: {salesforce_id}, action: {action}: {e}")
     stop_reason = f"ERROR: {e}"
-    # raise e
+    raise e
 
 finally:
     logger.info(f"this is the finally block {stack}")
     if not stack == "developer":
-        setTaskRunning(sfpu.app_config, False)
 
         action = os.getenv("action", None)
         salesforce_id = os.getenv("SALESFORCE_INSTANCE_ID", None)
-        # NOTE: we cannot do this due to the current permissions on the execution role
-        #  we need to add the ECS:StopTask permission to the role
-        logger.info(f"Salesforce instance: {salesforce_id}: Action: {action} completed. {stop_reason}")
-        sfpu.app_config.stop_task_with_reason(f"Salesforce instance: {salesforce_id}: Action: {action} completed. {stop_reason}")
+        table_name = os.getenv("TABLE_NAME", None)
 
+        if sfpu is not None:
+            setTaskRunning(sfpu.app_config, False)
+
+            # NOTE: we cannot do this due to the current permissions on the execution role
+            #  we need to add the ECS:StopTask permission to the role
+            logger.info(f"Salesforce instance: {salesforce_id}: Action: {action} completed. {stop_reason}")
+            sfpu.app_config.stop_task_with_reason(f"Salesforce instance: {salesforce_id}: Action: {action} completed. {stop_reason}")
+        else:
+            app_config = AppConfig(id=salesforce_id, table_name=table_name)
+            app_config.stop_task_with_reason(f"Salesforce instance: {salesforce_id}: Action: {action} completed. {stop_reason}")
