@@ -68,6 +68,9 @@ jobs:
     name: Get all Deployed Versions
     runs-on: arc-runner-set-huit
     # runs-on: [ ubuntu-latest ]
+    container:
+      image: python:3.9
+      options: --user root
     steps:
       - name: Checkout the code
         uses: actions/checkout@v3
