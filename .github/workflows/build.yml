@@ -29,6 +29,7 @@ jobs:
   unittest:
     name: Running Unit tests
     runs-on: arc-runner-set-huit
+    # runs-on: ubuntu-latest
     container:
       image: python:3.9
       options: --user root
@@ -66,6 +67,7 @@ jobs:
   versions:
     name: Get all Deployed Versions
     runs-on: arc-runner-set-huit
+    # runs-on: [ ubuntu-latest ]
     steps:
       - name: Checkout the code
         uses: actions/checkout@v3
@@ -126,6 +128,7 @@ jobs:
     name: Build Code ${{ inputs.version }}
     needs: [unittest, versions]
     runs-on: arc-runner-set-huit
+    # runs-on: ubuntu-latest
 
     steps:
       - name: Checkout

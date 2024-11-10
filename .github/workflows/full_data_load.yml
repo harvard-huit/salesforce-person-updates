@@ -66,7 +66,8 @@ jobs:
   data_load: 
     name: Full data load on ${{ inputs.environment }} for ${{ inputs.salesforce_instance_id }}
     environment: ${{ inputs.environment }}
-    runs-on: [ ubuntu-latest ]
+    runs-on: arc-runner-set-huit
+    # runs-on: [ ubuntu-latest ]
 
     steps:
       - name: Login to AWS with a service account / iam user
@@ -131,8 +132,10 @@ jobs:
             --query 'tasks[0].taskArn' \
             --output text)
           echo "TASK_ARN=$TASK_ARN" >> $GITHUB_ENV
+          echo "## Task ARN" >> $GITHUB_STEP_SUMMARY
+          echo "$TASK_ARN" >> $GITHUB_STEP_SUMMARY
   
-      # github issue: https://github.huit.harvard.edu/HUIT/salesforce-person-updates/issues/74
+      # Note: stoppedReason needs to be last in the read list as it may contain spaces
       - name: Wait for task to complete
         run: |
           while true; do     
@@ -140,13 +143,16 @@ jobs:
             if [[ "$stopCode" == "EssentialContainerExited" || "$stopCode" == "UserInitiated" ]]; then
               if [[ "$exitCode" != "None" ]]; then
                 echo "Task failed with exit code $exitCode with reason: $stoppedReason"
+                echo "Task failed with exit code $exitCode with reason: $stoppedReason" >> $GITHUB_STEP_SUMMARY
                 exit 1
               else
                 echo "Task completed successfully. $stoppedReason"
+                echo "Task completed successfully. $stoppedReason" >> $GITHUB_STEP_SUMMARY
                 exit 0
               fi
               elif [[ "$lastStatus" == "STOPPED" ]]; then
-              echo "Task stopped with stop code $stopCode with reason: $stoppedReason and exit code: $exitCode"
+                echo "Task stopped with stop code $stopCode with reason: $stoppedReason and exit code: $exitCode"
+                echo "Task stopped with stop code $stopCode with reason: $stoppedReason and exit code: $exitCode" >> $GITHUB_STEP_SUMMARY
               exit 1
             fi
             sleep 10
