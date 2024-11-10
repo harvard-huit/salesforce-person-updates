@@ -90,7 +90,8 @@ jobs:
   action_run: 
     name: ${{ inputs.action }} on ${{ inputs.environment }} for ${{ inputs.salesforce_instance_id }}
     environment: ${{ inputs.environment }}
-    runs-on: [ ubuntu-latest ]
+    runs-on: arc-runner-set-huit
+    # runs-on: [ ubuntu-latest ]
 
     steps:
 
