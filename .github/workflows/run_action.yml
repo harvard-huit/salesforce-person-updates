@@ -92,6 +92,9 @@ jobs:
     environment: ${{ inputs.environment }}
     runs-on: arc-runner-set-huit
     # runs-on: [ ubuntu-latest ]
+    container:
+      image: amazonlinux:latest
+      options: --user root
 
     steps:
 
@@ -106,6 +109,11 @@ jobs:
           role-session-name: MyDeploySession
           role-skip-session-tagging: true
           role-external-id: ${{ secrets.EXTERNAL_ID }}
+
+      - name: Install AWS CLI
+        run: |
+          yum install -y aws-cli
+          aws --version  
 
       - name: get current identity 
         run: aws sts get-caller-identity
