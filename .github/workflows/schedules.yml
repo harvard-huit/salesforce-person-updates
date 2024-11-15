@@ -25,7 +25,8 @@ jobs:
   
   deploy:
     name: Setting up Schedules in ${{ github.event.inputs.environment }}
-    runs-on: ubuntu-latest
+    runs-on: arc-runner-set-huit
+    # runs-on: ubuntu-latest
     steps:
       - name: Login to AWS with a service account / iam user
         uses: HUIT/configure-aws-credentials@v4

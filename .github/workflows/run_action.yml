@@ -93,7 +93,7 @@ jobs:
     runs-on: arc-runner-set-huit
     # runs-on: [ ubuntu-latest ]
     container:
-      image: amazonlinux:latest
+      image: amazonlinux:2023
       options: --user root
 
     steps:

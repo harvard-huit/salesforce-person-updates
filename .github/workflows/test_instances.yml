@@ -25,9 +25,18 @@ defaults:
 jobs:
   get_instances:
     name: Get all Instances for ${{ inputs.environment }}
-    runs-on: ubuntu-latest
+    runs-on: arc-runner-set-huit
+    # runs-on: ubuntu-latest
+    container:
+      image: amazonlinux:2023
+      options: --user root
     environment: ${{ inputs.environment }}
     steps:
+      - name: Install AWS CLI
+        run: |
+          yum install -y aws-cli
+          aws --version  
+
       - name: Login to AWS with a service account / iam user
         uses: aws-actions/configure-aws-credentials@v4
         with:
