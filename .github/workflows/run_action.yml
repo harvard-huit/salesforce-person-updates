@@ -163,7 +163,7 @@ jobs:
       - name: Wait for task to complete
         run: |
           while true; do     
-            read lastStatus stopCode exitCode stoppedReason <<< $(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].[lastStatus, stopCode, stoppedReason, containers[0].exitCode]' --output text)
+            read lastStatus stopCode exitCode stoppedReason <<< $(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].[lastStatus, stopCode, containers[0].exitCode, stoppedReason]' --output text)
             echo "Task status: $lastStatus"
             echo "Task stop code: $stopCode"
             echo "Task exit code: $exitCode"
