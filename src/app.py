@@ -270,7 +270,7 @@ try:
     elif action == "test":
         logger.info(f"test action called")
 
-        # sfpu.cleanup_updateds(object_name='Contact')
+        sfpu.cleanup_updateds(object_name='Contact')
         sfpu.cleanup_updateds(object_name='Affiliation__c')
 
         logger.info(f"test action finished")

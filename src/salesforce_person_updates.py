@@ -771,7 +771,7 @@ class SalesforcePersonUpdates:
                     temp_or_conditions.append({pds_id: sf_ids_batch})
                 temp_pds_query['conditions']['or'] = temp_or_conditions
             else:
-                temp_pds_query['conditions'][pds_id] = sf_ids_batch
+                temp_pds_query['conditions'][pds_ids[0]] = sf_ids_batch
                 
             try:
                 results = self.pds.search(temp_pds_query)
