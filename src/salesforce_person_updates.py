@@ -482,7 +482,15 @@ class SalesforcePersonUpdates:
             if today != watermark_day:
                 # if this is a new day, go through the cleanup process
                 logger.info(f"New day, running cleanup")
-                self.cleanup_updateds()
+
+                for(object_name, object_config) in self.app_config.config.items():
+                    if 'updatedFlag' in object_config:
+                        updated_flag = object_config['updatedFlag']
+                        external_id = object_config['Id']['salesforce']
+                        pds_id = object_config['Id']['pds']
+                        self.cleanup_updateds(object_name=object_name)
+
+                # self.cleanup_updateds()
 
         watermark = self.app_config.update_watermark("person")
         logger.info(f"Watermark updated: {watermark}")
@@ -738,15 +746,18 @@ class SalesforcePersonUpdates:
         # get the external id we're using in the config for this org
         external_id = self.app_config.config[object_name]['Id']['salesforce']
         updated_flag = self.app_config.config[object_name]['updatedFlag']
-        pds_id = self.app_config.config[object_name]['Id']['pds']
+        pds_ids = self.app_config.config[object_name]['Id']['pds']
         all_sf_ids = self.hsf.get_all_external_ids(object_name=object_name, external_id=external_id, updated_flag_name=updated_flag, updated_flag_value=True)
         logger.info(f"Found {len(all_sf_ids)} ids in Salesforce with a True updated flag")
+    
         
         # 2. Call PDS with those IDs
         # we only need to know if these are getttable, 
         #   it doesn't matter what other fields or conditions are in the provided query
+        if not isinstance(pds_ids, list):
+            pds_ids = [pds_ids]
         temp_pds_query = {}
-        temp_pds_query['fields'] = [pds_id]
+        temp_pds_query['fields'] = pds_ids
         temp_pds_query['conditions'] = {}
         self.pds.batch_size = 800
 
@@ -754,21 +765,40 @@ class SalesforcePersonUpdates:
         # step through the sf ids 800 at a time
         for i in range(0, len(all_sf_ids), self.pds.batch_size):
             sf_ids_batch = all_sf_ids[i:i+self.pds.batch_size]
-            temp_pds_query['conditions'][pds_id] = sf_ids_batch
+            if len(pds_ids) > 1:
+                temp_or_conditions = []
+                for pds_id in pds_ids:
+                    temp_or_conditions.append({pds_id: sf_ids_batch})
+                temp_pds_query['conditions']['or'] = temp_or_conditions
+            else:
+                temp_pds_query['conditions'][pds_id] = sf_ids_batch
+                
             try:
                 results = self.pds.search(temp_pds_query)
                 if 'results' not in results:
                     break
-                pds_ids = [person[pds_id] for person in results['results']]
-                if len(pds_ids) < len(sf_ids_batch):
+                # pds_ids = [person[pds_id] for person in results['results']]
+                pds_ids_in_pds = []
+                for person in results['results']:
+                    for pds_id in pds_ids:
+                        if '.' in pds_id:
+                            pds_id_pieces = pds_id.split('.')
+                            if pds_id_pieces[0] in person:
+                                for piece in person[pds_id_pieces[0]]:
+                                    pds_ids_in_pds.append(str(piece[pds_id_pieces[1]]))
+                        else:
+                            pds_ids_in_pds.append(str(person[pds_id]))
+
+
+                if len(pds_ids_in_pds) < len(sf_ids_batch):
                     # get the diff
-                    not_updating_ids += [item for item in sf_ids_batch if item not in pds_ids]
+                    not_updating_ids += [item for item in sf_ids_batch if item not in pds_ids_in_pds]
 
             except Exception as e:
                 logger.error(f"Error getting pds ids: {e}, pds_query: {temp_pds_query}")
                 raise e
 
-        logger.info(f"Found {len(not_updating_ids)} ids that are no longer updating")
+        logger.info(f"Found {len(not_updating_ids)} ids in {object_name} that are no longer updating")
 
         self.hsf.flag_field(object_name=object_name, external_id=external_id, flag_name=updated_flag, value=False, ids=not_updating_ids)
 
