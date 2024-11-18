@@ -17,7 +17,7 @@ on:
         description: the salesforce instance id (from dynamo)
         type: string
         required: true
-        default: 'huit-full-sandbox'
+        default: 'huitsalescloud-huitfull'
       action:
         type: choice
         required: true
@@ -159,27 +159,25 @@ jobs:
               --output text)
             echo "TASK_ARN=$TASK_ARN" >> $GITHUB_ENV
     
+      # Note: stoppedReason needs to be last in the read list as it may contain spaces
       - name: Wait for task to complete
         run: |
-          aws ecs wait tasks-stopped --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }}
-          STOP_CODE=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].stopCode' --output text)
-          # if stop code is either essentialcontainerexited or userinitiated
-          if [[ "$STOP_CODE" == "EssentialContainerExited" || "$STOP_CODE" == "UserInitiated" ]]; then
-            EXIT_CODE=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].containers[0].exitCode' --output text)
-            STOPPED_REASON=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].stoppedReason' --output text)
-            if [[ "$EXIT_CODE" != "0" ]]; then
-              echo "Task failed with exit code $EXIT_CODE with reason: $STOPPED_REASON"
-              echo "## Task failed with exit code $EXIT_CODE" >> $GITHUB_STEP_SUMMARY
-              echo "$STOPPED_REASON" >> $GITHUB_STEP_SUMMARY
+          while true; do     
+            read lastStatus stopCode exitCode stoppedReason <<< $(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].[lastStatus, stopCode, stoppedReason, containers[0].exitCode]' --output text)
+            if [[ "$stopCode" == "EssentialContainerExited" || "$stopCode" == "UserInitiated" ]]; then
+              if [[ "$exitCode" != "None" ]]; then
+                echo "Task failed with exit code $exitCode with reason: $stoppedReason"
+                echo "Task failed with exit code $exitCode with reason: $stoppedReason" >> $GITHUB_STEP_SUMMARY
+                exit 1
+              else
+                echo "Task completed successfully. $stoppedReason"
+                echo "Task completed successfully. $stoppedReason" >> $GITHUB_STEP_SUMMARY
+                exit 0
+              fi
+              elif [[ "$lastStatus" == "STOPPED" ]]; then
+                echo "Task stopped with stop code $stopCode with reason: $stoppedReason and exit code: $exitCode"
+                echo "Task stopped with stop code $stopCode with reason: $stoppedReason and exit code: $exitCode" >> $GITHUB_STEP_SUMMARY
               exit 1
-            else
-              echo "Task completed successfully"
-              echo "## Task completed successfully" >> $GITHUB_STEP_SUMMARY
-              echo "$STOPPED_REASON" >> $GITHUB_STEP_SUMMARY
-              exit 0
             fi
-
-          else 
-            echo "Task stopped with stop code $STOP_CODE"
-            exit 1
-          fi
+            sleep 10
+          done

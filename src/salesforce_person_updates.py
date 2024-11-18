@@ -46,7 +46,8 @@ if stack == 'developer':
         config_filename = os.getenv("CONFIG_FILENAME")
 
     if is_unittest():
-        config_filename = '../' + config_filename
+        # config_filename = '../' + config_filename
+        config_filename = config_filename.replace('../', '')
 
     f = open(config_filename, 'r')
     config = json.load(f)
@@ -58,7 +59,9 @@ if stack == 'developer':
         query_filename = os.getenv("QUERY_FILENAME")
 
     if is_unittest():
-        query_filename = '../' + query_filename
+        # query_filename = '../' + query_filename
+        query_filename = query_filename.replace('../', '')
+        
 
     f = open(query_filename, 'r')
     pds_query = json.load(f)
