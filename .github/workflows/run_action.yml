@@ -98,6 +98,7 @@ jobs:
 
     steps:
 
+      # NOTE: role-duration-seconds is the maximum duration for the role session (21600 is 6 hours)
       - name: Login to AWS with a service account / iam user
         uses: HUIT/configure-aws-credentials@v4
         with:
@@ -105,7 +106,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_NONPROD }}
           aws-region: ${{ vars.AWS_REGION }}
           role-to-assume: 'arn:aws:iam::${{ vars.AWS_ACCOUNT }}:role/AutomationDeployRole'
-          role-duration-seconds: 1200
+          role-duration-seconds: 21600
           role-session-name: MyDeploySession
           role-skip-session-tagging: true
           role-external-id: ${{ secrets.EXTERNAL_ID }}
