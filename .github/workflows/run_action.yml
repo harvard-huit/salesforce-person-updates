@@ -164,6 +164,10 @@ jobs:
         run: |
           while true; do     
             read lastStatus stopCode exitCode stoppedReason <<< $(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].[lastStatus, stopCode, stoppedReason, containers[0].exitCode]' --output text)
+            echo "Task status: $lastStatus"
+            echo "Task stop code: $stopCode"
+            echo "Task exit code: $exitCode"
+            echo "Task stopped reason: $stoppedReason"
             if [[ "$stopCode" == "EssentialContainerExited" || "$stopCode" == "UserInitiated" ]]; then
               if [[ "$exitCode" != "None" ]]; then
                 echo "Task failed with exit code $exitCode with reason: $stoppedReason"
