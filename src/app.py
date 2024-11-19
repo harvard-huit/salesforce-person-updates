@@ -297,8 +297,6 @@ finally:
         if sfpu is not None:
             setTaskRunning(sfpu.app_config, False)
 
-            # NOTE: we cannot do this due to the current permissions on the execution role
-            #  we need to add the ECS:StopTask permission to the role
             logger.info(f"Salesforce instance: {salesforce_id}: Action: {action} completed. {stop_reason}")
             sfpu.app_config.stop_task_with_reason(f"Salesforce instance: {salesforce_id}: Action: {action} completed. {stop_reason}")
         else:
