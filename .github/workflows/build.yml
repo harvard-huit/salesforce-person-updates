@@ -177,7 +177,7 @@ jobs:
 
   test_production:
     name: Test Production
-    if: needs.versions.outputs.prod == inputs.version
+    if: needs.versions.outputs.prod == inputs.version && inputs.version != ''
     needs: [versions, deploys]
     uses: ./.github/workflows/test_instances.yml
     with:
