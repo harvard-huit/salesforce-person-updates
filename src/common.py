@@ -75,9 +75,11 @@ class AppConfig():
         self.starting_timestamp = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
 
         if self.local:
+            print("SETTING LOCAL CONFIG VALUES")
             self.set_local_config_values()
         else:
             # if it's not local, we get the config values from the dynamo table
+            print("SETTING REMOTE CONFIG VALUES")
             self.get_config_values()
 
     # this method just sets all of the config variables 
@@ -85,11 +87,17 @@ class AppConfig():
     #   - it removes aws from the dependencies
     def set_local_config_values(self):
         # config and query we'll get from the example json files on the root
-        f = open('../example_config.json')
+        try:
+            f = open('../example_config.json')
+        except:
+            f = open('example_config.json')
         self.config = json.load(f)
         f.close()
 
-        f = open('../example_pds_query.json')
+        try:
+            f = open('../example_pds_query.json')
+        except:
+            f = open('example_pds_query.json')
         self.pds_query = json.load(f)
         f.close()
 

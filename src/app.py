@@ -58,6 +58,7 @@ batch_thread_count_override = os.getenv("BATCH_THREAD_COUNT") or None
 LOCAL = os.getenv("LOCAL") or False
 ####################################
 
+stop_reason = None
 try:
     sfpu = None
     sfpu = SalesforcePersonUpdates(local=LOCAL)
@@ -276,7 +277,8 @@ try:
         logger.info(f"test action finished")
     else: 
         logger.warning(f"App triggered without a valid action: {action}, please see documentation for more information.")
-    stop_reason = "Success Apparent"
+    if stop_reason is None:
+        stop_reason = "Success Apparent"
 
 except Exception as e:
     action = os.getenv("action", None)
@@ -286,7 +288,6 @@ except Exception as e:
     raise e
 
 finally:
-    logger.info(f"this is the finally block {stack}")
     if not stack == "developer":
 
         action = os.getenv("action", None)

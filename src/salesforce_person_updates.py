@@ -109,6 +109,8 @@ class SalesforcePersonUpdates:
             except:
                 pass
 
+
+            
             self.hsf = HarvardSalesforce(
                 domain = self.app_config.salesforce_domain,
                 username = self.app_config.salesforce_username,
