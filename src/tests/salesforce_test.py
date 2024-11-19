@@ -338,7 +338,7 @@ class HarvardSalesforceTest(unittest.TestCase):
             "EPPN": "1234"
         }], dry_run=True)
 
-        self.assertEquals(response, 0)
+        self.assertEqual(response, 0)
 
 
 

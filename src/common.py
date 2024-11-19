@@ -75,11 +75,9 @@ class AppConfig():
         self.starting_timestamp = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
 
         if self.local:
-            print("SETTING LOCAL CONFIG VALUES")
             self.set_local_config_values()
         else:
             # if it's not local, we get the config values from the dynamo table
-            print("SETTING REMOTE CONFIG VALUES")
             self.get_config_values()
 
     # this method just sets all of the config variables 
