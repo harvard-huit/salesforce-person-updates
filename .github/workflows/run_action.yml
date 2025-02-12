@@ -24,7 +24,7 @@ on:
         default: 'test'
         options: 
           - 'test'
-          # - 'cleanup-updateds'
+          - 'cleanup-updateds'
           # - 'defunct-accounts-check'
           # - 'defunct-contacts-check'
           # - 'defunct-contacts-remove'

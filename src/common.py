@@ -160,7 +160,7 @@ class AppConfig():
                     #   this will also throw an error if the format is wrong on the watermark
                     datetime_watermarks = {}
                     for index, watermark in self.watermarks.items():
-                        datetime_watermarks[index] = datetime.strptime(watermark['S'], '%Y-%m-%dT%H:%M:%S').date()
+                        datetime_watermarks[index] = datetime.strptime(watermark['S'], '%Y-%m-%dT%H:%M:%S')
                     self.watermarks = datetime_watermarks
 
                     self.config = json.loads(response.get('Item').get('transformation_config').get('S'))
