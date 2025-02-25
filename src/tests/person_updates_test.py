@@ -56,7 +56,7 @@ class SalesforcePersonUpdatesTest(unittest.TestCase):
         self.sfpu.cleanup_updateds(object_name='Contact')
 
         correct_amount = len(self.mock_hsf_instance.get_all_external_ids.return_value) - len(self.mock_pds_instance.search.return_value['results'])
-        self.mock_logger.info.assert_called_with(f"Found {correct_amount} ids in Contact that are no longer updating")
+        self.mock_logger.info.assert_called_with(f"Found {correct_amount}/{len(self.mock_hsf_instance.get_all_external_ids.return_value)} ids in Contact that are no longer updating")
 
 
     def test_cleanup_updateds_on_Contacts_no_change(self):
@@ -87,7 +87,7 @@ class SalesforcePersonUpdatesTest(unittest.TestCase):
         self.sfpu.cleanup_updateds(object_name='Contact')
 
         correct_amount = len(self.mock_hsf_instance.get_all_external_ids.return_value) - len(self.mock_pds_instance.search.return_value['results'])
-        self.mock_logger.info.assert_called_with(f"Found {correct_amount} ids in Contact that are no longer updating")
+        self.mock_logger.info.assert_called_with(f"Found {correct_amount}/{len(self.mock_hsf_instance.get_all_external_ids.return_value)} ids in Contact that are no longer updating")
 
 
     def test_cleanup_updateds_on_Affiliation(self):
@@ -138,7 +138,7 @@ class SalesforcePersonUpdatesTest(unittest.TestCase):
         self.sfpu.cleanup_updateds(object_name='hed__Affiliation__c')
 
         correct_amount = len(self.mock_hsf_instance.get_all_external_ids.return_value) - len(self.mock_pds_instance.search.return_value['results'])
-        self.mock_logger.info.assert_called_with(f"Found {correct_amount} ids in hed__Affiliation__c that are no longer updating")
+        self.mock_logger.info.assert_called_with(f"Found {correct_amount}/{len(self.mock_hsf_instance.get_all_external_ids.return_value)} ids in hed__Affiliation__c that are no longer updating")
 
     def test_cleanup_updateds_on_Affiliation_no_change(self):
         self.mock_hsf_instance.get_all_external_ids.return_value = ['1', '2', '3', '4', '5']
@@ -188,7 +188,7 @@ class SalesforcePersonUpdatesTest(unittest.TestCase):
         self.sfpu.cleanup_updateds(object_name='hed__Affiliation__c')
 
         correct_amount = len(self.mock_hsf_instance.get_all_external_ids.return_value) - len(self.mock_pds_instance.search.return_value['results'])
-        self.mock_logger.info.assert_called_with(f"Found {correct_amount} ids in hed__Affiliation__c that are no longer updating")
+        self.mock_logger.info.assert_called_with(f"Found {correct_amount}/{len(self.mock_hsf_instance.get_all_external_ids.return_value)} ids in hed__Affiliation__c that are no longer updating")
 
 
 if __name__ == '__main__':
