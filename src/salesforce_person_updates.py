@@ -757,13 +757,23 @@ class SalesforcePersonUpdates:
     
         
         # 2. Call PDS with those IDs
-        # we only need to know if these are getttable, 
-        #   it doesn't matter what other fields or conditions are in the provided query
+        # we do need the conditions here because we don't want to be thinking we're 
+        #   updating a person when they aren't meeting the pds conditions and aren't actually being updated
         if not isinstance(pds_ids, list):
             pds_ids = [pds_ids]
         temp_pds_query = {}
         temp_pds_query['fields'] = pds_ids
-        temp_pds_query['conditions'] = {}
+        temp_pds_query['conditions'] = []
+
+
+        # if conditions is a dict, we need to convert it to a list 
+        #   this is just in case the conditions have an OR in them, as we are using an OR in the next step
+        if isinstance(self.app_config.pds_query['conditions'], dict):
+            for key, value in self.app_config.pds_query['conditions'].items():
+                temp_pds_query['conditions'].append({key: value})
+        elif isinstance(self.app_config.pds_query['conditions'], list):
+            temp_pds_query['conditions'] = self.app_config.pds_query['conditions']
+        
         self.pds.batch_size = 800
 
         not_updating_ids = []
@@ -774,9 +784,13 @@ class SalesforcePersonUpdates:
                 temp_or_conditions = []
                 for pds_id in pds_ids:
                     temp_or_conditions.append({pds_id: sf_ids_batch})
-                temp_pds_query['conditions']['or'] = temp_or_conditions
+                temp_pds_query['conditions'].append({
+                    "or": temp_or_conditions
+                })
             else:
-                temp_pds_query['conditions'][pds_ids[0]] = sf_ids_batch
+                temp_pds_query['conditions'].append({
+                    pds_ids[0]: sf_ids_batch
+                })
                 
             try:
                 results = self.pds.search(temp_pds_query)
@@ -803,7 +817,9 @@ class SalesforcePersonUpdates:
                 logger.error(f"Error getting pds ids: {e}, pds_query: {temp_pds_query}")
                 raise e
 
-        logger.info(f"Found {len(not_updating_ids)} ids in {object_name} that are no longer updating")
+        if len(not_updating_ids) == len(all_sf_ids):
+            raise Exception(f"Something went wrong, all records are not updating: {len(not_updating_ids)}")
+        logger.info(f"Found {len(not_updating_ids)}/{len(all_sf_ids)} ids in {object_name} that are no longer updating")
 
         self.hsf.flag_field(object_name=object_name, external_id=external_id, flag_name=updated_flag, value=False, ids=not_updating_ids)
 

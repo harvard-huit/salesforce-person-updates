@@ -123,6 +123,7 @@ try:
         updates_only = False
 
         sfpu.full_people_data_load(updates_only=updates_only)
+        sfpu.cleanup_updateds()
 
     elif action == 'person-updates':
         updates_only = False
