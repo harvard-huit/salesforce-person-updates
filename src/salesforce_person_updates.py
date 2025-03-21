@@ -793,6 +793,7 @@ class SalesforcePersonUpdates:
                 })
                 
             try:
+                logger.info(f"query: {temp_pds_query}")
                 results = self.pds.search(temp_pds_query)
                 if 'results' not in results:
                     break
