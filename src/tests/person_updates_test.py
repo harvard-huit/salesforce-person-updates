@@ -1,7 +1,7 @@
 import json
 import os
 import unittest
-from unittest import mock
+from unittest import mock, skip
 from salesforce_person_updates import SalesforcePersonUpdates
 
 
@@ -28,6 +28,7 @@ class SalesforcePersonUpdatesTest(unittest.TestCase):
         os.environ['FORCE_LOCAL_CONFIG'] = "True"
         self.sfpu = SalesforcePersonUpdates(local="True")
 
+    
     def test_cleanup_updateds_on_Contacts(self):
         self.mock_hsf_instance.get_all_external_ids.return_value = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
         self.mock_pds_instance.search.return_value = {
@@ -54,6 +55,39 @@ class SalesforcePersonUpdatesTest(unittest.TestCase):
         self.mock_hsf_instance.flag_field.return_value = True
 
         self.sfpu.cleanup_updateds(object_name='Contact')
+
+        correct_amount = len(self.mock_hsf_instance.get_all_external_ids.return_value) - len(self.mock_pds_instance.search.return_value['results'])
+        self.mock_logger.info.assert_called_with(f"Found {correct_amount}/{len(self.mock_hsf_instance.get_all_external_ids.return_value)} ids in Contact that are no longer updating")
+
+    # @skip("Skipping test_cleanup_updateds_on_Contacts_no_change")
+    def test_cleanup_updateds_on_Contacts_query(self):
+        self.mock_hsf_instance.get_all_external_ids.return_value = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
+        self.mock_pds_instance.search.return_value = {
+            "count": 5,
+            "total_count": 5,
+            "results": [
+                {
+                    "personKey": "1"
+                },
+                {
+                    "personKey": "2"
+                },
+                {
+                    "personKey": "3"
+                },
+                {
+                    "personKey": "4"
+                },
+                {
+                    "personKey": "5"
+                }
+            ]
+        }
+        self.mock_hsf_instance.flag_field.return_value = True
+
+        self.sfpu.cleanup_updateds(object_name='Contact')
+
+        # self.mock_pds_instance.search.assert_called_with()
 
         correct_amount = len(self.mock_hsf_instance.get_all_external_ids.return_value) - len(self.mock_pds_instance.search.return_value['results'])
         self.mock_logger.info.assert_called_with(f"Found {correct_amount}/{len(self.mock_hsf_instance.get_all_external_ids.return_value)} ids in Contact that are no longer updating")
@@ -85,6 +119,8 @@ class SalesforcePersonUpdatesTest(unittest.TestCase):
         self.mock_hsf_instance.flag_field.return_value = True
 
         self.sfpu.cleanup_updateds(object_name='Contact')
+        # assert search is called 1 time
+        assert self.mock_pds_instance.search.call_count == 1
 
         correct_amount = len(self.mock_hsf_instance.get_all_external_ids.return_value) - len(self.mock_pds_instance.search.return_value['results'])
         self.mock_logger.info.assert_called_with(f"Found {correct_amount}/{len(self.mock_hsf_instance.get_all_external_ids.return_value)} ids in Contact that are no longer updating")

@@ -6,6 +6,7 @@ from transformer import SalesforceTransformer
 from person_reference import PersonReference
 
 import os
+import copy
 import json
 import logging
 import time
@@ -745,7 +746,7 @@ class SalesforcePersonUpdates:
 
     def cleanup_updateds(self, object_name='Contact'):
 
-        logger.info(f"Checking PDS for records that are no longer being updated")
+        logger.info(f"Checking PDS for records that are no longer being updated ({object_name})")
 
         # 1. Get all (external) IDs from Salesforce
         # get the external id we're using in the config for this org
@@ -758,7 +759,7 @@ class SalesforcePersonUpdates:
         
         # 2. Call PDS with those IDs
         # we do need the conditions here because we don't want to be thinking we're 
-        #   updating a person when they aren't meeting the pds conditions and aren't actually being updated
+        #   updating a person when they aren't meeting the pds conditions and aren't actually being updated (this suuuucks)
         if not isinstance(pds_ids, list):
             pds_ids = [pds_ids]
         temp_pds_query = {}
@@ -780,24 +781,26 @@ class SalesforcePersonUpdates:
         # step through the sf ids 800 at a time
         for i in range(0, len(all_sf_ids), self.pds.batch_size):
             sf_ids_batch = all_sf_ids[i:i+self.pds.batch_size]
+            batch_query = copy.deepcopy(temp_pds_query)
+
             if len(pds_ids) > 1:
                 temp_or_conditions = []
                 for pds_id in pds_ids:
                     temp_or_conditions.append({pds_id: sf_ids_batch})
-                temp_pds_query['conditions'].append({
+                batch_query['conditions'].append({
                     "or": temp_or_conditions
                 })
             else:
-                temp_pds_query['conditions'].append({
+                batch_query['conditions'].append({
                     pds_ids[0]: sf_ids_batch
                 })
                 
             try:
-                logger.info(f"query: {temp_pds_query}")
-                results = self.pds.search(temp_pds_query)
+                logger.info(f"composite query: {batch_query}")
+                results = self.pds.search(batch_query)
                 if 'results' not in results:
                     break
-                # pds_ids = [person[pds_id] for person in results['results']]
+
                 pds_ids_in_pds = []
                 for person in results['results']:
                     for pds_id in pds_ids:
@@ -809,13 +812,13 @@ class SalesforcePersonUpdates:
                         else:
                             pds_ids_in_pds.append(str(person[pds_id]))
 
-
+                logger.info(f"Found {len(pds_ids_in_pds)}/{len(sf_ids_batch)} ids in PDS")
                 if len(pds_ids_in_pds) < len(sf_ids_batch):
                     # get the diff
                     not_updating_ids += [item for item in sf_ids_batch if item not in pds_ids_in_pds]
 
             except Exception as e:
-                logger.error(f"Error getting pds ids: {e}, pds_query: {temp_pds_query}")
+                logger.error(f"Error getting pds ids: {e}, pds_query: {batch_query}")
                 raise e
 
         if len(not_updating_ids) == len(all_sf_ids):
