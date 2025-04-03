@@ -10,6 +10,11 @@ class HarvardSalesforceTest(unittest.TestCase):
 
     @mock.patch('salesforce.Salesforce')  
     def setUp(self, mock_connection):
+
+        patcher = mock.patch('salesforce.logger')
+        self.mock_logger = patcher.start()
+        self.addCleanup(patcher.stop)
+
         connection_instance = mock.MagicMock()                                        
         connection_instance.execute.return_value = True
         mock_connection.return_value = connection_instance
@@ -333,7 +338,7 @@ class HarvardSalesforceTest(unittest.TestCase):
             "EPPN": "1234"
         }], dry_run=True)
 
-        self.assertEquals(response, 0)
+        self.assertEqual(response, 0)
 
 
 

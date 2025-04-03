@@ -18,7 +18,8 @@ defaults:
 jobs:
   mirror:
     name: Mirror Repository
-    runs-on: ubuntu-latest
+    runs-on: arc-runner-set-huit
+    # runs-on: ubuntu-latest
 
     steps:
 

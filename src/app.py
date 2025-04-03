@@ -1,4 +1,4 @@
-from common import isTaskRunning, setTaskRunning, logger, stack
+from common import isTaskRunning, setTaskRunning, logger, stack, AppConfig
 from salesforce_person_updates import SalesforcePersonUpdates
 from account_handler import AccountHandler
 
@@ -58,54 +58,58 @@ batch_thread_count_override = os.getenv("BATCH_THREAD_COUNT") or None
 LOCAL = os.getenv("LOCAL") or False
 ####################################
 
-
-sfpu = SalesforcePersonUpdates(local=LOCAL)
-
-# We don't need to set up the logging to salesforce if we're running locally
-#  unless we're testing that
-if not os.getenv("SIMPLE_LOGS"):
-    logger = sfpu.setup_logging(logger=logger)
-
-# this is poorly named, I know, don't @ me
-#  it's just a way to force the config to be set to the example config 
-#  (while getting the rest of the env vars from dynamo)
-if os.getenv("FORCE_LOCAL_CONFIG"):
-    sfpu.app_config.config = config
-    # sfpu.app_config.pds_query = pds_query
-
-task_running = isTaskRunning(sfpu.app_config)
-WAIT_LIMIT = 20
-if task_running and not stack == "developer":
-    if action in [
-            'single-person-update',
-            'validate',
-            'person-updates',
-            'person-updates-updates-only',
-            'cleanup-updateds',
-            'remove-unaffiliated-affiliations',
-            'defunct-accounts-check',
-            'remove people test',
-            'defunct-contacts-check',
-            'defunct-contacts-remove']:
-        logger.warning(f"The current task is actively running.")
-        exit()
-    elif action in ['full-person-load','full-account-load']:
-        wait_count = 1
-        while (task_running and wait_count <= WAIT_LIMIT):
-            logger.warning(f"The current task is actively running. (Currently on try {wait_count}/{WAIT_LIMIT})")
-            time.sleep(30)
-            task_running = isTaskRunning(sfpu.app_config)
-            wait_count += 1
-        if task_running and wait_count > WAIT_LIMIT:
-            logger.warning(f"The current task is actively running and the wait limit of {WAIT_LIMIT} has been exceeded.")
-            exit()
-
-if not stack == "developer":
-    setTaskRunning(sfpu.app_config, True)
-
-output = ""
-
+stop_reason = None
 try:
+    sfpu = None
+    sfpu = SalesforcePersonUpdates(local=LOCAL)
+
+    # connect to salesforce
+
+
+    # We don't need to set up the logging to salesforce if we're running locally
+    #  unless we're testing that
+    if not os.getenv("SIMPLE_LOGS"):
+        logger = sfpu.setup_logging(logger=logger)
+
+    # this is poorly named, I know, don't @ me
+    #  it's just a way to force the config to be set to the example config 
+    #  (while getting the rest of the env vars from dynamo)
+    if os.getenv("FORCE_LOCAL_CONFIG"):
+        sfpu.app_config.config = config
+        # sfpu.app_config.pds_query = pds_query
+
+    task_running = isTaskRunning(sfpu.app_config)
+    WAIT_LIMIT = 20
+    if task_running and not stack == "developer":
+        if action in [
+                'single-person-update',
+                'validate',
+                'person-updates',
+                'person-updates-updates-only',
+                'cleanup-updateds',
+                'remove-unaffiliated-affiliations',
+                'defunct-accounts-check',
+                'remove people test',
+                'defunct-contacts-check',
+                'defunct-contacts-remove']:
+            logger.warning(f"The current task is actively running.")
+            exit()
+        elif action in ['full-person-load','full-account-load']:
+            wait_count = 1
+            while (task_running and wait_count <= WAIT_LIMIT):
+                logger.warning(f"The current task is actively running. (Currently on try {wait_count}/{WAIT_LIMIT})")
+                time.sleep(30)
+                task_running = isTaskRunning(sfpu.app_config)
+                wait_count += 1
+            if task_running and wait_count > WAIT_LIMIT:
+                logger.warning(f"The current task is actively running and the wait limit of {WAIT_LIMIT} has been exceeded.")
+                exit()
+
+    if not stack == "developer":
+        setTaskRunning(sfpu.app_config, True)
+
+    output = ""
+
     if action == 'single-person-update' and len(person_ids) > 0:
         sfpu.update_single_person(person_ids)
     elif action == 'validate':
@@ -119,6 +123,7 @@ try:
         updates_only = False
 
         sfpu.full_people_data_load(updates_only=updates_only)
+        sfpu.cleanup_updateds()
 
     elif action == 'person-updates':
         updates_only = False
@@ -267,10 +272,14 @@ try:
     elif action == "test":
         logger.info(f"test action called")
 
+        sfpu.cleanup_updateds(object_name='Contact')
+        sfpu.cleanup_updateds(object_name='Affiliation__c')
+
         logger.info(f"test action finished")
     else: 
         logger.warning(f"App triggered without a valid action: {action}, please see documentation for more information.")
-    stop_reason = "Success Apparent"
+    if stop_reason is None:
+        stop_reason = "Success Apparent"
 
 except Exception as e:
     action = os.getenv("action", None)
@@ -281,9 +290,16 @@ except Exception as e:
 
 finally:
     if not stack == "developer":
-        setTaskRunning(sfpu.app_config, False)
 
-        # action = os.getenv("action", None)
-        # salesforce_id = os.getenv("SALESFORCE_INSTANCE_ID", None)
-        # sfpu.app_config.stop_task_with_reason(f"Salesforce instance: {salesforce_id}: Action: {action} completed. {stop_reason}")
+        action = os.getenv("action", None)
+        salesforce_id = os.getenv("SALESFORCE_INSTANCE_ID", None)
+        table_name = os.getenv("TABLE_NAME", None)
 
+        if sfpu is not None:
+            setTaskRunning(sfpu.app_config, False)
+
+            logger.info(f"Salesforce instance: {salesforce_id}: Action: {action} completed. {stop_reason}")
+            sfpu.app_config.stop_task_with_reason(f"Salesforce instance: {salesforce_id}: Action: {action} completed. {stop_reason}")
+        else:
+            app_config = AppConfig(id=salesforce_id, table_name=table_name)
+            app_config.stop_task_with_reason(f"Salesforce instance: {salesforce_id}: Action: {action} completed. {stop_reason}")

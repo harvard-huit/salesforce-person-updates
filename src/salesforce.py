@@ -1004,6 +1004,7 @@ class HarvardSalesforce:
 
         ids = []
         try:
+            logger.debug(f"SELECT {external_id} FROM {object_name} WHERE {external_id} != null {updated_flag_string}")
             sf_data = self.sf.query_all(f"SELECT {external_id} FROM {object_name} WHERE {external_id} != null {updated_flag_string}")
             logger.debug(f"got this data from salesforce: {sf_data['records']}")
             for record in sf_data['records']:

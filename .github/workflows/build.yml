@@ -18,7 +18,7 @@ on:
         required: true
 
 env:
-  version: ${{ github.event.inputs.version }}
+  version: ${{ inputs.version }}
   branch: ${{ github.ref_name }}
 
 defaults:
@@ -28,7 +28,8 @@ defaults:
 jobs:
   unittest:
     name: Running Unit tests
-    runs-on: ubuntu-latest
+    runs-on: arc-runner-set-huit
+    # runs-on: ubuntu-latest
     container:
       image: python:3.9
       options: --user root
@@ -54,18 +55,22 @@ jobs:
           output=$(python -m unittest discover -s src -p *_test.py 2>&1)
           if [ $? -ne 0 ]; then
             echo "## Unit Tests Failed" >> $GITHUB_STEP_SUMMARY
-            echo "$output">> $GITHUB_STEP_SUMMARY
+            echo "<pre>$output</pre>">> $GITHUB_STEP_SUMMARY
             exit 1
           else
             echo "## Unit Tests" >> $GITHUB_STEP_SUMMARY
             echo "<details><summary>Click to see unit test output</summary>" >> $GITHUB_STEP_SUMMARY
-            echo "$output">> $GITHUB_STEP_SUMMARY
+            echo "<pre>$output</pre>">> $GITHUB_STEP_SUMMARY
             echo "</details>" >> $GITHUB_STEP_SUMMARY
           fi
 
   versions:
     name: Get all Deployed Versions
-    runs-on: ubuntu-latest
+    runs-on: arc-runner-set-huit
+    # runs-on: [ ubuntu-latest ]
+    container:
+      image: python:3.9
+      options: --user root
     steps:
       - name: Checkout the code
         uses: actions/checkout@v3
@@ -125,7 +130,8 @@ jobs:
   build:
     name: Build Code ${{ inputs.version }}
     needs: [unittest, versions]
-    runs-on: ubuntu-latest
+    runs-on: arc-runner-set-huit
+    # runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
@@ -171,7 +177,7 @@ jobs:
 
   test_production:
     name: Test Production
-    if: needs.versions.outputs.prod != ''
+    if: needs.versions.outputs.prod == inputs.version && inputs.version != ''
     needs: [versions, deploys]
     uses: ./.github/workflows/test_instances.yml
     with:

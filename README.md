@@ -16,8 +16,7 @@ This is coupled loosely with / build alongside the [HUD Salesforce Package](http
  - Log transparency 
    - when python throws a log, it is mirrored in the system (assuming they have the HUD package installed)
  - Mark records that are no longer being updated via this system
-   - Currently natively supporting `Contact`
-   - Can be configured (a flag field can be manually added to the desired object and declared in the config)
+   - Supported for any object that has the `updatedFlag` field in their config
  - Significantly better error detection and logging
  - Automatic duplicate resolution
    - detecting and dealing with duplicates 
@@ -115,6 +114,8 @@ What is done is controlled by environment variables sent in to the app (through 
 
  - `mark-not-updated` this one will check the ids (`eppn`s) in the Salesforce instance against those that can be queried (with the instance's PDS key). Ids that are not queryable are not being updated by this system and are marked by the "HUIT Updated" (`huit__Updated__c`) flag.
 
+ - `test` this one does nothing and is useful for checking if the config is able to connect / validate
+
 #### Local-only actions:
 
  - `delete-people` similar to `single-person-update` it can take a list of Ids and will (soft) delete them. This has no real-world application, but is useful in development / debugging.
@@ -152,6 +153,8 @@ These are the Apigee apikeys for use in the Person Data Connector (PDC). Current
 ### Configuration
 
 The configuration is the heart of this application. Each Salesforce instance will have its own configuration that will map fields from the PDS (and departments (and potentially other data sources)) to Objects in Salesforce. 
+
+Please see [HUIT/salesforce-customer-configurations](https://github.huit.harvard.edu/HUIT/salesforce-customer-configurations/) for the current configurations for each customer. 
 
 #### `source`
 
@@ -230,12 +233,11 @@ This indicates that that field will have a single, unchanging value. (In this ca
 
 #### `updatedFlag`
 
-This should be the name of a boolean field in Salesforce. This is only tested for Contact records. It will set to true when it's being updated. If the record is no longer gettable in the PDS level, it will set the value of this flag to false. 
+This should be the name of a boolean field in Salesforce. This should work for any Object. It will set to true when it's being updated. If the record is no longer gettable in the PDS level (or doesn't exist in the PDS), it will set the value of this flag to false. 
 
 #### `updateOnlyFlag`
 
-This is only available in the context of a Contact. Set this to `true`` to have it only update Contacts (and branch data) that exist in the org already. 
-
+This is only available in the context of a Contact. Set this to `true` to have it only update Contacts (and branch data) that exist in the org already. 
 
 ## Deployment Notes
 
@@ -243,7 +245,7 @@ Building and deployment will be done through Github Actions.
 
 ### Build Action
 
-A build will take the code on the dev branch and assign it to a version tag. This image is then pushed to Artifactory.
+A build will take the code on the dev branch and assign it to a version tag. This image is then pushed to Artifactory. 
 
 The pattern being used here is `v0.0.0` for production images and `v0.0.0-dev` for beta/test versions. 
 
@@ -260,7 +262,7 @@ Running this application can be done a few ways. The two main ways are one-off r
 A "run" will trigger from the Github Actions, but the action does not (can not?) report on success. In order to see that, you must (currently) look at the Splunk (or Salesforce) logs. 
 
  - **Spot Update**: this will run the `single-update-action` action given a comma separated list of ids (huids).
- - **Full Data Load**: this will run the `full-person-load` action. It will take some time. 
+ - **Full Data Load**: this will run the `full-person-load` action. It will take some time, but it should run until the job is actually finished. This could be anywhere from 15 min to 6 hrs. 
 
 
 ## Splunk Logs

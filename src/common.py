@@ -85,11 +85,17 @@ class AppConfig():
     #   - it removes aws from the dependencies
     def set_local_config_values(self):
         # config and query we'll get from the example json files on the root
-        f = open('../example_config.json')
+        try:
+            f = open('../example_config.json')
+        except:
+            f = open('example_config.json')
         self.config = json.load(f)
         f.close()
 
-        f = open('../example_pds_query.json')
+        try:
+            f = open('../example_pds_query.json')
+        except:
+            f = open('example_pds_query.json')
         self.pds_query = json.load(f)
         f.close()
 
@@ -154,7 +160,7 @@ class AppConfig():
                     #   this will also throw an error if the format is wrong on the watermark
                     datetime_watermarks = {}
                     for index, watermark in self.watermarks.items():
-                        datetime_watermarks[index] = datetime.strptime(watermark['S'], '%Y-%m-%dT%H:%M:%S').date()
+                        datetime_watermarks[index] = datetime.strptime(watermark['S'], '%Y-%m-%dT%H:%M:%S')
                     self.watermarks = datetime_watermarks
 
                     self.config = json.loads(response.get('Item').get('transformation_config').get('S'))

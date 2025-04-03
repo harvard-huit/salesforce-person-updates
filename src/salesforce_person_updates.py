@@ -6,6 +6,7 @@ from transformer import SalesforceTransformer
 from person_reference import PersonReference
 
 import os
+import copy
 import json
 import logging
 import time
@@ -46,7 +47,8 @@ if stack == 'developer':
         config_filename = os.getenv("CONFIG_FILENAME")
 
     if is_unittest():
-        config_filename = '../' + config_filename
+        # config_filename = '../' + config_filename
+        config_filename = config_filename.replace('../', '')
 
     f = open(config_filename, 'r')
     config = json.load(f)
@@ -58,7 +60,9 @@ if stack == 'developer':
         query_filename = os.getenv("QUERY_FILENAME")
 
     if is_unittest():
-        query_filename = '../' + query_filename
+        # query_filename = '../' + query_filename
+        query_filename = query_filename.replace('../', '')
+        
 
     f = open(query_filename, 'r')
     pds_query = json.load(f)
@@ -106,6 +110,8 @@ class SalesforcePersonUpdates:
             except:
                 pass
 
+
+            
             self.hsf = HarvardSalesforce(
                 domain = self.app_config.salesforce_domain,
                 username = self.app_config.salesforce_username,
@@ -357,7 +363,7 @@ class SalesforcePersonUpdates:
                 raise thread.exception
 
     def update_single_person(self, huids):
-        pds_query = self.app_config.pds_query
+        pds_query = copy.deepcopy(self.app_config.pds_query)
         # if 'conditions' not in pds_query:
         pds_query['conditions'] = {}
         pds_query['conditions']['univid'] = huids
@@ -385,7 +391,7 @@ class SalesforcePersonUpdates:
 
         logger.info(f"Processing updates since {watermark}")
 
-        pds_query = self.app_config.pds_query
+        pds_query = copy.deepcopy(self.app_config.pds_query)
         if 'conditions' not in pds_query:
             pds_query['conditions'] = {}
         if len(pds_query['conditions'].keys()) > 0:
@@ -467,7 +473,7 @@ class SalesforcePersonUpdates:
                         raise Exception(f"Filtered id list is too large: {len(filtered_id_list)} or add a record_limit")
                     self.hsf.flag_field(object_name='Contact', external_id=external_id, flag_name=updated_flag, value=False, ids=filtered_id_list)
                     try:
-                        pds_query = self.app_config.pds_query
+                        pds_query = copy.deepcopy(self.app_config.pds_query)
                         pds_query['conditions'] = {}
                         pds_query['conditions'][pds_id] = filtered_id_list
                         # NOTE: this can fail if the id list is too large (due to elastic search limitations)
@@ -482,7 +488,15 @@ class SalesforcePersonUpdates:
             if today != watermark_day:
                 # if this is a new day, go through the cleanup process
                 logger.info(f"New day, running cleanup")
-                self.cleanup_updateds()
+
+                for(object_name, object_config) in self.app_config.config.items():
+                    if 'updatedFlag' in object_config:
+                        updated_flag = object_config['updatedFlag']
+                        external_id = object_config['Id']['salesforce']
+                        pds_id = object_config['Id']['pds']
+                        self.cleanup_updateds(object_name=object_name)
+
+                # self.cleanup_updateds()
 
         watermark = self.app_config.update_watermark("person")
         logger.info(f"Watermark updated: {watermark}")
@@ -492,7 +506,7 @@ class SalesforcePersonUpdates:
 
         try:
 
-            pds_query = self.app_config.pds_query
+            pds_query = copy.deepcopy(self.app_config.pds_query)
             if updates_only and False:
                 # if we are updating only, we need to add ids to the query..
                 if 'conditions' not in pds_query:
@@ -532,7 +546,7 @@ class SalesforcePersonUpdates:
 
         # without the pds_query, it uses the "full" configured query
         if pds_query is None:
-            pds_query = self.app_config.pds_query
+            pds_query = copy.deepcopy(self.app_config.pds_query)
 
         logger.info(f"{pds_query}")
 
@@ -732,43 +746,84 @@ class SalesforcePersonUpdates:
 
     def cleanup_updateds(self, object_name='Contact'):
 
-        logger.info(f"Checking PDS for records that are no longer being updated")
+        logger.info(f"Checking PDS for records that are no longer being updated ({object_name})")
 
         # 1. Get all (external) IDs from Salesforce
         # get the external id we're using in the config for this org
         external_id = self.app_config.config[object_name]['Id']['salesforce']
         updated_flag = self.app_config.config[object_name]['updatedFlag']
-        pds_id = self.app_config.config[object_name]['Id']['pds']
+        pds_ids = self.app_config.config[object_name]['Id']['pds']
         all_sf_ids = self.hsf.get_all_external_ids(object_name=object_name, external_id=external_id, updated_flag_name=updated_flag, updated_flag_value=True)
         logger.info(f"Found {len(all_sf_ids)} ids in Salesforce with a True updated flag")
+    
         
         # 2. Call PDS with those IDs
-        # we only need to know if these are getttable, 
-        #   it doesn't matter what other fields or conditions are in the provided query
+        # we do need the conditions here because we don't want to be thinking we're 
+        #   updating a person when they aren't meeting the pds conditions and aren't actually being updated (this suuuucks)
+        if not isinstance(pds_ids, list):
+            pds_ids = [pds_ids]
         temp_pds_query = {}
-        temp_pds_query['fields'] = [pds_id]
-        temp_pds_query['conditions'] = {}
+        temp_pds_query['fields'] = pds_ids
+        temp_pds_query['conditions'] = []
+
+
+        # if conditions is a dict, we need to convert it to a list 
+        #   this is just in case the conditions have an OR in them, as we are using an OR in the next step
+        if isinstance(self.app_config.pds_query['conditions'], dict):
+            for key, value in self.app_config.pds_query['conditions'].items():
+                temp_pds_query['conditions'].append({key: value})
+        elif isinstance(self.app_config.pds_query['conditions'], list):
+            temp_pds_query['conditions'] = self.app_config.pds_query['conditions']
+        
         self.pds.batch_size = 800
 
         not_updating_ids = []
         # step through the sf ids 800 at a time
         for i in range(0, len(all_sf_ids), self.pds.batch_size):
             sf_ids_batch = all_sf_ids[i:i+self.pds.batch_size]
-            temp_pds_query['conditions'][pds_id] = sf_ids_batch
+            batch_query = copy.deepcopy(temp_pds_query)
+
+            if len(pds_ids) > 1:
+                temp_or_conditions = []
+                for pds_id in pds_ids:
+                    temp_or_conditions.append({pds_id: sf_ids_batch})
+                batch_query['conditions'].append({
+                    "or": temp_or_conditions
+                })
+            else:
+                batch_query['conditions'].append({
+                    pds_ids[0]: sf_ids_batch
+                })
+                
             try:
-                results = self.pds.search(temp_pds_query)
+                logger.info(f"composite query: {batch_query}")
+                results = self.pds.search(batch_query)
                 if 'results' not in results:
                     break
-                pds_ids = [person[pds_id] for person in results['results']]
-                if len(pds_ids) < len(sf_ids_batch):
+
+                pds_ids_in_pds = []
+                for person in results['results']:
+                    for pds_id in pds_ids:
+                        if '.' in pds_id:
+                            pds_id_pieces = pds_id.split('.')
+                            if pds_id_pieces[0] in person:
+                                for piece in person[pds_id_pieces[0]]:
+                                    pds_ids_in_pds.append(str(piece[pds_id_pieces[1]]))
+                        else:
+                            pds_ids_in_pds.append(str(person[pds_id]))
+
+                logger.info(f"Found {len(pds_ids_in_pds)}/{len(sf_ids_batch)} ids in PDS")
+                if len(pds_ids_in_pds) < len(sf_ids_batch):
                     # get the diff
-                    not_updating_ids += [item for item in sf_ids_batch if item not in pds_ids]
+                    not_updating_ids += [item for item in sf_ids_batch if item not in pds_ids_in_pds]
 
             except Exception as e:
-                logger.error(f"Error getting pds ids: {e}, pds_query: {temp_pds_query}")
+                logger.error(f"Error getting pds ids: {e}, pds_query: {batch_query}")
                 raise e
 
-        logger.info(f"Found {len(not_updating_ids)} ids that are no longer updating")
+        if len(not_updating_ids) == len(all_sf_ids):
+            raise Exception(f"Something went wrong, all records are not updating: {len(not_updating_ids)}")
+        logger.info(f"Found {len(not_updating_ids)}/{len(all_sf_ids)} ids in {object_name} that are no longer updating")
 
         self.hsf.flag_field(object_name=object_name, external_id=external_id, flag_name=updated_flag, value=False, ids=not_updating_ids)
 
@@ -925,7 +980,7 @@ class SalesforcePersonUpdates:
 
     def get_all_updated_people(self, watermark=None) -> list:
         # get all updates ids from the pds
-        pds_query = self.app_config.pds_query
+        pds_query = copy.deepcopy(self.app_config.pds_query)
         pds_id_name = self.app_config.config['Contact']['Id']['pds']
         pds_query['fields'] = [pds_id_name]
         if not watermark:

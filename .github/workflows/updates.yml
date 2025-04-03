@@ -34,17 +34,17 @@ defaults:
 jobs:
   updates: 
     name: Spot update on ${{ github.event.inputs.environment }} on ${{ github.event.inputs.salesforce_instance_id }}
-    runs-on: [ ubuntu-latest ]
+    runs-on: arc-runner-set-huit
+    # runs-on: ubuntu-latest
+    container:
+      image: amazonlinux:2023
+      options: --user root
 
     steps:
-    #   - name: test task_version value
-    #     run: |
-    #       echo "\"${{ github.event.inputs.task_version }}\""
-
-    #   - name: Set task version format
-    #     if: ${{ github.event.inputs.task_version != '' }}
-    #     run: |
-    #       echo "task_version=:${{ github.event.inputs.task_version }}" >> $GITHUB_ENV
+      - name: Install AWS CLI
+        run: |
+          yum install -y aws-cli
+          aws --version  
 
       - name: Set admints-dev environment vars
         if: ${{ github.event.inputs.environment == 'dev' || github.event.inputs.environment == 'test' }}

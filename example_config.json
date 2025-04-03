@@ -230,6 +230,7 @@
             "pds": ["employeeRoles.personRoleKey", "poiRoles.personRoleKey", "studentRoles.personRoleKey"],
             "salesforce": "HUDA__hud_PERSON_ROLES_KEY__c"
         },
+        "updatedFlag": "huit__Updated__c",
         "fields": {
             "HUDA__hud_MULE_UNIQUE_PERSON_KEY__c": "personKey",
             "HUDA__hud_PERSON_ROLES_KEY__c": ["employeeRoles.personRoleKey", "poiRoles.personRoleKey", "studentRoles.personRoleKey"],

@@ -7,6 +7,11 @@ from person_reference import PersonReference
 class PersonReferenceTest(unittest.TestCase):
 
     def setUp(self):
+        patcher = mock.patch('person_reference.logger')
+        self.mock_logger = patcher.start()
+        self.addCleanup(patcher.stop)
+
+
         self.person_reference = PersonReference(apikey='12345', environment='testing')
 
         self.fake_schools = {

@@ -17,7 +17,7 @@ on:
         description: the salesforce instance id (from dynamo)
         type: string
         required: true
-        default: 'huit-full-sandbox'
+        default: 'huitsalescloud-huitfull'
       record_limit:
         type: number
         required: false
@@ -37,26 +37,26 @@ on:
         options:
           - 'True'
           - 'False'
-      cpu:
-        type: choice
-        required: false
-        default: '1024'
-        options:
-          - '1024'
-          - '2048'
-      memory:
-        type: choice
-        required: false
-        default: '4096'
-        options:
-          - '2048'
-          - '3072'
-          - '4096'
-          - '5120'
-          - '6144'
-          - '7168'
-          - '8192'
-          - '16384'
+      # cpu:
+      #   type: choice
+      #   required: false
+      #   default: '1024'
+      #   options:
+      #     - '1024'
+      #     - '2048'
+      # memory:
+      #   type: choice
+      #   required: false
+      #   default: '4096'
+      #   options:
+      #     - '2048'
+      #     - '3072'
+      #     - '4096'
+      #     - '5120'
+      #     - '6144'
+      #     - '7168'
+      #     - '8192'
+      #     - '16384'
                             
 defaults:
   run:
@@ -66,8 +66,10 @@ jobs:
   data_load: 
     name: Full data load on ${{ inputs.environment }} for ${{ inputs.salesforce_instance_id }}
     environment: ${{ inputs.environment }}
-    runs-on: [ ubuntu-latest ]
+    runs-on: arc-runner-set-huit
+    # runs-on: [ ubuntu-latest ]
 
+    # NOTE: role-duration-seconds is the maximum duration for the role session (21600 is 6 hours)
     steps:
       - name: Login to AWS with a service account / iam user
         uses: HUIT/configure-aws-credentials@v4
@@ -76,7 +78,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_NONPROD }}
           aws-region: ${{ vars.AWS_REGION }}
           role-to-assume: 'arn:aws:iam::${{ vars.AWS_ACCOUNT }}:role/AutomationDeployRole'
-          role-duration-seconds: 1200
+          role-duration-seconds: 21600
           role-session-name: MyDeploySession
           role-skip-session-tagging: true
           role-external-id: ${{ secrets.EXTERNAL_ID }}
@@ -84,79 +86,106 @@ jobs:
       - name: get current identity 
         run: aws sts get-caller-identity
 
-      - name: Create Overrides
-        run: |
-          CONTAINER_OVERRIDES='[ 
-            {
-              "name": "aais-services-${{ inputs.environment }}-feed-salesforce-person-updates", 
-              "cpu": ${{ inputs.cpu }},
-              "memory": ${{ inputs.memory }},
-              "environment": [ 
-                {
-                  "name": "SALESFORCE_INSTANCE_ID", 
-                  "value": "${{ inputs.salesforce_instance_id }}"
-                }, {
-                  "name": "TABLE_NAME", 
-                  "value": "${{ vars.TABLE_NAME }}"
-                }, {
-                  "name": "action", 
-                  "value": "full-person-load"
-                }, {
-                  "name": "BATCH_SIZE", 
-                  "value": "${{ inputs.batch_size }}"
-                }, {
-                  "name": "BATCH_THREAD_COUNT", 
-                  "value": "${{ inputs.batch_thread_count }}"
-                }, {
-                  "name": "RECORD_LIMIT", 
-                  "value": "${{ inputs.record_limit }}"
-                }, {
-                  "name": "DEBUG", 
-                  "value": "${{ inputs.debug }}"
-                }
-              ]
-            } 
-          ]'
-          CONTAINER_OVERRIDES=$(echo "$CONTAINER_OVERRIDES" | tr -d '\n')
-          echo "CONTAINER_OVERRIDES=$CONTAINER_OVERRIDES" >> $GITHUB_ENV
+      # - name: Create Overrides
+      #   run: |
+      #     CONTAINER_OVERRIDES='[ 
+      #       {
+      #         "name": "aais-services-${{ inputs.environment }}-feed-salesforce-person-updates", 
+      #         "cpu": ${{ inputs.cpu }},
+      #         "memory": ${{ inputs.memory }},
+      #         "environment": [ 
+      #           {
+      #             "name": "SALESFORCE_INSTANCE_ID", 
+      #             "value": "${{ inputs.salesforce_instance_id }}"
+      #           }, {
+      #             "name": "TABLE_NAME", 
+      #             "value": "${{ vars.TABLE_NAME }}"
+      #           }, {
+      #             "name": "action", 
+      #             "value": "full-person-load"
+      #           }, {
+      #             "name": "BATCH_SIZE", 
+      #             "value": "${{ inputs.batch_size }}"
+      #           }, {
+      #             "name": "BATCH_THREAD_COUNT", 
+      #             "value": "${{ inputs.batch_thread_count }}"
+      #           }, {
+      #             "name": "RECORD_LIMIT", 
+      #             "value": "${{ inputs.record_limit }}"
+      #           }, {
+      #             "name": "DEBUG", 
+      #             "value": "${{ inputs.debug }}"
+      #           }
+      #         ]
+      #       } 
+      #     ]'
+      #     CONTAINER_OVERRIDES=$(echo "$CONTAINER_OVERRIDES" | tr -d '\n')
+      #     echo "CONTAINER_OVERRIDES=$CONTAINER_OVERRIDES" >> $GITHUB_ENV
 
-      - name: Run ${{ inputs.environment }} full data load on [${{ inputs.people }}]
-        run: |
-          TASK_ARN=$(aws ecs run-task \
-            --cluster aais-services-${{ inputs.environment }}-cluster \
-            --overrides '{"cpu": "${{ inputs.cpu }}", "memory": "${{ inputs.memory }}", "containerOverrides": ${{ env.CONTAINER_OVERRIDES }} }' \
-            --task-definition arn:aws:ecs:us-east-1:${{ vars.AWS_ACCOUNT }}:task-definition/aais-services-${{ inputs.environment }}-feed-salesforce-person-updates \
-            --network-configuration '{ "awsvpcConfiguration": { "assignPublicIp":"DISABLED", "securityGroups": ["${{ vars.SECURITY_GROUP }}"], "subnets": ["${{ vars.SUBNET }}"]}}' \
-            --launch-type FARGATE \
-            --query 'tasks[0].taskArn' \
-            --output text)
-          echo "TASK_ARN=$TASK_ARN" >> $GITHUB_ENV
+      - name: Run ${{ inputs.environment }} full data load
+        uses: HUIT/aais-ecs-infrastructure/actions/run-task@develop
+        env:
+          CLUSTER: aais-services-${{ inputs.environment || 'dev' }}-cluster
+          TASK_DEF_ARN: arn:aws:ecs:us-east-1:${{ vars.AWS_ACCOUNT }}:task-definition/aais-services-${{ inputs.environment || 'dev' }}-feed-salesforce-person-updates
+          CONTAINER_NAME: aais-services-${{ inputs.environment || 'dev' }}-feed-salesforce-person-updates
+          ENVIRONMENT: ${{ inputs.environment || 'dev' }}
+          SUBNETS: '["${{ vars.SUBNET }}"]'
+          SECURITY_GROUPS: '["${{ vars.SECURITY_GROUP }}"]'
+        with:
+          cluster: ${{ env.CLUSTER}}
+          task_def_arn: ${{ env.TASK_DEF_ARN}}
+          container_name: ${{ env.CONTAINER_NAME }}
+          # FUTURE ME: if you're feeling adventurous, try using the > or | to make this more readable
+          override_fields: > 
+            {
+              "SALESFORCE_INSTANCE_ID": "${{ inputs.salesforce_instance_id }}",
+              "TABLE_NAME": "${{ vars.TABLE_NAME }}",
+              "action": "full-person-load", 
+              "BATCH_SIZE": "${{ inputs.batch_size }}",
+              "BATCH_THREAD_COUNT": "${{ inputs.batch_thread_count }}",
+              "RECORD_LIMIT": "${{ inputs.record_limit }}",
+              "DEBUG": "${{ inputs.debug }}"
+            }
+          subnets: ${{ env.SUBNETS }}
+          security_groups: ${{ env.SECURITY_GROUPS }}
+          print_summary: true
+          debug: true
+          wait: true
+
+
+      # - name: Run ${{ inputs.environment }} full data load
+      #   run: |
+      #     TASK_ARN=$(aws ecs run-task \
+      #       --cluster aais-services-${{ inputs.environment }}-cluster \
+      #       --overrides '{"cpu": "${{ inputs.cpu }}", "memory": "${{ inputs.memory }}", "containerOverrides": ${{ env.CONTAINER_OVERRIDES }} }' \
+      #       --task-definition arn:aws:ecs:us-east-1:${{ vars.AWS_ACCOUNT }}:task-definition/aais-services-${{ inputs.environment }}-feed-salesforce-person-updates \
+      #       --network-configuration '{ "awsvpcConfiguration": { "assignPublicIp":"DISABLED", "securityGroups": ["${{ vars.SECURITY_GROUP }}"], "subnets": ["${{ vars.SUBNET }}"]}}' \
+      #       --launch-type FARGATE \
+      #       --query 'tasks[0].taskArn' \
+      #       --output text)
+      #     echo "TASK_ARN=$TASK_ARN" >> $GITHUB_ENV
+      #     echo "## Task ARN" >> $GITHUB_STEP_SUMMARY
+      #     echo "$TASK_ARN" >> $GITHUB_STEP_SUMMARY
   
-      # TODO: github issue: https://github.huit.harvard.edu/HUIT/salesforce-person-updates/issues/74
+      # # Note: stoppedReason needs to be last in the read list as it may contain spaces
       # - name: Wait for task to complete
       #   run: |
-      #     while true; do            
-      #       aws ecs wait tasks-stopped --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} > /dev/null 2> error.log
-      #       ERROR=$(cat error.log)
-      #       if [[ "$ERROR" == "Waiter TasksStopped failed: Max attempts exceeded" ]]; then
-      #         continue
-      #       fi
-            
-      #       STOP_CODE=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].stopCode' --output text)
-      #       if [[ "$STOP_CODE" == "EssentialContainerExited" ]]; then
-      #         EXIT_CODE=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].containers[0].exitCode' --output text)
-      #         if [[ "$EXIT_CODE" != "0" ]]; then
-      #           STOPPED_REASON=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].stoppedReason' --output text)
-        
-      #           echo "Task failed with exit code $EXIT_CODE with reason: $STOPPED_REASON"
+      #     while true; do     
+      #       read lastStatus stopCode exitCode stoppedReason <<< $(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].[lastStatus, stopCode, containers[0].exitCode, stoppedReason]' --output text)
+      #       if [[ "$stopCode" == "EssentialContainerExited" || "$stopCode" == "UserInitiated" ]]; then
+      #         if [[ "$exitCode" != "None" ]]; then
+      #           echo "Task failed with exit code $exitCode with reason: $stoppedReason"
+      #           echo "Task failed with exit code $exitCode with reason: $stoppedReason" >> $GITHUB_STEP_SUMMARY
       #           exit 1
       #         else
-      #           echo "Task completed successfully"
+      #           echo "Task completed successfully. $stoppedReason"
+      #           echo "Task completed successfully. $stoppedReason" >> $GITHUB_STEP_SUMMARY
       #           exit 0
       #         fi
-
-      #       else 
-      #         echo "Task stopped with stop code $STOP_CODE"
+      #         elif [[ "$lastStatus" == "STOPPED" ]]; then
+      #           echo "Task stopped with stop code $stopCode with reason: $stoppedReason and exit code: $exitCode"
+      #           echo "Task stopped with stop code $stopCode with reason: $stoppedReason and exit code: $exitCode" >> $GITHUB_STEP_SUMMARY
       #         exit 1
       #       fi
-
+      #       sleep 10
+      #     done

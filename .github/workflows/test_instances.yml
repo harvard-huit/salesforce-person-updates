@@ -1,5 +1,5 @@
-name: Check Salesforce Instances
-run-name: Check all Salesforce Instances on ${{ inputs.environment }}
+name: Test Salesforce Instances
+run-name: Testing all Salesforce Instances on ${{ inputs.environment }}
 
 on:
   workflow_dispatch:
@@ -12,6 +12,11 @@ on:
             - 'test'
             - 'stage'
             - 'prod'
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
 
 defaults:
   run:
@@ -27,6 +32,11 @@ jobs:
       options: --user root
     environment: ${{ inputs.environment }}
     steps:
+      - name: Install AWS CLI
+        run: |
+          yum install -y aws-cli
+          aws --version  
+
       - name: Login to AWS with a service account / iam user
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -38,12 +48,7 @@ jobs:
           role-session-name: MyDeploySession
           role-skip-session-tagging: true
           role-external-id: ${{ secrets.EXTERNAL_ID }}
-    
-      - name: Install AWS CLI
-        run: |
-          yum install -y aws-cli
-          aws --version
-
+      
       - name: Get All Instance Ids
         id: get-instances
         env:
@@ -66,8 +71,8 @@ jobs:
       instances: ${{ steps.get-instances.outputs.instances }}
           
 
-  check_instances:
-    name: Check Instances
+  test_instances:
+    name: Test Instances
     if: needs.get_instances.outputs.instances != '[]'
     needs: [ get_instances ]
     strategy:
@@ -76,10 +81,9 @@ jobs:
       matrix:
         # instance: [ instance1 ]
         instance: ${{ fromJson(needs.get_instances.outputs.instances) || '[]' }}
-    uses: ./.github/workflows/run_action.yml
+    uses: ./.github/workflows/update_people.yml
     with: 
       environment: ${{ inputs.environment }}
       salesforce_instance_id: ${{ matrix.instance }}
-      action: 'test'
-      debug: 'False'
+      people: '80719647'
     secrets: inherit

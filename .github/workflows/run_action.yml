@@ -17,14 +17,14 @@ on:
         description: the salesforce instance id (from dynamo)
         type: string
         required: true
-        default: 'huit-full-sandbox'
+        default: 'huitsalescloud-huitfull'
       action:
         type: choice
         required: true
         default: 'test'
         options: 
           - 'test'
-          # - 'cleanup-updateds'
+          - 'cleanup-updateds'
           # - 'defunct-accounts-check'
           # - 'defunct-contacts-check'
           # - 'defunct-contacts-remove'
@@ -90,10 +90,17 @@ jobs:
   action_run: 
     name: ${{ inputs.action }} on ${{ inputs.environment }} for ${{ inputs.salesforce_instance_id }}
     environment: ${{ inputs.environment }}
-    runs-on: [ ubuntu-latest ]
+    # runs-on: arc-runner-set-huit
+    runs-on:
+      group: 'huit-arc'
+    # runs-on: [ ubuntu-latest ]
+    container:
+      image: amazonlinux:2023
+      options: --user root
 
     steps:
 
+      # NOTE: role-duration-seconds is the maximum duration for the role session (21600 is 6 hours)
       - name: Login to AWS with a service account / iam user
         uses: HUIT/configure-aws-credentials@v4
         with:
@@ -101,10 +108,15 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_NONPROD }}
           aws-region: ${{ vars.AWS_REGION }}
           role-to-assume: 'arn:aws:iam::${{ vars.AWS_ACCOUNT }}:role/AutomationDeployRole'
-          role-duration-seconds: 1200
+          role-duration-seconds: 21600
           role-session-name: MyDeploySession
           role-skip-session-tagging: true
           role-external-id: ${{ secrets.EXTERNAL_ID }}
+
+      - name: Install AWS CLI
+        run: |
+          yum install -y aws-cli
+          aws --version  
 
       - name: get current identity 
         run: aws sts get-caller-identity
@@ -150,27 +162,29 @@ jobs:
               --output text)
             echo "TASK_ARN=$TASK_ARN" >> $GITHUB_ENV
     
+      # Note: stoppedReason needs to be last in the read list as it may contain spaces
       - name: Wait for task to complete
         run: |
-          aws ecs wait tasks-stopped --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }}
-          STOP_CODE=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].stopCode' --output text)
-          # if stop code is either essentialcontainerexited or userinitiated
-          if [[ "$STOP_CODE" == "EssentialContainerExited" || "$STOP_CODE" == "UserInitiated" ]]; then
-            EXIT_CODE=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].containers[0].exitCode' --output text)
-            STOPPED_REASON=$(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].stoppedReason' --output text)
-            if [[ "$EXIT_CODE" != "0" ]]; then
-              echo "Task failed with exit code $EXIT_CODE with reason: $STOPPED_REASON"
-              echo "## Task failed with exit code $EXIT_CODE" >> $GITHUB_STEP_SUMMARY
-              echo "$STOPPED_REASON" >> $GITHUB_STEP_SUMMARY
+          while true; do     
+            read lastStatus stopCode exitCode stoppedReason <<< $(aws ecs describe-tasks --cluster aais-services-${{ inputs.environment }}-cluster --tasks ${{ env.TASK_ARN }} --query 'tasks[0].[lastStatus, stopCode, containers[0].exitCode, stoppedReason]' --output text)
+            echo "Task status: $lastStatus"
+            echo "Task stop code: $stopCode"
+            echo "Task exit code: $exitCode"
+            echo "Task stopped reason: $stoppedReason"
+            if [[ "$stopCode" == "EssentialContainerExited" || "$stopCode" == "UserInitiated" ]]; then
+              if [[ "$exitCode" != "None" ]]; then
+                echo "Task failed with exit code $exitCode with reason: $stoppedReason"
+                echo "Task failed with exit code $exitCode with reason: $stoppedReason" >> $GITHUB_STEP_SUMMARY
+                exit 1
+              else
+                echo "Task completed successfully. $stoppedReason"
+                echo "Task completed successfully. $stoppedReason" >> $GITHUB_STEP_SUMMARY
+                exit 0
+              fi
+              elif [[ "$lastStatus" == "STOPPED" ]]; then
+                echo "Task stopped with stop code $stopCode with reason: $stoppedReason and exit code: $exitCode"
+                echo "Task stopped with stop code $stopCode with reason: $stoppedReason and exit code: $exitCode" >> $GITHUB_STEP_SUMMARY
               exit 1
-            else
-              echo "Task completed successfully"
-              echo "## Task completed successfully" >> $GITHUB_STEP_SUMMARY
-              echo "$STOPPED_REASON" >> $GITHUB_STEP_SUMMARY
-              exit 0
             fi
-
-          else 
-            echo "Task stopped with stop code $STOP_CODE"
-            exit 1
-          fi
+            sleep 10
+          done
