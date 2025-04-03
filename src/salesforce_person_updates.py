@@ -363,7 +363,7 @@ class SalesforcePersonUpdates:
                 raise thread.exception
 
     def update_single_person(self, huids):
-        pds_query = self.app_config.pds_query
+        pds_query = copy.deepcopy(self.app_config.pds_query)
         # if 'conditions' not in pds_query:
         pds_query['conditions'] = {}
         pds_query['conditions']['univid'] = huids
@@ -391,7 +391,7 @@ class SalesforcePersonUpdates:
 
         logger.info(f"Processing updates since {watermark}")
 
-        pds_query = self.app_config.pds_query
+        pds_query = copy.deepcopy(self.app_config.pds_query)
         if 'conditions' not in pds_query:
             pds_query['conditions'] = {}
         if len(pds_query['conditions'].keys()) > 0:
@@ -473,7 +473,7 @@ class SalesforcePersonUpdates:
                         raise Exception(f"Filtered id list is too large: {len(filtered_id_list)} or add a record_limit")
                     self.hsf.flag_field(object_name='Contact', external_id=external_id, flag_name=updated_flag, value=False, ids=filtered_id_list)
                     try:
-                        pds_query = self.app_config.pds_query
+                        pds_query = copy.deepcopy(self.app_config.pds_query)
                         pds_query['conditions'] = {}
                         pds_query['conditions'][pds_id] = filtered_id_list
                         # NOTE: this can fail if the id list is too large (due to elastic search limitations)
@@ -506,7 +506,7 @@ class SalesforcePersonUpdates:
 
         try:
 
-            pds_query = self.app_config.pds_query
+            pds_query = copy.deepcopy(self.app_config.pds_query)
             if updates_only and False:
                 # if we are updating only, we need to add ids to the query..
                 if 'conditions' not in pds_query:
@@ -546,7 +546,7 @@ class SalesforcePersonUpdates:
 
         # without the pds_query, it uses the "full" configured query
         if pds_query is None:
-            pds_query = self.app_config.pds_query
+            pds_query = copy.deepcopy(self.app_config.pds_query)
 
         logger.info(f"{pds_query}")
 
@@ -980,7 +980,7 @@ class SalesforcePersonUpdates:
 
     def get_all_updated_people(self, watermark=None) -> list:
         # get all updates ids from the pds
-        pds_query = self.app_config.pds_query
+        pds_query = copy.deepcopy(self.app_config.pds_query)
         pds_id_name = self.app_config.config['Contact']['Id']['pds']
         pds_query['fields'] = [pds_id_name]
         if not watermark:
