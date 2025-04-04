@@ -7,6 +7,7 @@ import json
 import boto3
 import threading
 from datetime import datetime, timedelta
+import pytz
 
 from dotenv import load_dotenv
 load_dotenv() 
@@ -72,7 +73,8 @@ class AppConfig():
         self.dept_apikey = None
 
         # for updates, this is what we'll use for updating the watermark
-        self.starting_timestamp = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+        eastern = pytz.timezone('US/Eastern')
+        self.starting_timestamp = datetime.now(eastern).strftime('%Y-%m-%dT%H:%M:%S')
 
         if self.local:
             self.set_local_config_values()
@@ -113,7 +115,8 @@ class AppConfig():
 
         # default the watermarks to one day ago if they're not defined (locally)
         #   and ensure they're datetime format
-        one_day_ago = datetime.now() - timedelta(days=1)
+        eastern = pytz.timezone('US/Eastern')
+        one_day_ago = datetime.now(eastern) - timedelta(days=1)
         person_watermark_env = os.getenv('PERSON_WATERMARK') or False
         if person_watermark_env:
             person_watermark = datetime.strptime(person_watermark_env, '%Y-%m-%dT%H:%M:%S').date()

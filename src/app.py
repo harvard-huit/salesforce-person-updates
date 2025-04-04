@@ -6,6 +6,7 @@ import os
 import json
 import time
 from datetime import datetime
+import pytz
 
 
 import inspect
@@ -138,7 +139,8 @@ try:
         try:
             account_watermark = sfpu.app_config.watermarks.get('account', None)
             if account_watermark is not None:
-                today = datetime.now().weekday()
+                eastern = pytz.timezone('US/Eastern')
+                today = datetime.now(eastern).weekday()
                 accout_watermark_day = account_watermark.weekday()
                 if today != accout_watermark_day:
 

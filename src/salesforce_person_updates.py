@@ -12,6 +12,7 @@ import logging
 import time
 import math
 from datetime import datetime
+import pytz
 
 #### DEV debugging section #########
 from pprint import pformat
@@ -84,7 +85,8 @@ class SalesforcePersonUpdates:
             else: 
                 logger.info(f"Starting PDC {self.action} action on: {self.salesforce_instance_id} with version: {self.version}")
 
-            current_time_mash = datetime.now().strftime('%Y%m%d%H%M')
+            eastern = pytz.timezone('US/Eastern')
+            current_time_mash = datetime.now(eastern).strftime('%Y%m%d%H%M')
             self.run_id = f"{self.action}_{current_time_mash}"
 
 
@@ -483,7 +485,8 @@ class SalesforcePersonUpdates:
                         raise e
 
             # This will handle the case where the data has moved out of the security level of the customers pds key
-            today = datetime.now().weekday()
+            eastern = pytz.timezone('US/Eastern')
+            today = datetime.now(eastern).weekday()
             watermark_day = watermark.weekday()
             if today != watermark_day:
                 # if this is a new day, go through the cleanup process
@@ -683,12 +686,13 @@ class SalesforcePersonUpdates:
                     break
 
             # get current timestamp
-            current_time = datetime.now()
+            eastern = pytz.timezone('US/Eastern')
+            current_time = datetime.now(eastern)
             reasonable_duration = 60 * 60 * 2 # 2 hours
             if len(self.batch_threads) > 0:
                 logger.info(f"Finishing remaining processing threads: {len(self.batch_threads)}")
             while(self.batch_threads):
-                if (datetime.now() - current_time).total_seconds() > reasonable_duration:
+                if (datetime.now(eastern) - current_time).total_seconds() > reasonable_duration:
                     raise Exception(f"Something went wrong with the processing. It took too long.")
                 for thread in self.batch_threads.copy():
                     if not thread.is_alive():
