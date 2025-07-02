@@ -530,12 +530,13 @@ class HarvardSalesforce:
         if 'updateable' not in self.type_data[object][field]:
             raise Exception(f"Error: field ({field}) does not have an associated `updateable`")
 
-        # NOTE: Salesforce cannot take a null value directly, it needs to take the value: '#N/A'?
         if value is None:
+            if self.type_data[object][field]['type'] in ["boolean"]:
+                return False
             return None
         
         # NOTE: adding this test to handle empty DotMaps
-        if bool(value) == False:
+        if bool(value) == False and self.type_data[object][field]['type'] not in ["boolean"]:
             if value != False:
                 return None
 

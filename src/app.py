@@ -221,16 +221,23 @@ try:
 
     elif action == "delete-all-data":
         logger.warning(f"delete-all-data action called")
-        for object_name in sfpu.app_config.config.keys():
+        for object_name in sfpu.app_config.config.keys().reverse():
             logger.info(f"{object_name}")
-            external_id = sfpu.app_config.config[object_name]['Id']['salesforce']
-            result = sfpu.hsf.sf.query_all(f"SELECT Id, {external_id} FROM {object_name} WHERE {external_id} != null ORDER BY LastModifiedDate DESC")
-            logger.info(f"Found {len(result['records'])} {object_name} records")
-            # delete them all
-            ids = [{'Id': record['Id']} for record in result['records']]
-            logger.warning(f"attempting delete")
-            # sfpu.hsf.sf.bulk.__getattr__(object_name).delete(ids)
-            logger.warning(f"delete complete")
+            if isinstance(sfpu.app_config.config[object_name], list):
+                objects = sfpu.app_config.config[object_name]
+            else:
+                objects = [sfpu.app_config.config[object_name]]
+
+            for obj in objects:
+
+                external_id = obj['Id']['salesforce']
+                result = sfpu.hsf.sf.query_all(f"SELECT Id, {external_id} FROM {object_name} WHERE {external_id} != null ORDER BY LastModifiedDate DESC")
+                logger.info(f"Found {len(result['records'])} {object_name} records")
+                # delete them all
+                ids = [{'Id': record['Id']} for record in result['records']]
+                logger.warning(f"attempting delete")
+                sfpu.hsf.sf.bulk.__getattr__(object_name).delete(ids)
+                logger.warning(f"delete complete")
 
         logger.info(f"delete-all-data action finished")
     elif action == "delete-account-data":
@@ -273,6 +280,13 @@ try:
         logger.info(f"duplicate-check action finished")
     elif action == "test":
         logger.info(f"test action called")
+
+        # result = sfpu.hsf.sf.query_all(f"SELECT Id, HUDA__hud_DEPT_ID__c, HUDA__hud_EFF_STATUS__c FROM Account WHERE HUDA__hud_DEPT_ID__c = '104580' LIMIT 200")
+        # logger.info(f"Found {len(result['records'])} Account records")
+        # logger.info(f"{result['records']}")
+
+        sfpu.cleanup_updateds('Affiliation__c')
+
         logger.info(f"test action finished")
     else: 
         logger.warning(f"App triggered without a valid action: {action}, please see documentation for more information.")
