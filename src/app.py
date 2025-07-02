@@ -281,11 +281,6 @@ try:
     elif action == "test":
         logger.info(f"test action called")
 
-        # result = sfpu.hsf.sf.query_all(f"SELECT Id, HUDA__hud_DEPT_ID__c, HUDA__hud_EFF_STATUS__c FROM Account WHERE HUDA__hud_DEPT_ID__c = '104580' LIMIT 200")
-        # logger.info(f"Found {len(result['records'])} Account records")
-        # logger.info(f"{result['records']}")
-
-        sfpu.cleanup_updateds('Affiliation__c')
 
         logger.info(f"test action finished")
     else: 
