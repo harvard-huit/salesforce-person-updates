@@ -8,9 +8,9 @@ from salesforce_person_updates import SalesforcePersonUpdates, logger
 class SalesforcePersonUpdatesTest(unittest.TestCase):
 
     def setUp(self):
-        # patcher = mock.patch('salesforce_person_updates.logger')
-        # self.mock_logger = patcher.start()
-        # self.addCleanup(patcher.stop)
+        patcher = mock.patch('salesforce_person_updates.logger')
+        self.mock_logger = patcher.start()
+        self.addCleanup(patcher.stop)
 
         patcher = mock.patch('salesforce_person_updates.HarvardSalesforce', autospec=True)
         self.mock_hsf = patcher.start()
