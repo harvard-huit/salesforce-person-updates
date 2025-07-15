@@ -388,6 +388,7 @@ class SalesforcePersonUpdates:
         logger.info(f"Finished spot data load: {self.run_id}")
 
     def update_people_data_load(self, watermark: datetime=None, updates_only=False):
+        
         if not watermark:
             watermark = self.app_config.watermarks['person']
 
@@ -413,7 +414,7 @@ class SalesforcePersonUpdates:
                 logger.warning(f"Updated id list may be too large for the PDS to handle: {len(updated_ids)}")
             pds_query['conditions'][self.app_config.config['Contact']['Id']['pds']] = updated_ids
 
-        self.people_data_load(pds_query=pds_query)
+        updated_count = self.people_data_load(pds_query=pds_query)
 
         if 'updatedFlag' in self.app_config.config['Contact']:
             updated_flag = self.app_config.config['Contact']['updatedFlag']
@@ -501,25 +502,45 @@ class SalesforcePersonUpdates:
 
                 # self.cleanup_updateds()
 
-        watermark = self.app_config.update_watermark("person")
-        logger.info(f"Watermark updated: {watermark}")
+        if updated_count > 0:
+            logger.info(f"Updated {updated_count} records in Salesforce")
+            watermark = self.app_config.update_watermark("person")
+            logger.info(f"Watermark updated: {watermark}")
+        else:
+            logger.info(f"No updates found since {watermark}. No records updated in Salesforce.")
 
     def full_people_data_load(self, dry_run=False, updates_only=False):
         logger.info(f"Processing full data load")
 
         try:
 
-            pds_query = copy.deepcopy(self.app_config.pds_query)
-            if updates_only and False:
-                # if we are updating only, we need to add ids to the query..
-                if 'conditions' not in pds_query:
-                    pds_query['conditions'] = {}
-                all_ids = self.hsf.get_all_external_ids(object_name='Contact', external_id=self.app_config.config['Contact']['Id']['salesforce'])
-                pds_query['conditions'][self.app_config.config['Contact']['Id']['pds']] = all_ids
-                # this may fail if the id list is too large ... this requires testing
-                # TODO: test this!
+            # pds_query = copy.deepcopy(self.app_config.pds_query)
+            # if updates_only and False:
+            #     # if we are updating only, we need to add ids to the query..
+            #     if 'conditions' not in pds_query:
+            #         pds_query['conditions'] = {}
+            #     all_ids = self.hsf.get_all_external_ids(object_name='Contact', external_id=self.app_config.config['Contact']['Id']['salesforce'])
+            #     pds_query['conditions'][self.app_config.config['Contact']['Id']['pds']] = all_ids
+            #     # this may fail if the id list is too large ... this requires testing
+            #     # TODO: test this!
 
-            self.people_data_load(dry_run=dry_run)
+
+            pds_query = copy.deepcopy(self.app_config.pds_query)
+            # if this is using pds security category D AND it's running in a test/sandbox salesforce instance, 
+            # we need to limit the amount of records returned
+            if self.app_config.pds_security_category == 'D' and self.app_config.salesforce_domain == 'test':
+                if 'conditions' not in pds_query:
+                    pds_query['conditions'] = []
+                if isinstance(pds_query['conditions'], dict):
+                    new_conditions = []
+                    for key, value in self.app_config.pds_query['conditions'].items():
+                        if key != 'sourceUpdateDate':
+                            new_conditions.append({key: value})
+                    pds_query['conditions'] = new_conditions
+                pds_query['conditions'].append({"sourceUpdateDate": "2020-01-01"})
+            
+            
+            self.people_data_load(dry_run=dry_run, pds_query=pds_query)
 
             logger.debug(f"Waiting for batch jobs to finish.")
             while(self.batch_threads):
@@ -551,7 +572,7 @@ class SalesforcePersonUpdates:
         if pds_query is None:
             pds_query = copy.deepcopy(self.app_config.pds_query)
 
-        logger.info(f"{pds_query}")
+        logger.debug(f"{pds_query}")
 
         try:
             self.pds.start_pagination(pds_query)
@@ -698,6 +719,7 @@ class SalesforcePersonUpdates:
                     if not thread.is_alive():
                         self.batch_threads.remove(thread)
 
+            return current_count
 
         except Exception as e:
             logger.error(f"Something went wrong with the processing. ({e})")

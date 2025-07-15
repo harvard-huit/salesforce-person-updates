@@ -49,6 +49,7 @@ class AppConfig():
         self.salesforce_username = None
         self.salesforce_domain = None
         self.pds_query = None
+        self.pds_security_category = 'Unknown'
         self.config = None
         self.watermarks = {
             "person": None,
@@ -204,6 +205,14 @@ class AppConfig():
 
                 self.pds_apikey = self.get_secret(pds_apikey_arn)
                 self.dept_apikey = self.get_secret(dept_apikey_arn)
+
+                if 'CRM-PDC-D' in pds_apikey_arn:
+                    self.pds_security_category = 'D'
+                elif 'CRM-PDC-C' in pds_apikey_arn:
+                    self.pds_security_category = 'C'
+                else:
+                    logger.warning(f"Warning: pds_apikey_arn {pds_apikey_arn} does not match expected format for security category")
+                    self.pds_security_category = 'Unknown'  # default to D if not found
 
             except Exception as e:
                 logger.error(f"Error: failure to get secrets manager values")    
