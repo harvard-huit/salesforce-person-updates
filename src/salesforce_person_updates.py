@@ -11,7 +11,7 @@ import json
 import logging
 import time
 import math
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 
 #### DEV debugging section #########
@@ -538,7 +538,7 @@ class SalesforcePersonUpdates:
                         if key != 'sourceUpdateDate':
                             new_conditions.append({key: value})
                     pds_query['conditions'] = new_conditions
-                five_years_ago_string = datetime.now(pytz.timezone('US/Eastern')).timedelta(years=-5).strftime('%Y-%m-%d')
+                five_years_ago_string = (datetime.now(pytz.timezone('US/Eastern')) - timedelta(days=365*5)).strftime('%Y-%m-%d')
                 pds_query['conditions'].append({"sourceUpdateDate": ">" + five_years_ago_string})
                 logger.warning(f"Running in a test/sandbox Salesforce instance with PDS security category D. Limiting records to last 5 years of updates ({five_years_ago_string}).")
             
