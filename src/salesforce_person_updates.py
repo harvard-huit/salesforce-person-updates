@@ -531,13 +531,16 @@ class SalesforcePersonUpdates:
             if self.app_config.pds_security_category == 'D' and self.app_config.salesforce_domain == 'test':
                 if 'conditions' not in pds_query:
                     pds_query['conditions'] = []
+                # this block will convert the conditions to a list format if it's a dict
                 if isinstance(pds_query['conditions'], dict):
                     new_conditions = []
                     for key, value in self.app_config.pds_query['conditions'].items():
                         if key != 'sourceUpdateDate':
                             new_conditions.append({key: value})
                     pds_query['conditions'] = new_conditions
-                pds_query['conditions'].append({"sourceUpdateDate": "2020-01-01"})
+                five_years_ago_string = datetime.now(pytz.timezone('US/Eastern')).timedelta(years=-5).strftime('%Y-%m-%d')
+                pds_query['conditions'].append({"sourceUpdateDate": ">" + five_years_ago_string})
+                logger.warning(f"Running in a test/sandbox Salesforce instance with PDS security category D. Limiting records to last 5 years of updates ({five_years_ago_string}).")
             
             
             self.people_data_load(dry_run=dry_run, pds_query=pds_query)
@@ -591,13 +594,10 @@ class SalesforcePersonUpdates:
             backlog = []
             while True:
 
-                # logger.debug(f"Getting next batch: {batch_count} ({current_count}/{total_count}) -- backlog: {len(backlog)}")
-                # logger.debug(f"is_paginating: {self.pds.is_paginating}")
+                logger.debug(f"Getting next batch: {batch_count} ({current_count}/{total_count}) -- backlog: {len(backlog)}")
 
                 results = self.pds.next_page_results()
                 current_run_result_count = len(results)
-
-                # logger.info(f"got results... {current_run_result_count} records")
 
                 if len(backlog) > 0:
                     # if we have a backlog, we need to add it to the results
