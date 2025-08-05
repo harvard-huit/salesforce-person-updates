@@ -7,6 +7,7 @@ import json
 import boto3
 import threading
 from datetime import datetime, timedelta
+import pytz
 
 from dotenv import load_dotenv
 load_dotenv() 
@@ -48,6 +49,7 @@ class AppConfig():
         self.salesforce_username = None
         self.salesforce_domain = None
         self.pds_query = None
+        self.pds_security_category = 'Unknown'
         self.config = None
         self.watermarks = {
             "person": None,
@@ -72,7 +74,8 @@ class AppConfig():
         self.dept_apikey = None
 
         # for updates, this is what we'll use for updating the watermark
-        self.starting_timestamp = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+        eastern = pytz.timezone('US/Eastern')
+        self.starting_timestamp = datetime.now(eastern).strftime('%Y-%m-%dT%H:%M:%S')
 
         if self.local:
             self.set_local_config_values()
@@ -113,7 +116,8 @@ class AppConfig():
 
         # default the watermarks to one day ago if they're not defined (locally)
         #   and ensure they're datetime format
-        one_day_ago = datetime.now() - timedelta(days=1)
+        eastern = pytz.timezone('US/Eastern')
+        one_day_ago = datetime.now(eastern) - timedelta(days=1)
         person_watermark_env = os.getenv('PERSON_WATERMARK') or False
         if person_watermark_env:
             person_watermark = datetime.strptime(person_watermark_env, '%Y-%m-%dT%H:%M:%S').date()
@@ -201,6 +205,14 @@ class AppConfig():
 
                 self.pds_apikey = self.get_secret(pds_apikey_arn)
                 self.dept_apikey = self.get_secret(dept_apikey_arn)
+
+                if 'CRM-PDC-D' in pds_apikey_arn:
+                    self.pds_security_category = 'D'
+                elif 'CRM-PDC-C' in pds_apikey_arn:
+                    self.pds_security_category = 'C'
+                else:
+                    logger.warning(f"Warning: pds_apikey_arn {pds_apikey_arn} does not match expected format for security category")
+                    self.pds_security_category = 'Unknown'  # default to D if not found
 
             except Exception as e:
                 logger.error(f"Error: failure to get secrets manager values")    

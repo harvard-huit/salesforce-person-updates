@@ -11,7 +11,8 @@ import json
 import logging
 import time
 import math
-from datetime import datetime
+from datetime import datetime, timedelta
+import pytz
 
 #### DEV debugging section #########
 from pprint import pformat
@@ -84,7 +85,8 @@ class SalesforcePersonUpdates:
             else: 
                 logger.info(f"Starting PDC {self.action} action on: {self.salesforce_instance_id} with version: {self.version}")
 
-            current_time_mash = datetime.now().strftime('%Y%m%d%H%M')
+            eastern = pytz.timezone('US/Eastern')
+            current_time_mash = datetime.now(eastern).strftime('%Y%m%d%H%M')
             self.run_id = f"{self.action}_{current_time_mash}"
 
 
@@ -386,6 +388,7 @@ class SalesforcePersonUpdates:
         logger.info(f"Finished spot data load: {self.run_id}")
 
     def update_people_data_load(self, watermark: datetime=None, updates_only=False):
+        
         if not watermark:
             watermark = self.app_config.watermarks['person']
 
@@ -411,7 +414,7 @@ class SalesforcePersonUpdates:
                 logger.warning(f"Updated id list may be too large for the PDS to handle: {len(updated_ids)}")
             pds_query['conditions'][self.app_config.config['Contact']['Id']['pds']] = updated_ids
 
-        self.people_data_load(pds_query=pds_query)
+        updated_count = self.people_data_load(pds_query=pds_query)
 
         if 'updatedFlag' in self.app_config.config['Contact']:
             updated_flag = self.app_config.config['Contact']['updatedFlag']
@@ -483,7 +486,8 @@ class SalesforcePersonUpdates:
                         raise e
 
             # This will handle the case where the data has moved out of the security level of the customers pds key
-            today = datetime.now().weekday()
+            eastern = pytz.timezone('US/Eastern')
+            today = datetime.now(eastern).weekday()
             watermark_day = watermark.weekday()
             if today != watermark_day:
                 # if this is a new day, go through the cleanup process
@@ -498,25 +502,48 @@ class SalesforcePersonUpdates:
 
                 # self.cleanup_updateds()
 
-        watermark = self.app_config.update_watermark("person")
-        logger.info(f"Watermark updated: {watermark}")
+        if updated_count > 0:
+            logger.info(f"Updated {updated_count} records in Salesforce")
+            watermark = self.app_config.update_watermark("person")
+            logger.info(f"Watermark updated: {watermark}")
+        else:
+            logger.info(f"No updates found since {watermark}. No records updated in Salesforce.")
 
     def full_people_data_load(self, dry_run=False, updates_only=False):
         logger.info(f"Processing full data load")
 
         try:
 
-            pds_query = copy.deepcopy(self.app_config.pds_query)
-            if updates_only and False:
-                # if we are updating only, we need to add ids to the query..
-                if 'conditions' not in pds_query:
-                    pds_query['conditions'] = {}
-                all_ids = self.hsf.get_all_external_ids(object_name='Contact', external_id=self.app_config.config['Contact']['Id']['salesforce'])
-                pds_query['conditions'][self.app_config.config['Contact']['Id']['pds']] = all_ids
-                # this may fail if the id list is too large ... this requires testing
-                # TODO: test this!
+            # pds_query = copy.deepcopy(self.app_config.pds_query)
+            # if updates_only and False:
+            #     # if we are updating only, we need to add ids to the query..
+            #     if 'conditions' not in pds_query:
+            #         pds_query['conditions'] = {}
+            #     all_ids = self.hsf.get_all_external_ids(object_name='Contact', external_id=self.app_config.config['Contact']['Id']['salesforce'])
+            #     pds_query['conditions'][self.app_config.config['Contact']['Id']['pds']] = all_ids
+            #     # this may fail if the id list is too large ... this requires testing
+            #     # TODO: test this!
 
-            self.people_data_load(dry_run=dry_run)
+
+            pds_query = copy.deepcopy(self.app_config.pds_query)
+            # if this is using pds security category D AND it's running in a test/sandbox salesforce instance, 
+            # we need to limit the amount of records returned
+            if self.app_config.pds_security_category == 'D' and self.app_config.salesforce_domain == 'test':
+                if 'conditions' not in pds_query:
+                    pds_query['conditions'] = []
+                # this block will convert the conditions to a list format if it's a dict
+                if isinstance(pds_query['conditions'], dict):
+                    new_conditions = []
+                    for key, value in self.app_config.pds_query['conditions'].items():
+                        if key != 'sourceUpdateDate':
+                            new_conditions.append({key: value})
+                    pds_query['conditions'] = new_conditions
+                five_years_ago_string = (datetime.now(pytz.timezone('US/Eastern')) - timedelta(days=365*5)).strftime('%Y-%m-%d')
+                pds_query['conditions'].append({"sourceUpdateDate": ">" + five_years_ago_string})
+                logger.warning(f"Running in a test/sandbox Salesforce instance with PDS security category D. Limiting records to last 5 years of updates ({five_years_ago_string}).")
+            
+            
+            self.people_data_load(dry_run=dry_run, pds_query=pds_query)
 
             logger.debug(f"Waiting for batch jobs to finish.")
             while(self.batch_threads):
@@ -548,7 +575,7 @@ class SalesforcePersonUpdates:
         if pds_query is None:
             pds_query = copy.deepcopy(self.app_config.pds_query)
 
-        logger.info(f"{pds_query}")
+        logger.debug(f"{pds_query}")
 
         try:
             self.pds.start_pagination(pds_query)
@@ -567,13 +594,10 @@ class SalesforcePersonUpdates:
             backlog = []
             while True:
 
-                # logger.debug(f"Getting next batch: {batch_count} ({current_count}/{total_count}) -- backlog: {len(backlog)}")
-                # logger.debug(f"is_paginating: {self.pds.is_paginating}")
+                logger.debug(f"Getting next batch: {batch_count} ({current_count}/{total_count}) -- backlog: {len(backlog)}")
 
                 results = self.pds.next_page_results()
                 current_run_result_count = len(results)
-
-                # logger.info(f"got results... {current_run_result_count} records")
 
                 if len(backlog) > 0:
                     # if we have a backlog, we need to add it to the results
@@ -683,17 +707,19 @@ class SalesforcePersonUpdates:
                     break
 
             # get current timestamp
-            current_time = datetime.now()
+            eastern = pytz.timezone('US/Eastern')
+            current_time = datetime.now(eastern)
             reasonable_duration = 60 * 60 * 2 # 2 hours
             if len(self.batch_threads) > 0:
                 logger.info(f"Finishing remaining processing threads: {len(self.batch_threads)}")
             while(self.batch_threads):
-                if (datetime.now() - current_time).total_seconds() > reasonable_duration:
+                if (datetime.now(eastern) - current_time).total_seconds() > reasonable_duration:
                     raise Exception(f"Something went wrong with the processing. It took too long.")
                 for thread in self.batch_threads.copy():
                     if not thread.is_alive():
                         self.batch_threads.remove(thread)
 
+            return current_count
 
         except Exception as e:
             logger.error(f"Something went wrong with the processing. ({e})")

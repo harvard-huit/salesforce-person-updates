@@ -6,6 +6,7 @@ import os
 import json
 import time
 from datetime import datetime
+import pytz
 
 
 import inspect
@@ -138,7 +139,8 @@ try:
         try:
             account_watermark = sfpu.app_config.watermarks.get('account', None)
             if account_watermark is not None:
-                today = datetime.now().weekday()
+                eastern = pytz.timezone('US/Eastern')
+                today = datetime.now(eastern).weekday()
                 accout_watermark_day = account_watermark.weekday()
                 if today != accout_watermark_day:
 
@@ -219,16 +221,23 @@ try:
 
     elif action == "delete-all-data":
         logger.warning(f"delete-all-data action called")
-        for object_name in sfpu.app_config.config.keys():
+        for object_name in sfpu.app_config.config.keys().reverse():
             logger.info(f"{object_name}")
-            external_id = sfpu.app_config.config[object_name]['Id']['salesforce']
-            result = sfpu.hsf.sf.query_all(f"SELECT Id, {external_id} FROM {object_name} WHERE {external_id} != null ORDER BY LastModifiedDate DESC")
-            logger.info(f"Found {len(result['records'])} {object_name} records")
-            # delete them all
-            ids = [{'Id': record['Id']} for record in result['records']]
-            logger.warning(f"attempting delete")
-            # sfpu.hsf.sf.bulk.__getattr__(object_name).delete(ids)
-            logger.warning(f"delete complete")
+            if isinstance(sfpu.app_config.config[object_name], list):
+                objects = sfpu.app_config.config[object_name]
+            else:
+                objects = [sfpu.app_config.config[object_name]]
+
+            for obj in objects:
+
+                external_id = obj['Id']['salesforce']
+                result = sfpu.hsf.sf.query_all(f"SELECT Id, {external_id} FROM {object_name} WHERE {external_id} != null ORDER BY LastModifiedDate DESC")
+                logger.info(f"Found {len(result['records'])} {object_name} records")
+                # delete them all
+                ids = [{'Id': record['Id']} for record in result['records']]
+                logger.warning(f"attempting delete")
+                sfpu.hsf.sf.bulk.__getattr__(object_name).delete(ids)
+                logger.warning(f"delete complete")
 
         logger.info(f"delete-all-data action finished")
     elif action == "delete-account-data":
@@ -272,8 +281,6 @@ try:
     elif action == "test":
         logger.info(f"test action called")
 
-        sfpu.cleanup_updateds(object_name='Contact')
-        sfpu.cleanup_updateds(object_name='Affiliation__c')
 
         logger.info(f"test action finished")
     else: 
