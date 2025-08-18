@@ -825,6 +825,7 @@ class SalesforcePersonUpdates:
                 logger.info(f"composite query: {batch_query}")
                 results = self.pds.search(batch_query)
                 if 'results' not in results:
+                    logger.error(f"Error getting pds ids: {results}")
                     break
 
                 pds_ids_in_pds = []
