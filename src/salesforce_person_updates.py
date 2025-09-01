@@ -807,46 +807,53 @@ class SalesforcePersonUpdates:
         # step through the sf ids 800 at a time
         for i in range(0, len(all_sf_ids), self.pds.batch_size):
             sf_ids_batch = all_sf_ids[i:i+self.pds.batch_size]
-            batch_query = copy.deepcopy(temp_pds_query)
 
-            if len(pds_ids) > 1:
-                temp_or_conditions = []
-                for pds_id in pds_ids:
-                    temp_or_conditions.append({pds_id: sf_ids_batch})
-                batch_query['conditions'].append({
-                    "or": temp_or_conditions
-                })
-            else:
-                batch_query['conditions'].append({
-                    pds_ids[0]: sf_ids_batch
-                })
+            # this loop is needed for objects that have multiple pds ids, specifically Affiliations
+            pds_ids_in_pds = []
+
+            for pds_id in pds_ids:
+                # deepcopy needed because even though "pointers don't exist in python", lists and dicts are mutable
+                batch_query = copy.deepcopy(temp_pds_query)
+                batch_query['conditions'].append({pds_id: sf_ids_batch})
+
+                if '.' in pds_id:
+                    branch = pds_id.split('.')[0]
+                    sub_id = pds_id.split('.')[1]
+                else:
+                    branch = None
+                    sub_id = pds_id
                 
-            try:
-                logger.info(f"composite query: {batch_query}")
-                results = self.pds.search(batch_query)
-                if 'results' not in results:
-                    logger.error(f"Error getting pds ids: {results}")
-                    break
+                try:
+                    logger.debug(f"composite query: {batch_query}")
+                    results = self.pds.search(batch_query)
+                    if 'results' not in results:
+                        logger.error(f"Error getting pds ids: {results}")
+                        break
 
-                pds_ids_in_pds = []
+                except Exception as e:
+                    logger.error(f"Error getting pds ids: {e}, pds_query: {batch_query}")
+                    raise e
+
                 for person in results['results']:
-                    for pds_id in pds_ids:
-                        if '.' in pds_id:
-                            pds_id_pieces = pds_id.split('.')
-                            if pds_id_pieces[0] in person:
-                                for piece in person[pds_id_pieces[0]]:
-                                    pds_ids_in_pds.append(str(piece[pds_id_pieces[1]]))
-                        else:
-                            pds_ids_in_pds.append(str(person[pds_id]))
+                    if branch:
+                        if branch not in person.keys():
+                            continue
+                        if sub_id not in person[branch][0].keys():
+                            continue
+                        sub_id_value = str(person[branch][0][sub_id])
+                        if sub_id_value in all_sf_ids:
+                            pds_ids_in_pds.append(sub_id_value)
+                    else:
+                        if sub_id not in person:
+                            continue
+                        if person[sub_id] in all_sf_ids:
+                            pds_ids_in_pds.append(person[sub_id])
+                            
 
-                logger.info(f"Found {len(pds_ids_in_pds)}/{len(sf_ids_batch)} ids in PDS")
-                if len(pds_ids_in_pds) < len(sf_ids_batch):
-                    # get the diff
-                    not_updating_ids += [item for item in sf_ids_batch if item not in pds_ids_in_pds]
-
-            except Exception as e:
-                logger.error(f"Error getting pds ids: {e}, pds_query: {batch_query}")
-                raise e
+            logger.info(f"Found {len(pds_ids_in_pds)}/{len(sf_ids_batch)} ids in PDS")
+            if len(pds_ids_in_pds) < len(sf_ids_batch):
+                # get the diff
+                not_updating_ids += [item for item in sf_ids_batch if item not in pds_ids_in_pds]
 
         if len(not_updating_ids) == len(all_sf_ids):
             raise Exception(f"Something went wrong, all records are not updating: {len(not_updating_ids)}")

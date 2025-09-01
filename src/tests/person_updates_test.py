@@ -136,6 +136,9 @@ class SalesforcePersonUpdatesTest(unittest.TestCase):
 
     def test_cleanup_updateds_on_Affiliation(self):
         self.mock_hsf_instance.get_all_external_ids.return_value = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
+        # This test is a little odd because affiliations will be making 3 calls to the PDS and the result won't look like this
+        # but for the sake of the test, this is fine as the ids not being looked for will be ignored
+        # Effectively, this will be making a call to the PDS 3 times and returning this same result each time
         self.mock_pds_instance.search.return_value = {
             "count": 5,
             "total_count": 5,
