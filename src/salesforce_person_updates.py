@@ -770,7 +770,130 @@ class SalesforcePersonUpdates:
 
         logger.warning(f"Delete Done, I hope you meant to do that.")
 
-    def cleanup_updateds(self, object_name='Contact'):
+    def cleanup_updateds(self):
+        # 1. Get all objects that have an updatedFlag
+        # and set up a hash for all of the ids we find in salesforce
+        all_sf_ids = {}
+        # and fields needed for the pds query
+        fields_needed = []
+        field_object_map = {}
+
+        # 2. Get all (external) IDs from Salesforce
+        # not sure if this should be limited to contacts with updatedFlag = True
+        # all_sf_ids = self.hsf.get_all_external_ids(object_name='Contact', external_id=contact_external_id, updated_flag_name=updated_flag, updated_flag_value=True)        
+
+        logger.info(f"Checking PDS for records that are no longer being updated (all objects)")
+        for(object_name, object_config) in self.app_config.config.items():
+            # contact external id is always needed
+            if 'updatedFlag' in object_config or object_name == 'Contact':
+                if 'updatedFlag' not in object_config:
+                    updated_flag = None
+                    updated_flag_value = False
+                else:
+                    updated_flag = object_config['updatedFlag']
+                    updated_flag_value = True
+                external_id = object_config['Id']['salesforce']
+                pds_id_name = object_config['Id']['pds']
+                if isinstance(pds_id_name, list):
+                    for pds_id in pds_id_name:
+                        if pds_id not in fields_needed:
+                            fields_needed.append(pds_id)
+                            field_object_map[pds_id] = object_name
+                else:
+                    if pds_id_name not in fields_needed: 
+                        fields_needed.append(pds_id_name)
+                        field_object_map[pds_id_name] = object_name
+                
+                all_sf_ids[object_name] = self.hsf.get_all_external_ids(object_name=object_name, external_id=external_id, updated_flag_name=updated_flag, updated_flag_value=updated_flag_value)
+                logger.info(f"{object_name}: {len(all_sf_ids[object_name])} records to check")
+
+
+        # 3. Call PDS with the IDs from Contact with the fields gathered from the config
+        temp_pds_query = {}
+        temp_pds_query['fields'] = fields_needed
+
+        # we do need the conditions here because we don't want to be thinking we're 
+        #   updating a person when they aren't meeting the pds conditions and aren't actually being updated (this suuuucks)
+        temp_pds_query['conditions'] = []
+    
+        # if conditions is a dict, we need to convert it to a list 
+        #   this is just in case the conditions have an OR in them, as we are using an OR in the next step
+        if isinstance(self.app_config.pds_query['conditions'], dict):
+            for key, value in self.app_config.pds_query['conditions'].items():
+                temp_pds_query['conditions'].append({key: value})
+        elif isinstance(self.app_config.pds_query['conditions'], list):
+            temp_pds_query['conditions'] = self.app_config.pds_query['conditions']
+        
+        self.pds.batch_size = 800
+        # step through the sf ids 800 at a time
+        all_contact_ids = all_sf_ids['Contact']
+        for i in range(0, len(all_contact_ids), self.pds.batch_size):
+            contact_ids_batch = all_contact_ids[i:i+self.pds.batch_size]
+
+            # deepcopy needed because even though "pointers don't exist in python", lists and dicts are mutable
+            batch_query = copy.deepcopy(temp_pds_query)
+            batch_query['conditions'].append({self.app_config.config['Contact']['Id']['pds']: contact_ids_batch})
+
+            try:
+                logger.debug(f"composite query: {batch_query}")
+                results = self.pds.search(batch_query)
+                if 'results' not in results:
+                    logger.error(f"Error getting pds ids: {results}")
+                    break
+
+            except Exception as e:
+                logger.error(f"Error getting pds ids: {e}, pds_query: {batch_query}")
+                raise e
+
+
+            for person in results['results']:
+
+                for pds_field in fields_needed:                    
+                    object_name = field_object_map[pds_field]
+                    if '.' in pds_field:
+                        branch = pds_field.split('.')[0]
+                        sub_id = pds_field.split('.')[1]
+                    else:
+                        branch = None
+                        sub_id = pds_field
+
+                    if branch:
+                        # if the branch of this id isn't in the results for this person, skip it
+                        if branch not in person.keys():
+                            continue
+                        # if the branch is there, we need to loop through all items
+                        for b in person[branch]:
+                            # if the sub_id of this id isn't in the results for this person, skip it (not really sure this can happen)
+                            if sub_id not in b.keys():
+                                continue
+                            sub_id_value = str(b[sub_id])
+
+                            # if the id is in the list of sf ids for this object, remove it from the list
+                            if sub_id_value in all_sf_ids[object_name]:
+                                all_sf_ids[object_name].remove(sub_id_value)
+                                
+                    else:
+                        if sub_id not in person.keys():
+                            continue
+                        if person[sub_id] in all_sf_ids[object_name]:
+                            all_sf_ids[object_name].remove(person[sub_id])
+
+        # 4. Any IDs remaining in the hash are no longer in the PDS results, so we need to update them
+        for object_name in all_sf_ids.keys():
+            if 'updatedFlag' not in self.app_config.config[object_name]:
+                continue
+            if len(all_sf_ids[object_name]) == 0:
+                logger.info(f"No {object_name} records to update")
+                continue
+            if len(all_sf_ids[object_name]) == len(self.hsf.get_all_external_ids(object_name=object_name, external_id=self.app_config.config[object_name]['Id']['salesforce'], updated_flag_name=self.app_config.config[object_name]['updatedFlag'], updated_flag_value=True)):
+                raise Exception(f"Something went wrong, all {object_name} records are not updating: {len(all_sf_ids[object_name])}")
+            logger.info(f"Found {len(all_sf_ids[object_name])} ids in {object_name} that are no longer updating")
+            external_id = self.app_config.config[object_name]['Id']['salesforce']
+            updated_flag = self.app_config.config[object_name]['updatedFlag']
+            self.hsf.flag_field(object_name=object_name, external_id=external_id, flag_name=updated_flag, value=False, ids=all_sf_ids[object_name])
+
+        
+    def cleanup_updateds_old(self, object_name='Contact'):
 
         logger.info(f"Checking PDS for records that are no longer being updated ({object_name})")
 
@@ -781,6 +904,7 @@ class SalesforcePersonUpdates:
         pds_ids = self.app_config.config[object_name]['Id']['pds']
         all_sf_ids = self.hsf.get_all_external_ids(object_name=object_name, external_id=external_id, updated_flag_name=updated_flag, updated_flag_value=True)
         logger.info(f"Found {len(all_sf_ids)} ids in Salesforce with a True updated flag")
+
     
         
         # 2. Call PDS with those IDs
