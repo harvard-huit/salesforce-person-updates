@@ -826,8 +826,11 @@ class SalesforcePersonUpdates:
         
         self.pds.batch_size = 800
         # step through the sf ids 800 at a time
-        all_contact_ids = all_sf_ids['Contact']
+
+        # need to deepcopy because we're going to be modifying all_sf_ids
+        all_contact_ids = copy.deepcopy(all_sf_ids['Contact'])
         for i in range(0, len(all_contact_ids), self.pds.batch_size):
+
             contact_ids_batch = all_contact_ids[i:i+self.pds.batch_size]
 
             # deepcopy needed because even though "pointers don't exist in python", lists and dicts are mutable
