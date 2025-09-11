@@ -492,15 +492,7 @@ class SalesforcePersonUpdates:
             if today != watermark_day:
                 # if this is a new day, go through the cleanup process
                 logger.info(f"New day, running cleanup")
-
-                for(object_name, object_config) in self.app_config.config.items():
-                    if 'updatedFlag' in object_config:
-                        updated_flag = object_config['updatedFlag']
-                        external_id = object_config['Id']['salesforce']
-                        pds_id = object_config['Id']['pds']
-                        self.cleanup_updateds(object_name=object_name)
-
-                # self.cleanup_updateds()
+                self.cleanup_updateds()
 
         if updated_count > 0:
             logger.info(f"Updated {updated_count} records in Salesforce")
@@ -894,99 +886,6 @@ class SalesforcePersonUpdates:
             external_id = self.app_config.config[object_name]['Id']['salesforce']
             updated_flag = self.app_config.config[object_name]['updatedFlag']
             self.hsf.flag_field(object_name=object_name, external_id=external_id, flag_name=updated_flag, value=False, ids=all_sf_ids[object_name])
-
-        
-    def cleanup_updateds_old(self, object_name='Contact'):
-
-        logger.info(f"Checking PDS for records that are no longer being updated ({object_name})")
-
-        # 1. Get all (external) IDs from Salesforce
-        # get the external id we're using in the config for this org
-        external_id = self.app_config.config[object_name]['Id']['salesforce']
-        updated_flag = self.app_config.config[object_name]['updatedFlag']
-        pds_ids = self.app_config.config[object_name]['Id']['pds']
-        all_sf_ids = self.hsf.get_all_external_ids(object_name=object_name, external_id=external_id, updated_flag_name=updated_flag, updated_flag_value=True)
-        logger.info(f"Found {len(all_sf_ids)} ids in Salesforce with a True updated flag")
-
-    
-        
-        # 2. Call PDS with those IDs
-        # we do need the conditions here because we don't want to be thinking we're 
-        #   updating a person when they aren't meeting the pds conditions and aren't actually being updated (this suuuucks)
-        if not isinstance(pds_ids, list):
-            pds_ids = [pds_ids]
-        temp_pds_query = {}
-        temp_pds_query['fields'] = pds_ids
-        temp_pds_query['conditions'] = []
-
-
-        # if conditions is a dict, we need to convert it to a list 
-        #   this is just in case the conditions have an OR in them, as we are using an OR in the next step
-        if isinstance(self.app_config.pds_query['conditions'], dict):
-            for key, value in self.app_config.pds_query['conditions'].items():
-                temp_pds_query['conditions'].append({key: value})
-        elif isinstance(self.app_config.pds_query['conditions'], list):
-            temp_pds_query['conditions'] = self.app_config.pds_query['conditions']
-        
-        self.pds.batch_size = 800
-
-        not_updating_ids = []
-        # step through the sf ids 800 at a time
-        for i in range(0, len(all_sf_ids), self.pds.batch_size):
-            sf_ids_batch = all_sf_ids[i:i+self.pds.batch_size]
-
-            # this loop is needed for objects that have multiple pds ids, specifically Affiliations
-            pds_ids_in_pds = []
-
-            for pds_id in pds_ids:
-                # deepcopy needed because even though "pointers don't exist in python", lists and dicts are mutable
-                batch_query = copy.deepcopy(temp_pds_query)
-                batch_query['conditions'].append({pds_id: sf_ids_batch})
-
-                if '.' in pds_id:
-                    branch = pds_id.split('.')[0]
-                    sub_id = pds_id.split('.')[1]
-                else:
-                    branch = None
-                    sub_id = pds_id
-                
-                try:
-                    logger.debug(f"composite query: {batch_query}")
-                    results = self.pds.search(batch_query)
-                    if 'results' not in results:
-                        logger.error(f"Error getting pds ids: {results}")
-                        break
-
-                except Exception as e:
-                    logger.error(f"Error getting pds ids: {e}, pds_query: {batch_query}")
-                    raise e
-
-                for person in results['results']:
-                    if branch:
-                        if branch not in person.keys():
-                            continue
-                        if sub_id not in person[branch][0].keys():
-                            continue
-                        sub_id_value = str(person[branch][0][sub_id])
-                        if sub_id_value in all_sf_ids:
-                            pds_ids_in_pds.append(sub_id_value)
-                    else:
-                        if sub_id not in person:
-                            continue
-                        if person[sub_id] in all_sf_ids:
-                            pds_ids_in_pds.append(person[sub_id])
-                            
-
-            logger.info(f"Found {len(pds_ids_in_pds)}/{len(sf_ids_batch)} ids in PDS")
-            if len(pds_ids_in_pds) < len(sf_ids_batch):
-                # get the diff
-                not_updating_ids += [item for item in sf_ids_batch if item not in pds_ids_in_pds]
-
-        if len(not_updating_ids) == len(all_sf_ids):
-            raise Exception(f"Something went wrong, all records are not updating: {len(not_updating_ids)}")
-        logger.info(f"Found {len(not_updating_ids)}/{len(all_sf_ids)} ids in {object_name} that are no longer updating")
-
-        self.hsf.flag_field(object_name=object_name, external_id=external_id, flag_name=updated_flag, value=False, ids=not_updating_ids)
 
 
     # this method will create xls files with comparisons of data from 2 salesforce sources
