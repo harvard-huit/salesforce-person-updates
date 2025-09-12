@@ -821,6 +821,7 @@ class SalesforcePersonUpdates:
 
         # need to deepcopy because we're going to be modifying all_sf_ids
         all_contact_ids = copy.deepcopy(all_sf_ids['Contact'])
+
         for i in range(0, len(all_contact_ids), self.pds.batch_size):
 
             contact_ids_batch = all_contact_ids[i:i+self.pds.batch_size]
@@ -888,11 +889,15 @@ class SalesforcePersonUpdates:
             self.hsf.flag_field(object_name=object_name, external_id=external_id, flag_name=updated_flag, value=False, ids=all_sf_ids[object_name])
 
 
-    # this method will create xls files with comparisons of data from 2 salesforce sources
-    # it can only really be run locally and also requires a second set of salesforce credentials
-    # it isn't well fleshed out, but it works
-    # What makes it helpful for testers is to have the output_folder set to something that is mapped to Sharepoint
     def compare_records(self):
+        """
+            this method will create xls files with comparisons of data from 2 salesforce sources
+            it can only really be run locally and also requires a second set of salesforce credentials
+            it isn't well fleshed out, but it works
+            What makes it helpful for testers is to have the output_folder set to something that is mapped to Sharepoint        
+
+            NOTE: this probably doesn't work anymore (post 2024)
+        """
         logger.info(f"Comparing records: {person_ids}")
         output_folder = os.getenv("output_folder", "../test_output/")
 
