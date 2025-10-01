@@ -309,14 +309,6 @@ class SalesforceTransformer:
                                 value = None
                         
 
-                        if isinstance(value, bool):
-                            if value:
-                                value = 1
-                            else:
-                                value = 0
-                        # logger.debug(f"      value: {value}")
-
-
                         if object_name not in current_record:
                             current_record[object_name] = {}
                         
