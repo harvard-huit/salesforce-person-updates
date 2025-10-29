@@ -388,7 +388,19 @@ class SalesforcePersonUpdates:
         logger.info(f"Finished spot data load: {self.run_id}")
 
     def update_people_data_load(self, watermark: datetime=None, updates_only=False):
+        """
+        This is driven by the watermark, it updates all records that have changed since the watermark
+          by querying the PDS for records with a cacheUpdateDate greater than the watermark.
+
+        Parameters
+        ----------
+        watermark: datetime
+            The watermark to use for filtering updates
+        updates_only: bool
+            Whether to only include updates
+        """
         
+        updated_count = 0
         if not watermark:
             watermark = self.app_config.watermarks['person']
 
@@ -410,11 +422,14 @@ class SalesforcePersonUpdates:
 
             # This will limit all updates to only those that already exist in Salesforce
             updated_ids = self.hsf.get_all_external_ids(object_name='Contact', external_id=self.app_config.config['Contact']['Id']['salesforce'])
-            if len(updated_ids) > 100000:
-                logger.warning(f"Updated id list may be too large for the PDS to handle: {len(updated_ids)}")
-            pds_query['conditions'][self.app_config.config['Contact']['Id']['pds']] = updated_ids
 
-        updated_count = self.people_data_load(pds_query=pds_query)
+            # we paginate through the updated_ids in chunks of 10000 to avoid hitting the post body limit in apigee
+            for i in range(0, len(updated_ids), 10000):
+                pds_query['conditions'][self.app_config.config['Contact']['Id']['pds']] = updated_ids[i:i+10000]
+                updated_count += self.people_data_load(pds_query=pds_query)
+
+        else:
+            updated_count = self.people_data_load(pds_query=pds_query)
 
         if 'updatedFlag' in self.app_config.config['Contact']:
             updated_flag = self.app_config.config['Contact']['updatedFlag']
@@ -762,7 +777,8 @@ class SalesforcePersonUpdates:
 
         logger.warning(f"Delete Done, I hope you meant to do that.")
 
-    def cleanup_updateds(self):
+    def cleanup_updateds(self, is_testing=False):
+
         # 1. Get all objects that have an updatedFlag
         # and set up a hash for all of the ids we find in salesforce
         all_sf_ids = {}
@@ -796,8 +812,9 @@ class SalesforcePersonUpdates:
                         fields_needed.append(pds_id_name)
                         field_object_map[pds_id_name] = object_name
                 
-                all_sf_ids[object_name] = self.hsf.get_all_external_ids(object_name=object_name, external_id=external_id, updated_flag_name=updated_flag, updated_flag_value=updated_flag_value)
-                logger.info(f"{object_name}: {len(all_sf_ids[object_name])} records to check")
+                if not is_testing:
+                    all_sf_ids[object_name] = self.hsf.get_all_external_ids(object_name=object_name, external_id=external_id, updated_flag_name=updated_flag, updated_flag_value=updated_flag_value)
+                    logger.info(f"{object_name}: {len(all_sf_ids[object_name])} records to check")
 
 
         # 3. Call PDS with the IDs from Contact with the fields gathered from the config
@@ -815,6 +832,7 @@ class SalesforcePersonUpdates:
                 temp_pds_query['conditions'].append({key: value})
         elif isinstance(self.app_config.pds_query['conditions'], list):
             temp_pds_query['conditions'] = self.app_config.pds_query['conditions']
+
         
         self.pds.batch_size = 800
         # step through the sf ids 800 at a time
@@ -884,6 +902,7 @@ class SalesforcePersonUpdates:
             if len(all_sf_ids[object_name]) == len(self.hsf.get_all_external_ids(object_name=object_name, external_id=self.app_config.config[object_name]['Id']['salesforce'], updated_flag_name=self.app_config.config[object_name]['updatedFlag'], updated_flag_value=True)):
                 raise Exception(f"Something went wrong, all {object_name} records are not updating: {len(all_sf_ids[object_name])}")
             logger.info(f"Found {len(all_sf_ids[object_name])} ids in {object_name} that are no longer updating")
+            logger.info(all_sf_ids)
             external_id = self.app_config.config[object_name]['Id']['salesforce']
             updated_flag = self.app_config.config[object_name]['updatedFlag']
             self.hsf.flag_field(object_name=object_name, external_id=external_id, flag_name=updated_flag, value=False, ids=all_sf_ids[object_name])
