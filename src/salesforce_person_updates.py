@@ -902,7 +902,7 @@ class SalesforcePersonUpdates:
             if len(all_sf_ids[object_name]) == len(self.hsf.get_all_external_ids(object_name=object_name, external_id=self.app_config.config[object_name]['Id']['salesforce'], updated_flag_name=self.app_config.config[object_name]['updatedFlag'], updated_flag_value=True)):
                 raise Exception(f"Something went wrong, all {object_name} records are not updating: {len(all_sf_ids[object_name])}")
             logger.info(f"Found {len(all_sf_ids[object_name])} ids in {object_name} that are no longer updating")
-            logger.info(all_sf_ids)
+            # logger.info(all_sf_ids)
             external_id = self.app_config.config[object_name]['Id']['salesforce']
             updated_flag = self.app_config.config[object_name]['updatedFlag']
             self.hsf.flag_field(object_name=object_name, external_id=external_id, flag_name=updated_flag, value=False, ids=all_sf_ids[object_name])
