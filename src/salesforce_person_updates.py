@@ -833,15 +833,14 @@ class SalesforcePersonUpdates:
         elif isinstance(self.app_config.pds_query['conditions'], list):
             temp_pds_query['conditions'] = self.app_config.pds_query['conditions']
 
-        excluded_conditions_for_cleanup = self.app_config.config.get('excluded_conditions_for_cleanup', [
+        excluded_conditions_for_cleanup = [
             "names.list_or_official"
-        ])
+        ]
 
-        for condition_key, condition_value in temp_pds_query['conditions']:
-            if condition_key in excluded_conditions_for_cleanup:
-                logger.info(f"Removing condition {condition_key} from cleanup pds query")
-                temp_pds_query['conditions'].remove({condition_key: condition_value})
-
+        for condition in temp_pds_query['conditions']:
+            if list(condition.keys())[0] in excluded_conditions_for_cleanup:
+                logger.info(f"Removing condition {condition.keys()[0]} from cleanup pds query")
+                temp_pds_query['conditions'].remove(condition)
         
         self.pds.batch_size = 800
         # step through the sf ids 800 at a time
