@@ -839,7 +839,7 @@ class SalesforcePersonUpdates:
 
         for condition in temp_pds_query['conditions']:
             if list(condition.keys())[0] in excluded_conditions_for_cleanup:
-                logger.info(f"Removing condition {condition.keys()[0]} from cleanup pds query")
+                logger.info(f"Removing condition {list(condition.keys())[0]} from cleanup pds query")
                 temp_pds_query['conditions'].remove(condition)
         
         self.pds.batch_size = 800
