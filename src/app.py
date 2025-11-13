@@ -281,7 +281,6 @@ try:
     elif action == "test":
         logger.info(f"test action called")
 
-
         logger.info(f"test action finished")
     else: 
         logger.warning(f"App triggered without a valid action: {action}, please see documentation for more information.")
